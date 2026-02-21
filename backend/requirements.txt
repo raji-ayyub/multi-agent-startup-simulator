@@ -1,0 +1,4 @@
+sqlalchemy
+fastapi
+dotenv
+psycopg2
