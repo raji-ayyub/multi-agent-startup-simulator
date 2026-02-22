@@ -5,7 +5,7 @@
 ### 1. Install Dependencies
 
 ```bash
-source b_venv/bin/activate  
+source b_venv/bin/activate
 
 pip install -r requirements.txt
 ```
@@ -143,6 +143,120 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 }
 ```
 
+### Request Password Reset
+
+Initiate a password reset by requesting a reset token. In a production system, this token would be sent via email.
+
+**Endpoint**: `POST /auth/request-password-reset`
+
+**Request Body**:
+
+```json
+{
+  "email": "founder@example.com"
+}
+```
+
+**Response** (200 OK):
+
+```json
+{
+  "message": "Password reset token sent to email",
+  "reset_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_expires_in_minutes": 15
+}
+```
+
+**Notes**:
+
+- Token is valid for 15 minutes by default
+- In production, this token would be sent via email link instead of returned in response
+- Example email link: `https://yourapp.com/reset-password?token=<reset_token>`
+
+### Reset Password
+
+Reset password using a valid reset token (e.g., from email link).
+
+**Endpoint**: `POST /auth/reset-password`
+
+**Request Body**:
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "new_password": "newsecurepassword123"
+}
+```
+
+**Response** (200 OK):
+
+```json
+{
+  "message": "Password reset successfully",
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer",
+  "user": {
+    "id": 1,
+    "email": "founder@example.com",
+    "full_name": "John Doe",
+    "company_name": "TechStartup Inc",
+    "is_active": true,
+    "created_at": "2026-02-21T10:30:00",
+    "updated_at": "2026-02-21T10:30:00"
+  }
+}
+```
+
+**Error Cases**:
+
+- Invalid or expired token → 401 Unauthorized
+- Password doesn't meet requirements → 400 Bad Request
+
+### Change Password
+
+Change password for an authenticated user. Requires current password verification.
+
+**Endpoint**: `POST /auth/change-password`
+
+**Headers**:
+
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+```
+
+**Request Body**:
+
+```json
+{
+  "email": "founder@example.com",
+  "current_password": "oldpassword123",
+  "new_password": "newsecurepassword123"
+}
+```
+
+**Response** (200 OK):
+
+```json
+{
+  "message": "Password changed successfully",
+  "user": {
+    "id": 1,
+    "email": "founder@example.com",
+    "full_name": "John Doe",
+    "company_name": "TechStartup Inc",
+    "is_active": true,
+    "created_at": "2026-02-21T10:30:00",
+    "updated_at": "2026-02-21T10:30:00"
+  }
+}
+```
+
+**Error Cases**:
+
+- Current password is incorrect → 401 Unauthorized
+- New password doesn't meet requirements → 400 Bad Request
+- User not found → 404 Not Found
+
 ---
 
 ## Error Responses
@@ -227,7 +341,9 @@ backend/
 3. **Protected Routes**: Add middleware to validate tokens for protected endpoints
 4. **Refresh Tokens**: Implement refresh token mechanism for better security
 5. **Email Verification**: Add email verification step on sign up
-6. **Password Reset**: Implement forgot password flow
+6. **Email Notifications**: Send password reset links via email instead of returning token in response
+7. **Rate Limiting**: Add rate limiting to prevent brute force attacks
+8. **Audit Logging**: Log authentication events for security monitoring
 
 ---
 
