@@ -3,6 +3,8 @@ import { useAuthStore } from "../../store/authStore";
 import { Link, useParams } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 
+import AuthLayout from "../../components/layout/AuthLayout";
+
 export default function ResetPassword() {
   const { resetPasswordConfirm, isLoading } = useAuthStore();
   const { token } = useParams();
@@ -28,44 +30,9 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-black text-white">
 
-      {/* LEFT SIDE */}
-      <div className="hidden lg:flex relative overflow-hidden">
-        {/* Background Image */}
-        <div className="absolute inset-0 bg-[url('/images/business-suit.jpg')] bg-cover bg-center bg-no-repeat"></div>
-
-        {/* Gradient Overlay (Sharp, Not Blurry) */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/60 to-black/80"></div>
-
-        <div className="relative z-10 flex flex-col justify-between h-full p-12">
-          <div>
-            <h1 className="text-5xl font-extrabold mb-6 tracking-tight">
-              PentraAI
-            </h1>
-            <p className="text-lg leading-relaxed max-w-md text-gray-300">
-              Secure your account and continue building with confidence.
-              PentraAI delivers enterprise-grade AI workflows with precision,
-              speed, and reliability.
-            </p>
-          </div>
-
-          <div>
-            <p className="text-sm font-medium mb-4 text-gray-400">
-              Trusted by modern teams
-            </p>
-            <div className="flex -space-x-3">
-              <div className="w-10 h-10 bg-gray-300 rounded-full border-2 border-white" />
-              <div className="w-10 h-10 bg-gray-400 rounded-full border-2 border-white" />
-              <div className="w-10 h-10 bg-gray-500 rounded-full border-2 border-white" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* RIGHT SIDE */}
-      <div className="flex items-center justify-center px-6 py-12 lg:px-16">
-        <div className="w-full max-w-md bg-[#0f172a] p-10 rounded-2xl shadow-2xl shadow-black/40 border border-slate-800">
+    <AuthLayout>
+      <div className="w-full max-w-md bg-[#0f172a] p-10 rounded-2xl shadow-2xl shadow-black/40 border border-slate-800">
 
           <h2 className="text-3xl font-bold mb-2 tracking-tight">
             Reset Password
@@ -142,7 +109,8 @@ export default function ResetPassword() {
             SECURED BY PENTRA PROTOCOL
           </p>
         </div>
-      </div>
-    </div>
+    </AuthLayout>
+
+    
   );
 }
