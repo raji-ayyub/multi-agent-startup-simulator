@@ -11,11 +11,11 @@ const AuthLayout = ({ children }) => {
         <div className="absolute inset-0 bg-black/70" />
 
         {/* Logo */}
-        <div className="absolute top-10 left-10 flex items-center gap-3 z-20">
+        <div className="absolute top-10 left-10 flex items-center justify-center  gap-3 z-20">
           <img
-            src="/images/pentralogo.jpg"
+            src="/images/Icon.svg"
             alt="Logo"
-            className="w-10 h-10"
+            className="w-10 h-10  flex items-center justify-center  bg-black p-1 rounded-xl"
           />
           <h1 className="text-2xl font-bold">PentraAI</h1>
         </div>
