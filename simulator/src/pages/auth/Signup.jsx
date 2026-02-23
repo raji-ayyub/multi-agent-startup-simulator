@@ -79,14 +79,37 @@ export default function Signup() {
      
 
       <AuthLayout>
-        <div className="w-full max-w-md bg-[#0b1220] rounded-2xl shadow-2xl p-8 border border-slate-800">
-
+      <div className="w-full max-w-md bg-transparent rounded-2xl shadow-2xl shadow-black/40 p-8 sm:p-10">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold mb-2">Create Account</h2>
             <p className="text-gray-400 text-sm">
               Join the elite AI enterprise network
             </p>
           </div>
+
+  <div className="flex flex-col space-y-3 mb-6">
+  <button className="flex items-center justify-center bg-[transparent] text-white border border-slate-800 py-2 rounded-lg hover:opacity-90 transition">
+    <img 
+    src="/images/google.svg" 
+    alt="Google Logo" 
+    className="w-5 h-5 mr-2" />
+    Sign up with Google
+  </button>
+
+  <button className="flex items-center justify-center bg-[transparent] text-white border border-slate-800 py-2 rounded-lg hover:opacity-90 transition">
+    <img src="/images/Key.svg"
+     alt="SSO Logo" 
+     className="w-5 h-5 mr-2" />
+    Single Sign-On (SSO)
+  </button>
+        {/* Divider */}
+      <div className="flex items-center my-4">
+        <hr className="flex-grow border-slate-700" />
+        <span className="mx-2 text-gray-400 text-sm">or continue with Email</span>
+        <hr className="flex-grow border-slate-700" />
+      </div>
+
+</div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
 
@@ -187,7 +210,7 @@ export default function Signup() {
 
           <div className="mt-6 text-center text-sm text-gray-400">
             Already registered?{" "}
-            <Link to="/login" className="text-white hover:underline">
+            <Link to="/login" className="text-yellow-200 hover:underline">
               Log in
             </Link>
           </div>
