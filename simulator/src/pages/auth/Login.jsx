@@ -27,7 +27,7 @@ export default function Login() {
      
 
       <AuthLayout>
-         <div className="w-full max-w-md bg-[#0b1220] rounded-2xl shadow-2xl shadow-black/40 p-8 sm:p-10">
+         <div className="w-full max-w-md bg-transparent rounded-2xl shadow-2xl shadow-black/40 p-8 sm:p-10">
 
           {/* Header */}
           <div className="text-center mb-8">
@@ -40,16 +40,22 @@ export default function Login() {
           </div>
 
           {/* OAuth Buttons */}
-          <div className="space-y-4 mb-8">
-            <button className="w-full border border-slate-700 py-3 rounded-lg hover:bg-slate-900 transition">
-              Sign in with Google
-            </button>
+        <div className="flex flex-col space-y-3 mb-6">
+        <button className="flex items-center justify-center bg-[transparent] text-white border border-slate-800 py-2 rounded-lg hover:opacity-90 transition">
+        <img 
+        src="/images/google.svg" 
+        alt="Google Logo" 
+       className="w-5 h-5 mr-2" />
+       Sign up with Google
+     </button>
 
-            <button className="w-full border border-slate-700 py-3 rounded-lg hover:bg-slate-900 transition">
-              Single Sign-On (SSO)
-            </button>
-          </div>
-
+      <button className="flex items-center justify-center bg-[transparent] text-white border border-slate-800 py-2 rounded-lg hover:opacity-90 transition">
+      <img src="/images/Key.svg"
+      alt="SSO Logo" 
+      className="w-5 h-5 mr-2 filter-black" />
+      Single Sign-On (SSO)
+     </button>
+   </div>
           {/* Divider */}
           <div className="flex items-center mb-8">
             <div className="flex-1 h-px bg-slate-800"></div>
@@ -101,7 +107,7 @@ export default function Login() {
               <div className="mt-2 text-right">
                 <Link
                   to="/forgot-password"
-                  className="text-xs text-indigo-400 hover:underline"
+                  className="text-xs text-yellow-200 hover:underline"
                 >
                   Forgot password?
                 </Link>
@@ -121,7 +127,7 @@ export default function Login() {
           {/* Footer */}
           <div className="mt-6 text-center text-sm text-slate-400">
             Don’t have an account?{" "}
-            <Link to="/signup" className="text-white hover:underline">
+            <Link to="/signup" className="text-yellow-200 hover:underline">
               Sign up
             </Link>
           </div>

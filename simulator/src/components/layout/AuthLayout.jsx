@@ -8,7 +8,7 @@ const AuthLayout = ({ children }) => {
 
         {/* Background */}
         <div className="absolute inset-0 bg-[url('/images/business-suit.jpg')] bg-cover bg-center" />
-        <div className="absolute inset-0 bg-black/70" />
+        <div className="absolute inset-0 bg-black/85" />
 
         {/* Logo */}
         <div className="absolute top-10 left-10 flex items-center justify-center  gap-3 z-20">
