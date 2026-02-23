@@ -3,6 +3,8 @@ import { useAuthStore } from "../../store/authStore";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 
+import AuthLayout from "../../components/layout/AuthLayout";
+
 export default function Login() {
   const { login, isLoading } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
@@ -21,42 +23,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-black text-white">
 
-      {/* ================= LEFT PANEL ================= */}
-      <div className="hidden lg:block relative">
-        <div className="absolute inset-0 bg-[url('/images/business-suit.jpg')] bg-cover bg-center bg-no-repeat" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/60 to-black/80" />
+     
 
-        <div className="relative z-10 flex flex-col justify-between h-full px-16 py-20">
-          <div>
-            <h1 className="text-5xl font-extrabold mb-6 tracking-tight">
-              PentraAI
-            </h1>
-            <p className="text-xl text-gray-300 max-w-md leading-relaxed">
-              Supercharge your enterprise workflow with AI precision.
-              Experience the next generation of business intelligence.
-              Join <span className="font-semibold text-white">500+ companies</span> scaling smarter.
-            </p>
-          </div>
-
-          <div>
-            <p className="text-sm text-gray-400 mb-4">
-              Trusted by innovative teams
-            </p>
-            <div className="flex -space-x-3">
-              <div className="w-10 h-10 bg-gray-300 rounded-full border-2 border-white" />
-              <div className="w-10 h-10 bg-gray-400 rounded-full border-2 border-white" />
-              <div className="w-10 h-10 bg-gray-500 rounded-full border-2 border-white" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ================= RIGHT PANEL ================= */}
-      <div className="flex items-center justify-center px-6 py-12 sm:px-8">
-
-        <div className="w-full max-w-md bg-[#0b1220] rounded-2xl shadow-2xl shadow-black/40 p-8 sm:p-10">
+      <AuthLayout>
+         <div className="w-full max-w-md bg-[#0b1220] rounded-2xl shadow-2xl shadow-black/40 p-8 sm:p-10">
 
           {/* Header */}
           <div className="text-center mb-8">
@@ -160,7 +131,8 @@ export default function Login() {
           </p>
 
         </div>
-      </div>
-    </div>
+      </AuthLayout>
+
+     
   );
 }

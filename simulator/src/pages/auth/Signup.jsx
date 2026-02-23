@@ -5,6 +5,8 @@ import { useAuthStore } from "../../store/authStore";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 
+import AuthLayout from "../../components/layout/AuthLayout";
+
 export default function Signup() {
   const { signup, isLoading } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
@@ -73,66 +75,10 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen grid grid-cols-1 md:grid-cols-2 bg-black text-white">
 
-      {/* ================= LEFT PANEL ================= */}
-      <div className="hidden md:block relative overflow-hidden">
+     
 
-        {/* Background */}
-        <div className="absolute inset-0 bg-[url('/images/business-suit.jpg')] bg-cover bg-center" />
-        <div className="absolute inset-0 bg-black/70" />
-
-        {/* Logo */}
-        <div className="absolute top-10 left-10 flex items-center gap-3 z-20">
-          <img
-            src="/images/pentralogo.jpg"
-            alt="Logo"
-            className="w-10 h-10"
-          />
-          <h1 className="text-2xl font-bold">PentraAI</h1>
-        </div>
-
-        {/* Hero Content */}
-        <div className="relative z-10 flex flex-col justify-between h-full px-16 py-20">
-
-          <div className="flex flex-col justify-center flex-1 mt-24">
-            <h2 className="text-5xl font-extrabold leading-tight max-w-xl">
-              Supercharge your enterprise{" "}
-              <span className="bg-white text-black px-3 py-1 rounded-md">
-                workflow
-              </span>{" "}
-              with AI precision.
-            </h2>
-
-            <p className="mt-6 text-gray-300 max-w-md">
-              Join over <span className="text-white font-semibold">500+ enterprises</span>{" "}
-              scaling with PentraAI.
-            </p>
-          </div>
-
-          {/* Trusted */}
-          <div className="flex items-center gap-4">
-            <div className="flex -space-x-3">
-              {["user1.jpg", "user2.jpg", "user3.jpg"].map((img, i) => (
-                <img
-                  key={i}
-                  src={`/images/${img}`}
-                  alt="team"
-                  className="w-10 h-10 rounded-full object-cover border-2 border-black"
-                />
-              ))}
-            </div>
-            <p className="text-sm text-gray-400">
-              Trusted by world-class teams
-            </p>
-          </div>
-
-        </div>
-      </div>
-
-      {/* ================= RIGHT PANEL ================= */}
-      <div className="flex items-center justify-end px-8 lg:px-20 py-12 bg-gradient-to-br from-black via-[#0b1220] to-black">
-
+      <AuthLayout>
         <div className="w-full max-w-md bg-[#0b1220] rounded-2xl shadow-2xl p-8 border border-slate-800">
 
           <div className="text-center mb-8">
@@ -247,7 +193,9 @@ export default function Signup() {
           </div>
 
         </div>
-      </div>
-    </div>
+      </AuthLayout>
+
+      
+   
   );
 }
