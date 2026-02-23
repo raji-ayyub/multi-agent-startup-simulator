@@ -1,3 +1,6 @@
+
+
+
 import { useState } from "react";
 import { useAuthStore } from "../../store/authStore";
 import { Link, useParams } from "react-router-dom";
@@ -30,20 +33,32 @@ export default function ResetPassword() {
   };
 
   return (
-
     <AuthLayout>
-      <div className="w-full max-w-md bg-[#0f172a] p-10 rounded-2xl shadow-2xl shadow-black/40 border border-slate-800">
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a] px-4">
+        <div className="w-full max-w-md">
 
-          <h2 className="text-3xl font-bold mb-2 tracking-tight">
+          {/* LOGO */}
+          <div className="flex justify-center mb-6">
+            <img 
+              src="/images/reset.svg" 
+              alt="Logo" 
+              className="h-12 w-auto"
+            />
+          </div>
+
+          {/* Heading */}
+          <h2 className="text-3xl font-bold mb-2 tracking-tight text-white text-center">
             Reset Password
           </h2>
-          <p className="text-gray-400 mb-8">
+          <p className="text-gray-400 mb-8 text-center">
             Enter your new password to regain access to your account.
           </p>
 
           {/* FORM */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-
+          <form 
+            onSubmit={handleSubmit} 
+            className="space-y-6 bg-[#0f172a] p-10 rounded-2xl shadow-2xl shadow-black/40 border border-slate-800"
+          >
             {/* New Password */}
             <div className="relative">
               <label className="block text-sm mb-2 text-gray-300">
@@ -92,7 +107,7 @@ export default function ResetPassword() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-white text-black font-semibold py-3 rounded-xl hover:opacity-90 transition shadow-lg"
+              className="w-full bg-[#CED87C] text-black font-semibold py-3 rounded-xl hover:opacity-90 transition shadow-lg"
             >
               {isLoading ? "Resetting..." : "Reset Password"}
             </button>
@@ -105,12 +120,12 @@ export default function ResetPassword() {
             </Link>
           </p>
 
+          {/* Footer */}
           <p className="mt-8 text-xs text-slate-600 text-center tracking-wider">
             SECURED BY PENTRA PROTOCOL
           </p>
         </div>
+      </div>
     </AuthLayout>
-
-    
   );
 }
