@@ -8,7 +8,7 @@ const AuthLayout = ({ children }) => {
 
         {/* Background */}
         <div className="absolute inset-0 bg-[url('/images/business-suit.jpg')] bg-cover bg-center" />
-        <div className="absolute inset-0 bg-black/85" />
+        <div className="absolute inset-0 bg-gray-700/75" />
 
         {/* Logo */}
         <div className="absolute top-10 left-10 flex items-center justify-center  gap-3 z-20">
@@ -26,10 +26,13 @@ const AuthLayout = ({ children }) => {
           <div className="flex flex-col justify-center flex-1 mt-24">
             <h2 className="text-5xl font-extrabold leading-tight max-w-xl">
               Supercharge your enterprise{" "}
-              <span className="bg-white text-black px-3 py-1 rounded-md">
+              <br />
+              <span className=" text-black text-6xl  py-1 rounded-md">
                 workflow
               </span>{" "}
-              with AI precision.
+              with 
+              <br />
+              AI precision.
             </h2>
 
             <p className="mt-6 text-gray-300 max-w-md">
