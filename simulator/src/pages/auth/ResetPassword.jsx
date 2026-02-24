@@ -1,11 +1,7 @@
-
-
-
 import { useState } from "react";
 import { useAuthStore } from "../../store/authStore";
 import { Link, useParams } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
-
 import AuthLayout from "../../components/layout/AuthLayout";
 
 export default function ResetPassword() {
@@ -37,32 +33,32 @@ export default function ResetPassword() {
       <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a] px-4">
         <div className="w-full max-w-md">
 
-          {/* LOGO */}
+          {/* TOP LOGO */}
           <div className="flex justify-center mb-6">
-            <img 
-              src="/images/reset.svg" 
-              alt="Logo" 
+            <img
+              src="/images/reset.svg"
+              alt="Logo"
               className="h-12 w-auto"
             />
           </div>
 
           {/* Heading */}
-          <h2 className="text-3xl font-bold mb-2 tracking-tight text-white text-center">
+          <h2 className="text-3xl font-bold mb-2 text-center text-white">
             Reset Password
           </h2>
-          <p className="text-gray-400 mb-8 text-center">
+          <p className="text-gray-400 mb-8 text-center text-sm">
             Enter your new password to regain access to your account.
           </p>
 
           {/* FORM */}
-          <form 
-            onSubmit={handleSubmit} 
+          <form
+            onSubmit={handleSubmit}
             className="space-y-6 bg-[#0f172a] p-10 rounded-2xl shadow-2xl shadow-black/40 border border-slate-800"
           >
             {/* New Password */}
             <div className="relative">
               <label className="block text-sm mb-2 text-gray-300">
-                New Password
+                 Enter New Password
               </label>
               <input
                 type={showPassword ? "text" : "password"}
@@ -103,27 +99,52 @@ export default function ResetPassword() {
               </span>
             </div>
 
-            {/* Submit */}
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#CED87C] text-black font-semibold py-3 rounded-xl hover:opacity-90 transition shadow-lg"
+              className="w-full bg-[#CED87C] text-black font-semibold py-3 rounded-xl hover:opacity-90 transition"
             >
               {isLoading ? "Resetting..." : "Reset Password"}
             </button>
+
+            {/* Back to login - stays in the same div */}
+            <p className="mt-4 text-center text-sm text-slate-400 flex items-center justify-center gap-1">
+              <img
+                src="/images/backicon.svg"
+                alt="back icon"
+                className="h-4 w-4"
+              />
+              <Link to="/login" className="text-white hover:underline">
+                Back to login
+              </Link>
+            </p>
+
           </form>
 
-          {/* Back Link */}
-          <p className="mt-6 text-center text-sm text-slate-400">
-            <Link to="/login" className="text-white hover:underline">
-              ← Back to Login
-            </Link>
-          </p>
-
-          {/* Footer */}
-          <p className="mt-8 text-xs text-slate-600 text-center tracking-wider">
+          {/* Security Section */}
+          <p className="mt-6 text-xs text-slate-600 text-center tracking-wide">
             SECURED BY PENTRA PROTOCOL
           </p>
+
+          <div className="flex justify-center items-center gap-4 mt-3">
+            <img
+              src="/images/shield-check.svg"
+              alt="security logo 1"
+              className="h-6 w-auto opacity-70"
+            />
+            <img
+              src="/images/shield.svg"
+              alt="security logo 2"
+              className="h-6 w-auto opacity-70"
+            />
+            <img
+              src="/images/shield-key.svg"
+              alt="security logo 3"
+              className="h-6 w-auto opacity-70"
+            />
+          </div>
+
         </div>
       </div>
     </AuthLayout>
