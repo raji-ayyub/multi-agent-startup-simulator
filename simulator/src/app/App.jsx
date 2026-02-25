@@ -200,6 +200,7 @@ const DocumentUpload = lazy(() => import("../pages/workforce/DocumentUpload"));
 const WorkforceDashboard = lazy(() => import("../pages/workforce/WorkforceDashboard"));
 const Profile = lazy(() => import("../pages/Profile"));
 const Settings = lazy(() => import("../pages/Settings"));
+const About = lazy(() => import("../pages/About"));
 
 // =====================
 // Reusable Error Pages
@@ -298,6 +299,16 @@ export default function App() {
           <Route
             path="/reset-password"
             element={<PublicRoute><PublicLayout><ResetPassword /></PublicLayout></PublicRoute>}
+          />
+           <Route
+            path="/about"
+            element={
+              <PublicRoute>
+                <AuthLayout>
+                  <About />
+                </AuthLayout>
+              </PublicRoute>
+            }
           />
 
           {/* DEFAULT ROUTE */}
