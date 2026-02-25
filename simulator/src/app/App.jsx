@@ -629,7 +629,7 @@ export default function App() {
           <Route path="/simulation/run" element={<ProtectedRoute><AuthLayout><SimulationRunner /></AuthLayout></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><AuthLayout><Profile /></AuthLayout></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><AuthLayout><Settings /></AuthLayout></ProtectedRoute>} />
-          <Route path="/settings" element={<LandingPage />} />
+          <Route path="/home" element={<LandingPage />} />
 
           {/* 404 */}
           <Route path="*" element={<div className="flex items-center justify-center min-h-screen bg-slate-950 text-white"><h1 className="text-2xl">404 - Page Not Found</h1></div>} />
