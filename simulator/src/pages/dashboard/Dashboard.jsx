@@ -1,39 +1,34 @@
-import React, { useEffect, useState, lazy, Suspense } from "react";
-import { FaRocket } from "react-icons/fa";
-import { useAuthStore } from "../../store/authStore";
-
-// :white_check_mark: Lazy-load the modal with explicit .jsx extension
-const EnvisioningModal = lazy(() => import("./components/EnvisioningModal.jsx"));
+nnnnimport React, { useState } from "react";
+import EnvisioningModal from "../../components/EnvisioningModal"; // Correct relative path
 
 export default function Dashboard() {
-  const { user, dashboardData, fetchDashboard, isLoading } = useAuthStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch dashboard data on mount
-  useEffect(() => {
-    if (!dashboardData) fetchDashboard();
-  }, [dashboardData, fetchDashboard]);
+  // Mock user & data
+  const user = { fullName: "John Doe" };
+  const dashboardData = {
+    stats: { marketViability: 72, investorConfidence: 65, customerDemand: 88 },
+    messages: ["Welcome to PentraAI!", "Your first simulation is ready."],
+  };
+  const isLoading = false;
 
-  // Metrics array
   const metrics = [
-    { title: "Market Viability", score: dashboardData?.stats?.marketViability || 0 },
-    { title: "Investor Confidence", score: dashboardData?.stats?.investorConfidence || 0 },
-    { title: "Customer Demand", score: dashboardData?.stats?.customerDemand || 0 },
+    { title: "Market Viability", score: dashboardData.stats.marketViability },
+    { title: "Investor Confidence", score: dashboardData.stats.investorConfidence },
+    { title: "Customer Demand", score: dashboardData.stats.customerDemand },
   ];
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans p-8">
-      {/* Header */}
+      {/* Greeting */}
       <h1 className="text-3xl font-bold mb-2">
-        Hello {user?.fullName?.split(" ")[0] || "User"}
+        Hello {user.fullName.split(" ")[0]}
       </h1>
       <p className="text-gray-400 mb-6">Welcome to PentraAI</p>
 
       {/* Simulation CTA */}
       <div className="bg-gray-800 p-6 rounded-lg mb-8 text-center">
-        <div className="flex justify-center mb-4">
-          <FaRocket className="text-4xl text-gray-400" />
-        </div>
+        <div className="text-4xl mb-4">🚀</div>
         <h2 className="text-lg font-semibold mb-2">
           Ready to simulate your first startup idea?
         </h2>
@@ -51,18 +46,21 @@ export default function Dashboard() {
           <div key={title} className="bg-gray-800 p-4 rounded">
             <div className="flex justify-between mb-1">
               <h3 className="text-sm text-gray-400">{title}</h3>
-              <span className="text-sm text-gray-300">{isLoading ? "--%" : `${score}%`}</span>
+              <span className="text-sm text-gray-300">
+                {isLoading ? "--%" : `${score}%`}
+              </span>
             </div>
-            {isLoading ? (
-              <div className="h-6 bg-gray-700 rounded animate-pulse"></div>
-            ) : (
-              <div className="h-6 bg-green-500 rounded transition-all duration-500" style={{ width: `${score}%` }}></div>
-            )}
+            <div
+              className={`h-6 rounded ${
+                isLoading ? "bg-gray-700 animate-pulse" : "bg-green-500"
+              }`}
+              style={{ width: isLoading ? "100%" : `${score}%` }}
+            />
           </div>
         ))}
       </div>
 
-      {/* Messages Section */}
+      {/* Messages */}
       <div>
         <h2 className="text-lg font-semibold mb-2">Messages</h2>
         {isLoading ? (
@@ -70,7 +68,7 @@ export default function Dashboard() {
             <div className="h-4 bg-gray-700 rounded animate-pulse"></div>
             <div className="h-4 bg-gray-700 rounded animate-pulse"></div>
           </div>
-        ) : dashboardData?.messages?.length ? (
+        ) : dashboardData.messages.length ? (
           <ul className="space-y-2">
             {dashboardData.messages.map((msg, idx) => (
               <li key={idx} className="bg-gray-700 p-2 rounded">
@@ -83,18 +81,8 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Lazy-loaded Envisioning Modal */}
-      {isModalOpen && (
-        <Suspense
-          fallback={
-            <div className="fixed inset-0 flex items-center justify-center text-white">
-              Loading Modal...
-            </div>
-          }
-        >
-          <EnvisioningModal onClose={() => setIsModalOpen(false)} />
-        </Suspense>
-      )}
+      {/* Envisioning Modal */}
+      {isModalOpen && <EnvisioningModal onClose={() => setIsModalOpen(false)} />}
     </div>
   );
 }
