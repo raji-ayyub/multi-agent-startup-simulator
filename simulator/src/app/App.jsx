@@ -547,11 +547,9 @@
 // }
 
 
+import React, { Suspense, lazy, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
-import React, { Suspense, lazy } from "react";
-
-// Layouts
 import Sidebar from "../components/layout/Sidebar";
 import Navbar from "../components/layout/Navbar";
 
@@ -561,75 +559,34 @@ import LandingPage from "../components/layout/LandingPage"; // Correct path
 // Loading Spinner
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center min-h-[70vh]">
-    <p className="text-slate-400">Loading...</p>
+    <p className="text-slate-400 text-lg">Loading...</p>
   </div>
 );
 
-// Lazy-loaded Pages
+// Lazy-loaded pages
 const Login = lazy(() => import("../pages/auth/Login"));
 const Signup = lazy(() => import("../pages/auth/Signup"));
-const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword"));
-const ResetPassword = lazy(() => import("../pages/auth/ResetPassword"));
+const Dashboard = lazy(() => import("../pages/dashboard/Dashboard"));
 const IdeaForm = lazy(() => import("../pages/simulation/IdeaForm"));
 const SimulationRunner = lazy(() => import("../pages/simulation/SimulationRunner"));
-const StrategyDashboard = lazy(() => import("../pages/dashboard/StrategyDashboard"));
-const DocumentUpload = lazy(() => import("../pages/workforce/DocumentUpload"));
-const WorkforceDashboard = lazy(() => import("../pages/workforce/WorkforceDashboard"));
 const Profile = lazy(() => import("../pages/Profile"));
 const Settings = lazy(() => import("../pages/Settings"));
 
-// =====================
-// Reusable Error Pages
-// =====================
-const ErrorPage = ({ code, message }) => (
-  <div className="flex flex-col items-center justify-center min-h-[70vh]">
-    <h1 className="text-3xl font-bold">{code}</h1>
-    <p className="text-slate-400 mt-2">{message}</p>
-  </div>
-);
-
-const NotFound = () => <ErrorPage code="404" message="Page not found" />;
-const Forbidden = () => <ErrorPage code="403" message="You do not have permission to access this page" />;
-
-// =====================
-// Default route per role
-// =====================
-const getDefaultRoute = (role) => {
-  switch (role) {
-    case "Admin": return "/dashboard";
-    case "Company": return "/simulation";
-    case "Analyst": return "/simulation";
-    default: return "/simulation";
-  }
-};
-
-// =====================
-// Protected Route Wrapper
-// =====================
-const ProtectedRoute = ({ children, roles }) => {
-  const { isAuthenticated, role } = useAuthStore();
-
+// Protected Route
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated } = useAuthStore();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-
-  if (roles && roles.length > 0 && !roles.includes(role)) return <Forbidden />;
-
   return children;
 };
 
-// =====================
-// Public Route Wrapper
-// =====================
+// Public Route
 const PublicRoute = ({ children }) => {
-  const { isAuthenticated, role } = useAuthStore();
-
-  if (isAuthenticated) return <Navigate to={getDefaultRoute(role)} replace />;
-
+  const { isAuthenticated } = useAuthStore();
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
   return children;
 };
 
-// =====================
-// Layout Components
-// =====================
+// Layouts
 const AuthLayout = ({ children }) => (
   <div className="flex h-screen bg-slate-950 text-slate-100">
     <Sidebar />
@@ -648,85 +605,34 @@ const PublicLayout = ({ children }) => (
   </div>
 );
 
-// =====================
-// App Component
-// =====================
 export default function App() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, checkAuth } = useAuthStore();
+
+  useEffect(() => {
+    if (checkAuth) checkAuth();
+  }, [checkAuth]);
 
   return (
     <Router>
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
+          {/* Public Routes */}
+          <Route path="/login" element={<PublicRoute><PublicLayout><Login /></PublicLayout></PublicRoute>} />
+          <Route path="/signup" element={<PublicRoute><PublicLayout><Signup /></PublicLayout></PublicRoute>} />
 
-          {/* DEFAULT ROUTE */}
-          <Route
-            path="/"
-            element={
-              isAuthenticated
-                ? <Navigate to="/simulation" replace />
-                : <PublicRoute>
-                    <PublicLayout>
-                      <LandingPage />
-                    </PublicLayout>
-                  </PublicRoute>
-            }
-          />
+          {/* Default Route */}
+          <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
 
-          {/* PUBLIC ROUTES */}
-          <Route
-            path="/login"
-            element={<PublicRoute><PublicLayout><Login /></PublicLayout></PublicRoute>}
-          />
-          <Route
-            path="/signup"
-            element={<PublicRoute><PublicLayout><Signup /></PublicLayout></PublicRoute>}
-          />
-          <Route
-            path="/forgot-password"
-            element={<PublicRoute><PublicLayout><ForgotPassword /></PublicLayout></PublicRoute>}
-          />
-          <Route
-            path="/reset-password"
-            element={<PublicRoute><PublicLayout><ResetPassword /></PublicLayout></PublicRoute>}
-          />
+          {/* Protected Routes */}
+          <Route path="/dashboard" element={<ProtectedRoute><AuthLayout><Dashboard /></AuthLayout></ProtectedRoute>} />
+          <Route path="/simulation" element={<ProtectedRoute><AuthLayout><IdeaForm /></AuthLayout></ProtectedRoute>} />
+          <Route path="/simulation/run" element={<ProtectedRoute><AuthLayout><SimulationRunner /></AuthLayout></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><AuthLayout><Profile /></AuthLayout></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><AuthLayout><Settings /></AuthLayout></ProtectedRoute>} />
+          <Route path="/settings" element={<LandingPage />} />
 
-          {/* PROTECTED ROUTES */}
-          <Route
-            path="/simulation"
-            element={<ProtectedRoute><AuthLayout><IdeaForm /></AuthLayout></ProtectedRoute>}
-          />
-          <Route
-            path="/simulation/run"
-            element={<ProtectedRoute><AuthLayout><SimulationRunner /></AuthLayout></ProtectedRoute>}
-          />
-
-          <Route
-            path="/dashboard"
-            element={<ProtectedRoute roles={["Admin"]}><AuthLayout><StrategyDashboard /></AuthLayout></ProtectedRoute>}
-          />
-
-          <Route
-            path="/workforce/upload"
-            element={<ProtectedRoute roles={["Admin","Company"]}><AuthLayout><DocumentUpload /></AuthLayout></ProtectedRoute>}
-          />
-          <Route
-            path="/workforce/dashboard"
-            element={<ProtectedRoute roles={["Admin","Company"]}><AuthLayout><WorkforceDashboard /></AuthLayout></ProtectedRoute>}
-          />
-
-          <Route
-            path="/profile"
-            element={<ProtectedRoute><AuthLayout><Profile /></AuthLayout></ProtectedRoute>}
-          />
-          <Route
-            path="/settings"
-            element={<ProtectedRoute><AuthLayout><Settings /></AuthLayout></ProtectedRoute>}
-          />
-
-          {/* 404 FALLBACK */}
-          <Route path="*" element={<NotFound />} />
-
+          {/* 404 */}
+          <Route path="*" element={<div className="flex items-center justify-center min-h-screen bg-slate-950 text-white"><h1 className="text-2xl">404 - Page Not Found</h1></div>} />
         </Routes>
       </Suspense>
     </Router>
