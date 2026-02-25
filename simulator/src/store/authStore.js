@@ -1,137 +1,100 @@
+// src/store/authStore.js
 import { create } from "zustand";
-import axios from "axios";
-
-const API_URL = "http://localhost:5000/api/auth"; 
-// 🔁 Change to your real backend URL
-
-// Create axios instance
-const axiosInstance = axios.create({
-  baseURL: API_URL,
-  withCredentials: true, // only if using cookies
-});
-
-// Attach token automatically (JWT support)
-axiosInstance.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
 
 export const useAuthStore = create((set) => ({
+
+  // ================= STATE =================
   user: null,
-  role: null,
+  dashboardData: null,
   isAuthenticated: false,
   isLoading: false,
   error: null,
 
-  // ================= LOGIN =================
+  // ================= CHECK AUTH =================
+  checkAuth: () => {
+    const savedUser = localStorage.getItem("mockUser");
+    if (savedUser) {
+      set({
+        user: JSON.parse(savedUser),
+        isAuthenticated: true,
+      });
+    }
+  },
+
+  // ================= LOGIN (MOCK) =================
   login: async ({ identifier, password }) => {
-    try {
-      set({ isLoading: true, error: null });
+    set({ isLoading: true, error: null });
 
-      const { data } = await axiosInstance.post("/login", {
-        identifier,
-        password,
-      });
+    // Fake delay
+    await new Promise((res) => setTimeout(res, 800));
 
-      // If backend returns token
-      if (data.token) {
-        localStorage.setItem("token", data.token);
-      }
+    const mockUser = {
+      fullName: "Basit Developer",
+      email: identifier,
+    };
 
-      set({
-        user: data.user,
-        role: data.role,
-        isAuthenticated: true,
-        isLoading: false,
-      });
+    localStorage.setItem("mockUser", JSON.stringify(mockUser));
 
-    } catch (err) {
-      set({
-        isLoading: false,
-        error: err.response?.data?.message || "Login failed",
-      });
-    }
+    set({
+      user: mockUser,
+      isAuthenticated: true,
+      isLoading: false,
+    });
+
+    return true;
   },
 
-  // ================= SIGNUP =================
-  signup: async ({ fullName, email, password, role }) => {
-    try {
-      set({ isLoading: true, error: null });
+  // ================= SIGNUP (MOCK) =================
+  signup: async ({ fullName, email }) => {
+    set({ isLoading: true });
 
-      const { data } = await axiosInstance.post("/signup", {
-        fullName,
-        email,
-        password,
-        role,
-      });
+    await new Promise((res) => setTimeout(res, 800));
 
-      if (data.token) {
-        localStorage.setItem("token", data.token);
-      }
+    const mockUser = { fullName, email };
 
-      set({
-        user: data.user,
-        role: data.role,
-        isAuthenticated: true,
-        isLoading: false,
-      });
+    localStorage.setItem("mockUser", JSON.stringify(mockUser));
 
-    } catch (err) {
-      set({
-        isLoading: false,
-        error: err.response?.data?.message || "Signup failed",
-      });
-    }
+    set({
+      user: mockUser,
+      isAuthenticated: true,
+      isLoading: false,
+    });
+
+    return true;
   },
 
-  // ================= REQUEST RESET =================
-  resetPassword: async (email) => {
-    try {
-      set({ isLoading: true, error: null });
+  // ================= FETCH DASHBOARD (MOCK) =================
+  fetchDashboard: async () => {
+    set({ isLoading: true });
 
-      await axiosInstance.post("/forgot-password", { email });
+    await new Promise((res) => setTimeout(res, 800));
 
-      set({ isLoading: false });
-
-    } catch (err) {
-      set({
-        isLoading: false,
-        error: err.response?.data?.message || "Reset request failed",
-      });
-    }
-  },
-
-  // ================= CONFIRM RESET =================
-  resetPasswordConfirm: async (token, newPassword) => {
-    try {
-      set({ isLoading: true, error: null });
-
-      await axiosInstance.post("/reset-password", {
-        token,
-        newPassword,
-      });
-
-      set({ isLoading: false });
-
-    } catch (err) {
-      set({
-        isLoading: false,
-        error: err.response?.data?.message || "Password reset failed",
-      });
-    }
+    set({
+      dashboardData: {
+        stats: {
+          marketViability: 78,
+          investorConfidence: 64,
+          customerDemand: 85,
+        },
+        messages: [
+          "Your idea shows strong traction.",
+          "Investors are moderately interested.",
+          "Customer demand looks promising.",
+        ],
+      },
+      isLoading: false,
+    });
   },
 
   // ================= LOGOUT =================
   logout: () => {
-    localStorage.removeItem("token");
+    localStorage.removeItem("mockUser");
 
     set({
       user: null,
-      role: null,
+      dashboardData: null,
       isAuthenticated: false,
     });
   },
+
 }));
