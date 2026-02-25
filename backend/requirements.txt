@@ -19,3 +19,11 @@ typing_extensions==4.15.0
 uvicorn==0.30.0
 
 pydantic[email]
+pdfplumber
+supabase
+psycopg2
+openai
+langChain
+langGraph
+langchain_text_splitters
+python-multipart

@@ -1,8 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, logger, status, UploadFile, File, Form, BackgroundTasks
+from fastapi.responses import JSONResponse
+
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
+from rag.model import generate_answer
+from rag.retrieval import build_context, retrieve_context
 from models import User
+
+import tempfile
+import asyncio
+from pathlib import Path
+from typing import List, Optional
+import os
+
+from rag.ingestion import ingest_document
+
 from schemas import (
     UserCreate,
     UserSignIn,
@@ -267,3 +280,94 @@ def change_password(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error changing password.",
         )
+
+
+
+
+
+
+
+
+# RAG Routes
+# -----------------------
+
+rag_router = APIRouter(prefix="/api/v1", tags=["Ingestion"])
+
+@rag_router.post("/ingest")
+async def ingest_document_endpoint(
+
+    file: UploadFile = File(..., description="PDF, TXT, or MD file to ingest"),
+    title: str = Form(..., description="Document title"),
+    source_type: Optional[str] = Form("pdf", description="Source type (pdf, txt, md)")
+
+):
+    
+    """
+    Upload a document and ingest it into the RAG pipeline.
+    The file is temporarily saved, processed, and then cleaned up.
+    Returns a summary of the ingestion.
+    """
+
+    # Validate file extension
+    allowed_extensions = {'.pdf', '.txt', '.md'}
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type. Allowed: {allowed_extensions}"
+        )
+
+    
+    if not source_type:
+        source_type = file_ext[1:]  
+
+    # Save uploaded file to a temporary location
+    try:
+        # Create a temporary file with the same extension
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
+            content = await file.read()
+            tmp_file.write(content)
+            tmp_path = tmp_file.name
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {str(e)}")
+
+
+    # Run ingestion in a thread pool to avoid blocking the event loop
+    try:
+        result = await asyncio.to_thread(
+            ingest_document,
+            local_file_path=tmp_path,
+            title=title,
+            source_type=source_type
+        )
+
+
+    except Exception as e:
+        # Clean up temp file even on error
+        os.unlink(tmp_path)
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
+    
+    
+    finally:
+        # Ensure temp file is removed after processing
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+
+    return JSONResponse(content={"message": result})
+
+
+
+@rag_router.post("/rag/search")
+async def rag_search(question: str):
+
+    chunks = retrieve_context(question, top_k=5)
+    
+    if not chunks:
+        return {"answer": "No relevant information found.", "sources": []}
+
+    context = build_context(chunks)
+    print(context)
+    answer = generate_answer(context, question)
+    sources = [c[1] for c in chunks]
+    return {"answer": answer, "sources": sources}
