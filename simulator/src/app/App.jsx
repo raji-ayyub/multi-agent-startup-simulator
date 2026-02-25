@@ -68,6 +68,9 @@ export default function App() {
           {/* Public Routes */}
           <Route path="/login" element={<PublicRoute><PublicLayout><Login /></PublicLayout></PublicRoute>} />
           <Route path="/signup" element={<PublicRoute><PublicLayout><Signup /></PublicLayout></PublicRoute>} />
+          <Route path="/about" element={<PublicLayout><About /></PublicLayout>} />
+  
+
 
           {/* Default Route */}
           <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />

@@ -5,7 +5,7 @@ export default function EnvisioningModal({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-md" onClick={onClose} />
       
       {/* Modal Container */}
       <div className="relative bg-[#0a0a0c] w-full max-w-4xl rounded-2xl border border-gray-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
