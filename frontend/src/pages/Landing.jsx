@@ -70,10 +70,10 @@ export default function Landing() {
           </Link>
 
           <nav className="hidden items-center gap-7 text-sm text-slate-400 md:flex">
-            <a href="#product" className="transition hover:text-slate-100">Product</a>
-            <a href="#method" className="transition hover:text-slate-100">Methodology</a>
-            <a href="#cases" className="transition hover:text-slate-100">Case Studies</a>
-            <a href="#pricing" className="transition hover:text-slate-100">Pricing</a>
+            <a href="/#product" className="transition hover:text-slate-100">Product</a>
+            <Link to="/about" className="transition hover:text-slate-100">About</Link>
+            <a href="/#method" className="transition hover:text-slate-100">Methodology</a>
+            <a href="/#pricing" className="transition hover:text-slate-100">Pricing</a>
           </nav>
 
           <div className="flex items-center gap-2">
