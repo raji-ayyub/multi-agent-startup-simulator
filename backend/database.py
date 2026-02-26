@@ -11,11 +11,15 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL not found in environment variables")
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    connect_args={"sslmode": "prefer"}
-)
+engine_kwargs = {"pool_pre_ping": True}
+
+# Supabase/Postgres deployments typically require SSL.
+if DATABASE_URL.startswith("postgresql"):
+    engine_kwargs["connect_args"] = {
+        "sslmode": os.getenv("DATABASE_SSLMODE", "require")
+    }
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 SessionLocal = sessionmaker(
     autocommit=False,
