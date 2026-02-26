@@ -215,8 +215,8 @@ export default function Navbar() {
                 Notifications
               </div>
               <div className="p-4 space-y-3 text-sm text-slate-300">
-                <p>📊 Simulation completed successfully</p>
-                <p>📄 Document analysis ready</p>
+                <p>Simulation completed successfully</p>
+                <p>Document analysis ready</p>
               </div>
               <div className="p-3 text-center text-indigo-400 hover:bg-slate-800 cursor-pointer rounded-b-xl">
                 View All
@@ -263,7 +263,7 @@ export default function Navbar() {
                 onClick={handleLogout}
                 className="w-full text-left px-4 py-3 text-red-400 hover:bg-slate-800 rounded-b-xl"
               >
-                🚪 Logout
+                 Logout
               </button>
 
             </div>

@@ -16,6 +16,7 @@ const Login = lazy(() => import("../pages/auth/Login"));
 const Signup = lazy(() => import("../pages/auth/Signup"));
 const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword"));
 const ResetPassword = lazy(() => import("../pages/auth/ResetPassword"));
+const Landing = lazy(() => import("../pages/Landing"));
 const Dashboard = lazy(() => import("../pages/dashboard/Dashboard"));
 const IdeaForm = lazy(() => import("../pages/simulation/IdeaForm"));
 const SimulationRunner = lazy(() => import("../pages/simulation/SimulationRunner"));
@@ -73,7 +74,7 @@ export default function App() {
           <Route path="/reset-password/:token" element={<PublicRoute><ResetPassword /></PublicRoute>} />
 
           {/* Default Route */}
-          <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
+          <Route path="/" element={<Landing />} />
 
           {/* Protected Routes */}
           <Route path="/dashboard" element={<ProtectedRoute><AuthLayout><Dashboard /></AuthLayout></ProtectedRoute>} />
