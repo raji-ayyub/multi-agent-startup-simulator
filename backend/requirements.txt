@@ -27,3 +27,4 @@ langChain
 langGraph
 langchain_text_splitters
 python-multipart
+numpy
