@@ -85,6 +85,7 @@ const DEFAULT_FORM = {
 };
 
 const URGENCY_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+
 const AGENTIC_LOGS = [
   { role: "IDENTITY DETECTED", message: "All agents on board.." },
   { role: "MARKET ANALYST", message: "Calculating 1,000 market scenarios..." },
@@ -244,10 +245,13 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
         <header className="border-b border-slate-800 px-6 py-5">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sm text-slate-400">
-              <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-600 text-xs font-bold text-white">
-                P
-              </div>
+              <img
+                src="/images/Icon.svg"
+                alt="Logo"
+                className="w-8 h-8 bg-black p-1 rounded-lg"
+              />
               <span className="font-medium text-slate-200">PentraAI <span className="mx-1 text-slate-600">/</span> {simulationStage ? "Simulation" : step.subtitle}</span>
+            
             </div>
             <button
               type="button"
