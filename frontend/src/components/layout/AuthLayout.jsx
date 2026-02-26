@@ -3,7 +3,7 @@ const AuthLayout = ({ children }) => {
     <div className="min-h-screen grid grid-cols-1 lg:grid-cols-[42%_58%] bg-black text-white">
       <div className="hidden lg:block relative overflow-hidden border-r border-white/10">
         <div className="absolute inset-0 bg-[url('/images/business-suit.jpg')] bg-cover bg-center" />
-        <div className="absolute inset-0 bg-black/72" />
+        <div className="absolute inset-0 bg-gray-800/90" />
 
         <div className="absolute top-8 left-8 flex items-center gap-3 z-20">
           <img
@@ -15,9 +15,17 @@ const AuthLayout = ({ children }) => {
         </div>
 
         <div className="relative z-10 flex h-full flex-col justify-between px-8 py-10">
-          <div className="mt-12 max-w-xs">
-            <h2 className="text-5xl font-black leading-[0.95] tracking-tight">
-              Supercharge your enterprise workflow with AI-driven precision.
+          <div className="mt-12">
+            <h2 className="text-6xl font-black leading-[1.1] tracking-tight ">
+              Supercharge your
+              <br/>
+              enterprise 
+              <br/>
+              <span className="text-7xl text-black">workflow</span> with 
+              <br/>
+              AI-driven 
+              <br/>
+              precision.
             </h2>
             <p className="mt-6 text-sm leading-relaxed text-slate-300">
               Experience the next generation of business intelligence. Join over

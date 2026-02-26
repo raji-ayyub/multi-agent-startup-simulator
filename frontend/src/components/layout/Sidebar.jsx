@@ -1,106 +1,111 @@
-import React, { useState } from "react";
-import { FaLayerGroup, FaBell, FaCog } from "react-icons/fa";
+import { useState } from "react";
+import { Bell, BarChart3, LayoutDashboard, Settings, Sparkles, UserCircle2 } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { useAuthStore } from "../../store/authStore";
+
+const menuItems = [
+  { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { title: "Simulations", icon: Sparkles, path: "/simulation" },
+  { title: "Reports", icon: BarChart3, path: "/simulation/results" },
+];
+
+const systemItems = [
+  { title: "Notifications", icon: Bell, path: "/notifications" },
+  { title: "Settings", icon: Settings, path: "/settings" },
+];
 
 export default function Sidebar() {
+  const { user } = useAuthStore();
   const [mode, setMode] = useState("Simulation");
 
-  const menuItems = [
-    { title: "Dashboard", icon: <FaLayerGroup />, path: "/dashboard" },
-    { title: "Simulations", icon: <FaLayerGroup />, path: "/simulation" },
-    { title: "Reports", icon: <FaLayerGroup />, path: "/reports" },
-  ];
-
-  const systemItems = [
-    { title: "Notifications", icon: <FaBell />, path: "/notifications" },
-    { title: "Settings", icon: <FaCog />, path: "/settings" },
-  ];
-
   return (
-    <div className="flex flex-col w-64 bg-slate-950 text-slate-300 p-6 justify-between h-screen">
-      {/* Logo */}
+    <aside className="flex h-screen w-[248px] flex-col justify-between border-r border-slate-800 bg-[#070b11] px-4 py-5 text-slate-300">
       <div>
-        <h1 className="text-2xl font-bold text-gray-100 flex items-center mb-1">
-          PentraAI <span className="ml-2 text-blue-500 text-xl">★</span>
-        </h1>
-        <p className="text-sm text-gray-400 mb-6">The Startup Consultant</p>
+        <div className="px-2">
+          <h1 className="flex items-center text-xl font-semibold text-slate-100">
+            PentraAI <span className="ml-1.5 text-blue-400">★</span>
+          </h1>
+          <p className="mt-1 text-xs text-slate-500">The Startup Consultant</p>
+        </div>
 
-        {/* Main Menu */}
-        <div className="space-y-2">
+        <nav className="mt-6 space-y-1.5">
           {menuItems.map((item) => (
-            <NavLink
-              key={item.title}
-              to={item.path}
-              className={({ isActive }) =>
-                `flex items-center w-full p-2 rounded font-medium transition-colors duration-200 ${
-                  isActive ? "text-blue-500 bg-slate-800" : "hover:text-blue-400 hover:bg-slate-800"
-                }`
-              }
-            >
-              <span className="mr-3 text-lg">{item.icon}</span>
-              {item.title}
-            </NavLink>
+            <NavItem key={item.title} title={item.title} icon={item.icon} path={item.path} />
           ))}
-        </div>
+        </nav>
 
-        {/* System Section */}
-        <p className="mt-6 mb-2 text-xs text-gray-500 uppercase">System</p>
-        <div className="space-y-2">
+        <p className="mt-6 px-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">System</p>
+        <nav className="mt-2 space-y-1.5">
           {systemItems.map((item) => (
-            <NavLink
-              key={item.title}
-              to={item.path}
-              className={({ isActive }) =>
-                `flex items-center w-full p-2 rounded font-medium text-gray-400 hover:text-blue-400 hover:bg-slate-800 transition-colors duration-200 ${
-                  isActive ? "text-blue-500 bg-slate-800" : ""
-                }`
-              }
-            >
-              <span className="mr-3 text-lg">{item.icon}</span>
-              {item.title}
-            </NavLink>
+            <NavItem key={item.title} title={item.title} icon={item.icon} path={item.path} />
           ))}
-        </div>
+        </nav>
 
-        {/* Mode Toggle */}
-        <p className="mt-6 mb-2 text-xs text-gray-500 uppercase">Mode</p>
-        <div className="flex rounded-full bg-slate-800 p-1 w-full">
-          {["Simulation", "Manage"].map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`flex-1 text-sm font-medium py-1 rounded-full transition-colors duration-200 ${
-                mode === m ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white hover:bg-slate-700"
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-      </div>
+        <div className="mt-6 px-2">
+          <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-slate-500 ">Mode</p>
+          <div className="flex mt-4">
+            {["Simulation", "Manage"].map((item, index) => {
+              const isActive = mode === item;
 
-      {/* Bottom Card */}
-      <div className="mt-6 space-y-4">
-        <div className="bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 p-4 rounded-xl text-center">
-          <span className="text-gray-400 text-xl">★</span>
-          <p className="text-sm font-bold text-gray-100 mt-2">AI FOR RESULT ANALYTICS</p>
-          <button className="mt-3 bg-black text-white px-4 py-2 rounded-full font-semibold hover:bg-gray-900 transition">
-            Try Now →
-          </button>
-        </div>
-
-        <div className="flex items-center space-x-3">
-          <img
-            src="https://i.pravatar.cc/40?img=5"
-            alt="Profile"
-            className="w-10 h-10 rounded-full"
-          />
-          <div>
-            <p className="text-gray-100 font-semibold">Olivia Trent</p>
-            <p className="text-gray-400 text-sm">Dev Lead</p>
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setMode(item)}
+                  className={`
+                    flex-1 bg-slate-900 h-[2rem] px-3 py-1 text-[11px] font-medium transition
+                    ${isActive ? "outline-8 z-10 outline-blue-400/20 border-slate-700 text-white" : "text-slate-400 hover:text-slate-200"}
+                    ${index === 0 ? "rounded-l-full" : ""}
+                    ${index === 1 ? "rounded-r-full" : ""}
+                  `}
+                >
+                  {item}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
-    </div>
+
+      <div className="space-y-4">
+        <article className="rounded-2xl border border-slate-700 bg-gradient-to-b from-slate-100 to-slate-300 p-4 text-center text-slate-900">
+          <p className="text-xs font-semibold leading-tight">AI FOR RESULT ANALYTICS</p>
+          <button
+            type="button"
+            className="mt-3 rounded-full bg-slate-900 px-4 py-1.5 text-[11px] font-semibold text-white transition hover:bg-black"
+          >
+            TRY NOW
+          </button>
+        </article>
+
+        <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-slate-200">
+            <UserCircle2 size={19} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-200">{user?.fullName || user?.name || "Olivia Trent"}</p>
+            <p className="text-xs text-slate-500">Dev Lead</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function NavItem({ title, icon: Icon, path }) {
+  return (
+    <NavLink
+      to={path}
+      className={({ isActive }) =>
+        `mx-1.5 flex items-center gap-2.5  px-3 py-2 text-sm transition ${
+          isActive
+            ? "border-l-4 border-blue-500/70  text-blue-500"
+            : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+        }`
+      }
+    >
+      <Icon size={15} />
+      <span>{title}</span>
+    </NavLink>
   );
 }

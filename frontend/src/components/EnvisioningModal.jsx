@@ -1,118 +1,515 @@
-import React from 'react';
-import { X, ChevronRight, ArrowLeft, Lightbulb } from 'lucide-react';
+import { useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  Lightbulb,
+  Rocket,
+  Save,
+  Target,
+  TrendingUp,
+  Wallet,
+  X,
+} from "lucide-react";
+import useSimulationStore from "../store/simulationStore";
 
-export default function EnvisioningModal({ onClose }) {
+const STEP_META = [
+  {
+    id: "core",
+    title: "01. What are you building?",
+    subtitle: "Define the Core Problem",
+    icon: Target,
+    tipTitle: "Pro-Tip: Precision",
+    tips: [
+      "Avoid broad claims. State the exact operational pain point.",
+      "Quantify impact where possible with time, cost, or conversion loss.",
+    ],
+    fields: ["startupName", "elevatorPitch", "problemStatement", "targetAudience"],
+  },
+  {
+    id: "market",
+    title: "02. Defining your reach?",
+    subtitle: "Market Analysis",
+    icon: TrendingUp,
+    tipTitle: "Pro-Tip: Segment First",
+    tips: [
+      "Clear segment and geography reduce noisy assumptions in simulation.",
+      "Call out current alternatives your audience uses today.",
+    ],
+    fields: ["primaryTargetSegment", "geography", "marketSizeEstimate", "customerBehaviorPainPoints"],
+  },
+  {
+    id: "cost",
+    title: "03. The math of survival",
+    subtitle: "Estimated Cost",
+    icon: Wallet,
+    tipTitle: "Pro-Tip: Runway Logic",
+    tips: [
+      "Monthly burn and current cash define realistic runway constraints.",
+      "Customer acquisition cost should reflect your first 90 days.",
+    ],
+    fields: ["monthlyBurn", "estimatedCac", "currentCashInHand", "marketingStrategy"],
+  },
+  {
+    id: "review",
+    title: "04. Review & Launch Simulation",
+    subtitle: "Ready to Launch",
+    icon: Rocket,
+    tipTitle: "Pro-Tip: Launch With Intent",
+    tips: [
+      "Run with focused assumptions, then iterate each weak metric.",
+      "Use one simulation per strategy variant for cleaner comparisons.",
+    ],
+    fields: [],
+  },
+];
+
+const DEFAULT_FORM = {
+  startupName: "",
+  elevatorPitch: "",
+  problemStatement: "",
+  targetAudience: "",
+  problemUrgency: "HIGH",
+  primaryTargetSegment: "",
+  geography: "",
+  marketSizeEstimate: "",
+  customerBehaviorPainPoints: "",
+  competitorPatterns: "",
+  monthlyBurn: "",
+  estimatedCac: "",
+  currentCashInHand: "",
+  marketingStrategy: "",
+};
+
+const URGENCY_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+
+export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
+  const {
+    isRunning,
+    saveDraft,
+    loadDraft,
+    clearDraft,
+    launchSimulationFromBrief,
+    patchIdeaFields,
+  } = useSimulationStore();
+
+  const bootDraft = loadDraft();
+  const [stepIndex, setStepIndex] = useState(0);
+  const [form, setForm] = useState({ ...DEFAULT_FORM, ...(bootDraft || {}) });
+  const [errors, setErrors] = useState({});
+  const [bannerMessage, setBannerMessage] = useState("");
+
+  const step = STEP_META[stepIndex];
+  const progress = ((stepIndex + 1) / STEP_META.length) * 100;
+
+  const reviewCards = useMemo(
+    () => [
+      { label: "Core Problem", value: form.problemStatement || "Not provided" },
+      {
+        label: "Market Segment",
+        value: form.primaryTargetSegment && form.geography
+          ? `${form.primaryTargetSegment} | ${form.geography}`
+          : "Not provided",
+      },
+      {
+        label: "Cost Baseline",
+        value:
+          form.monthlyBurn || form.currentCashInHand
+            ? `Burn ${form.monthlyBurn || "$0"} | Cash ${form.currentCashInHand || "$0"}`
+            : "Not provided",
+      },
+      { label: "Go-to-Market", value: form.marketingStrategy || "Not provided" },
+    ],
+    [form]
+  );
+
+  const setField = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  const validateStep = () => {
+    const nextErrors = {};
+
+    if (stepIndex === 0) {
+      if (!form.startupName.trim()) nextErrors.startupName = "Startup name is required.";
+      if (!form.problemStatement.trim()) nextErrors.problemStatement = "Problem statement is required.";
+      if (!form.targetAudience.trim()) nextErrors.targetAudience = "Target audience is required.";
+    }
+
+    if (stepIndex === 1) {
+      if (!form.primaryTargetSegment.trim()) nextErrors.primaryTargetSegment = "Primary target segment is required.";
+      if (!form.geography.trim()) nextErrors.geography = "Geography is required.";
+      if (!form.customerBehaviorPainPoints.trim()) {
+        nextErrors.customerBehaviorPainPoints = "Customer behavior and pain points are required.";
+      }
+    }
+
+    if (stepIndex === 2) {
+      if (!form.monthlyBurn.trim()) nextErrors.monthlyBurn = "Monthly burn is required.";
+      if (!form.currentCashInHand.trim()) nextErrors.currentCashInHand = "Current cash in hand is required.";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const goNext = () => {
+    if (!validateStep()) return;
+    setStepIndex((prev) => Math.min(prev + 1, STEP_META.length - 1));
+  };
+
+  const goBack = () => {
+    setStepIndex((prev) => Math.max(prev - 1, 0));
+  };
+
+  const handleSaveDraft = () => {
+    saveDraft(form);
+    patchIdeaFields(form);
+    setBannerMessage("Draft saved.");
+  };
+
+  const handleLaunch = async () => {
+    const requiredFields = [
+      "startupName",
+      "problemStatement",
+      "targetAudience",
+      "primaryTargetSegment",
+      "geography",
+      "monthlyBurn",
+      "currentCashInHand",
+    ];
+    const nextErrors = {};
+
+    requiredFields.forEach((field) => {
+      if (!String(form[field] || "").trim()) {
+        nextErrors[field] = "Required";
+      }
+    });
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      setStepIndex(0);
+      setBannerMessage("Complete required fields before launch.");
+      return;
+    }
+
+    try {
+      await launchSimulationFromBrief(form);
+      patchIdeaFields(form);
+      clearDraft();
+      if (onSimulationLaunched) onSimulationLaunched(form);
+      onClose();
+    } catch (error) {
+      setBannerMessage("Unable to launch simulation. Please try again.");
+    }
+  };
+
+  const StepIcon = step.icon;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={onClose} />
-      
-      {/* Modal Container */}
-      <div className="relative bg-[#0a0a0c] w-full max-w-4xl rounded-2xl border border-gray-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        
-        {/* Progress Header */}
-        <div className="p-6 border-b border-gray-800">
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center text-[10px] font-bold">P</div>
-                    <span className="text-sm font-semibold tracking-tight">PentraAI <span className="text-gray-600 mx-1">/</span> Envisioning</span>
-                </div>
-                <div className="text-right">
-                    <span className="block text-[9px] uppercase tracking-widest text-gray-500">Step 1 of 5</span>
-                    <span className="text-xs font-medium text-gray-300">Define the Core Problem</span>
-                </div>
+      <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={onClose} />
+
+      <section className="relative z-10 flex w-full max-w-6xl max-h-[94vh] flex-col overflow-hidden rounded-2xl border border-slate-700/80 bg-[#080b11] text-slate-100 shadow-[0_24px_70px_rgba(0,0,0,0.65)]">
+        <header className="border-b border-slate-800 px-6 py-5">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-600 text-xs font-bold text-white">
+                P
+              </div>
+              <span className="font-medium text-slate-200">
+                PentraAI <span className="mx-1 text-slate-600">/</span> {step.subtitle}
+              </span>
             </div>
-            <div className="flex gap-2">
-                <div className="h-1 flex-1 bg-blue-600 rounded-full" />
-                <div className="h-1 flex-1 bg-gray-800 rounded-full" />
-                <div className="h-1 flex-1 bg-gray-800 rounded-full" />
-            </div>
-        </div>
-
-        <div className="flex flex-1 overflow-y-auto">
-            {/* Left Form Side */}
-            <div className="flex-[1.4] p-8 border-r border-gray-800">
-                <h2 className="text-2xl font-bold text-white mb-1">01. What are you building?</h2>
-                <p className="text-gray-500 text-sm mb-8">Precision in problem definition directly correlates to simulation accuracy.</p>
-
-                <div className="space-y-6">
-                    <FormInput label="Startup Name" placeholder="e.g. Lumina Analytics" />
-                    <FormInput label="Elevator Pitch" placeholder="Describe your solution in one sentence..." />
-                    
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Problem Statement</label>
-                        <textarea className="w-full bg-[#111114] border border-gray-800 rounded-lg p-4 text-sm focus:border-blue-500 outline-none h-28 transition-all" placeholder="What specific pain point are you addressing? Be as detailed as possible." />
-                    </div>
-
-                    <FormInput label="Target Audience" placeholder="e.g. Fortune 500 CTOs" />
-
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Problem Urgency</label>
-                        <div className="grid grid-cols-4 gap-1 bg-black p-1 rounded-xl border border-gray-800">
-                            {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((lvl) => (
-                                <button key={lvl} className={`py-2.5 text-[10px] font-bold rounded-lg transition-all ${lvl === 'HIGH' ? 'bg-[#1c1c21] text-blue-400 border border-blue-900/30' : 'text-gray-600 hover:text-gray-400'}`}>
-                                    {lvl}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Right Sidebar */}
-            <div className="flex-1 bg-[#0d0d0f] p-8">
-                <div className="flex gap-3 mb-6">
-                    <Lightbulb size={18} className="text-gray-400 shrink-0" />
-                    <div>
-                        <h4 className="text-[11px] font-bold text-gray-200 uppercase mb-2">Pro-Tip: Precision</h4>
-                        <p className="text-xs text-gray-500 leading-relaxed">
-                            Clarity in your problem statement allows our AI to map the <span className="text-white">Competitive Landscape</span> with 94% higher accuracy.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="space-y-4 mb-12">
-                    <CheckItem text="Avoid broad generalizations like 'improving efficiency'." />
-                    <CheckItem text="Quantify the pain point if possible (e.g. 'losing 20 hours/week')." />
-                </div>
-
-                <div className="p-4 bg-[#141417] border border-gray-800 rounded-xl">
-                    <label className="text-[9px] font-bold text-gray-500 uppercase block mb-2">AI Simulation Status</label>
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                        <span className="text-xs italic text-gray-500">Waiting for input...</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {/* Footer */}
-        <div className="p-6 border-t border-gray-800 flex justify-between items-center">
-            <button onClick={onClose} className="text-xs text-gray-500 flex items-center gap-2 hover:text-white transition-colors">
-                <ArrowLeft size={14} /> Back to Dashboard
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-slate-700 p-2 text-slate-400 transition hover:border-slate-500 hover:text-slate-200"
+            >
+              <X size={15} />
             </button>
-            <div className="flex gap-3">
-                <button className="px-6 py-2.5 text-xs font-semibold border border-gray-800 rounded-full hover:bg-gray-800 transition-colors">Save Draft</button>
-                <button className="px-6 py-2.5 text-xs font-semibold bg-blue-600 text-white rounded-full flex items-center gap-2 hover:bg-blue-500 transition-all">
-                    Next: Market Analysis <ChevronRight size={14} />
-                </button>
+          </div>
+
+          <div className="mb-2 flex items-end justify-between gap-3">
+            <h2 className="text-xl font-semibold text-white">{step.title}</h2>
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+              Step {stepIndex + 1} of {STEP_META.length}
+            </p>
+          </div>
+
+          <div className="h-1.5 rounded-full bg-slate-800">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </header>
+
+        <div className="grid flex-1 overflow-y-auto lg:grid-cols-[1.45fr_1fr]">
+          <div className="border-r border-slate-800 p-6">
+            {stepIndex === 0 && (
+              <div className="space-y-5">
+                <InputField
+                  label="Startup Name"
+                  value={form.startupName}
+                  onChange={(value) => setField("startupName", value)}
+                  error={errors.startupName}
+                  placeholder="e.g. Lumina Analytics"
+                />
+                <InputField
+                  label="Elevator Pitch"
+                  value={form.elevatorPitch}
+                  onChange={(value) => setField("elevatorPitch", value)}
+                  placeholder="Describe your solution in one sentence..."
+                />
+                <TextAreaField
+                  label="Problem Statement"
+                  value={form.problemStatement}
+                  onChange={(value) => setField("problemStatement", value)}
+                  error={errors.problemStatement}
+                  placeholder="What specific pain point are you addressing?"
+                />
+                <InputField
+                  label="Target Audience"
+                  value={form.targetAudience}
+                  onChange={(value) => setField("targetAudience", value)}
+                  error={errors.targetAudience}
+                  placeholder="e.g. Growth-stage SaaS founders"
+                />
+                <div className="space-y-2">
+                  <Label>Problem Urgency</Label>
+                  <div className="grid grid-cols-4 rounded-xl border border-slate-700 bg-black/40 p-1">
+                    {URGENCY_LEVELS.map((level) => (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => setField("problemUrgency", level)}
+                        className={`rounded-lg py-2 text-[11px] font-semibold tracking-wide transition ${
+                          form.problemUrgency === level
+                            ? "border border-blue-500/40 bg-blue-500/10 text-blue-300"
+                            : "text-slate-500 hover:text-slate-300"
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {stepIndex === 1 && (
+              <div className="space-y-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <InputField
+                    label="Primary Target Segment"
+                    value={form.primaryTargetSegment}
+                    onChange={(value) => setField("primaryTargetSegment", value)}
+                    error={errors.primaryTargetSegment}
+                    placeholder="e.g. Enterprise SaaS & Logistics"
+                  />
+                  <InputField
+                    label="Geography"
+                    value={form.geography}
+                    onChange={(value) => setField("geography", value)}
+                    error={errors.geography}
+                    placeholder="e.g. North America"
+                  />
+                </div>
+                <InputField
+                  label="Market Size Estimate (TAM)"
+                  value={form.marketSizeEstimate}
+                  onChange={(value) => setField("marketSizeEstimate", value)}
+                  placeholder="e.g. $2.5B with 10% YoY growth"
+                />
+                <TextAreaField
+                  label="Customer Behavior & Pain Points"
+                  value={form.customerBehaviorPainPoints}
+                  onChange={(value) => setField("customerBehaviorPainPoints", value)}
+                  error={errors.customerBehaviorPainPoints}
+                  placeholder="Describe current behaviors and blockers."
+                />
+                <TextAreaField
+                  label="Competitor Patterns"
+                  value={form.competitorPatterns}
+                  onChange={(value) => setField("competitorPatterns", value)}
+                  placeholder="Who is active and where are their gaps?"
+                />
+              </div>
+            )}
+
+            {stepIndex === 2 && (
+              <div className="space-y-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <InputField
+                    label="Monthly Burn"
+                    value={form.monthlyBurn}
+                    onChange={(value) => setField("monthlyBurn", value)}
+                    error={errors.monthlyBurn}
+                    placeholder="$25,000"
+                  />
+                  <InputField
+                    label="Estimated CAC"
+                    value={form.estimatedCac}
+                    onChange={(value) => setField("estimatedCac", value)}
+                    placeholder="$200"
+                  />
+                </div>
+                <InputField
+                  label="Current Cash In Hand"
+                  value={form.currentCashInHand}
+                  onChange={(value) => setField("currentCashInHand", value)}
+                  error={errors.currentCashInHand}
+                  placeholder="$600,000"
+                />
+                <TextAreaField
+                  label="Marketing Strategy"
+                  value={form.marketingStrategy}
+                  onChange={(value) => setField("marketingStrategy", value)}
+                  placeholder="Positioning, channels, and initial GTM motion."
+                />
+              </div>
+            )}
+
+            {stepIndex === 3 && (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-400">
+                  Verify your key inputs before launching a high-fidelity simulation.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {reviewCards.map((card) => (
+                    <article key={card.label} className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
+                      <p className="mb-2 text-[11px] uppercase tracking-wider text-slate-500">{card.label}</p>
+                      <p className="text-sm text-slate-200">{card.value}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <aside className="bg-[#0b1018] p-6">
+            <div className="mb-6 flex items-start gap-3">
+              <div className="mt-0.5 rounded-full border border-slate-600 p-2 text-slate-300">
+                <StepIcon size={16} />
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-[0.18em] text-slate-500">{step.tipTitle}</p>
+                <p className="text-xs text-slate-400">
+                  Better inputs improve simulation signal quality and recommendation confidence.
+                </p>
+              </div>
             </div>
+
+            <div className="space-y-3">
+              {step.tips.map((tip) => (
+                <p key={tip} className="flex gap-2 text-xs text-slate-400">
+                  <Lightbulb size={13} className="mt-0.5 shrink-0 text-yellow-300/80" />
+                  <span>{tip}</span>
+                </p>
+              ))}
+            </div>
+
+            <div className="mt-8 rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Simulation Status</p>
+              <div className="mt-2 flex items-center gap-2 text-xs text-slate-300">
+                <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+                <span>{isRunning ? "Launching simulation..." : "Waiting for launch input."}</span>
+              </div>
+            </div>
+
+            {bannerMessage && (
+              <div className="mt-4 rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-200">
+                {bannerMessage}
+              </div>
+            )}
+          </aside>
         </div>
-      </div>
+
+        <footer className="flex items-center justify-between gap-3 border-t border-slate-800 px-6 py-4">
+          <button
+            type="button"
+            onClick={stepIndex === 0 ? onClose : goBack}
+            className="inline-flex items-center gap-2 text-xs text-slate-400 transition hover:text-slate-200"
+          >
+            <ArrowLeft size={13} />
+            {stepIndex === 0 ? "Back to Dashboard" : "Back"}
+          </button>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-700 px-4 py-2 text-xs font-medium text-slate-200 transition hover:bg-slate-800"
+            >
+              <Save size={13} />
+              Save Draft
+            </button>
+
+            {stepIndex < STEP_META.length - 1 ? (
+              <button
+                type="button"
+                onClick={goNext}
+                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-500"
+              >
+                Next
+                <ChevronRight size={13} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={isRunning}
+                onClick={handleLaunch}
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-white transition ${
+                  isRunning ? "cursor-not-allowed bg-slate-700" : "bg-blue-600 hover:bg-blue-500"
+                }`}
+              >
+                {isRunning ? "Launching..." : "Launch Simulation"}
+                <Rocket size={13} />
+              </button>
+            )}
+          </div>
+        </footer>
+      </section>
     </div>
   );
 }
 
-const FormInput = ({ label, placeholder }) => (
-    <div className="space-y-2">
-        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{label}</label>
-        <input className="w-full bg-[#111114] border border-gray-800 rounded-lg p-3 text-sm focus:border-blue-500 outline-none transition-all" placeholder={placeholder} />
-    </div>
-);
+function Label({ children }) {
+  return <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">{children}</label>;
+}
 
-const CheckItem = ({ text }) => (
-    <div className="flex gap-3 items-start text-xs text-gray-500">
-        <div className="w-4 h-4 rounded-full border border-blue-500/50 flex items-center justify-center text-blue-500 shrink-0">✓</div>
-        <span>{text}</span>
+function InputField({ label, value, onChange, placeholder, error }) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className={`w-full rounded-lg border bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 outline-none transition ${
+          error ? "border-red-500/60" : "border-slate-700 focus:border-blue-500"
+        }`}
+      />
+      {error ? <p className="text-xs text-red-400">{error}</p> : null}
     </div>
-);
+  );
+}
+
+function TextAreaField({ label, value, onChange, placeholder, error }) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <textarea
+        rows={4}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className={`w-full rounded-lg border bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 outline-none transition ${
+          error ? "border-red-500/60" : "border-slate-700 focus:border-blue-500"
+        }`}
+      />
+      {error ? <p className="text-xs text-red-400">{error}</p> : null}
+    </div>
+  );
+}

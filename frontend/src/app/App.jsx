@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import Sidebar from "../components/layout/Sidebar";
 import Navbar from "../components/layout/Navbar";
@@ -19,6 +19,7 @@ const ResetPassword = lazy(() => import("../pages/auth/ResetPassword"));
 const Dashboard = lazy(() => import("../pages/dashboard/Dashboard"));
 const IdeaForm = lazy(() => import("../pages/simulation/IdeaForm"));
 const SimulationRunner = lazy(() => import("../pages/simulation/SimulationRunner"));
+const ResultsView = lazy(() => import("../pages/simulation/ResultsView"));
 const Profile = lazy(() => import("../pages/Profile"));
 const Settings = lazy(() => import("../pages/Settings"));
 
@@ -37,17 +38,22 @@ const PublicRoute = ({ children }) => {
 };
 
 // Layouts
-const AuthLayout = ({ children }) => (
-  <div className="flex h-screen bg-slate-950 text-slate-100">
-    <Sidebar />
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <Navbar />
-      <main className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-        {children}
-      </main>
+const AuthLayout = ({ children }) => {
+  const location = useLocation();
+  const showNavbar = location.pathname !== "/dashboard";
+
+  return (
+    <div className="flex h-screen bg-[#05090f] text-slate-100">
+      <Sidebar />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {showNavbar ? <Navbar /> : null}
+        <main className={`flex-1 overflow-y-auto ${showNavbar ? "p-8" : "p-5 md:p-6"} bg-[#0b1017]`}>
+          {children}
+        </main>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
@@ -73,6 +79,7 @@ export default function App() {
           <Route path="/dashboard" element={<ProtectedRoute><AuthLayout><Dashboard /></AuthLayout></ProtectedRoute>} />
           <Route path="/simulation" element={<ProtectedRoute><AuthLayout><IdeaForm /></AuthLayout></ProtectedRoute>} />
           <Route path="/simulation/run" element={<ProtectedRoute><AuthLayout><SimulationRunner /></AuthLayout></ProtectedRoute>} />
+          <Route path="/simulation/results" element={<ProtectedRoute><AuthLayout><ResultsView /></AuthLayout></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><AuthLayout><Profile /></AuthLayout></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><AuthLayout><Settings /></AuthLayout></ProtectedRoute>} />
 

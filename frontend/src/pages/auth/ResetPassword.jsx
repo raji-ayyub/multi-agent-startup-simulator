@@ -44,7 +44,7 @@ export default function ResetPassword() {
 
   return (
     <AuthLayout>
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0a0f1a]/92 p-6 shadow-2xl shadow-black/60 sm:p-8">
+      <div className="w-full max-w-sm ">
         <div className="flex justify-center mb-5">
           <img src="/images/reset.svg" alt="Reset" className="h-10 w-auto" />
         </div>
@@ -54,7 +54,7 @@ export default function ResetPassword() {
           Enter your new password to regain account access.
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl border border-white/10 bg-[#0a0f1a]/92 p-6 shadow-2xl shadow-black/60 sm:p-8">
           <div className="relative">
             <label className="block text-xs mb-2 text-slate-300">New Password</label>
             <input
