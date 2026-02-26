@@ -22,9 +22,14 @@ export default function Sidebar() {
     <aside className="flex h-screen w-[248px] flex-col justify-between border-r border-slate-800 bg-[#070b11] px-4 py-5 text-slate-300">
       <div>
         <div className="px-2">
-          <h1 className="flex items-center text-xl font-semibold text-slate-100">
-            PentraAI <span className="ml-1.5 text-blue-400">★</span>
-          </h1>
+          <div className="flex items-center gap-2">
+            <img
+              src="/images/Icon.svg"
+              alt="Logo"
+              className="w-8 h-8 bg-black p-1 rounded-lg"
+            />
+            <h1 className="text-sm font-semibold tracking-wide text-[#E2E78D]">PentraAI</h1>
+          </div>
           <p className="mt-1 text-xs text-slate-500">The Startup Consultant</p>
         </div>
 
