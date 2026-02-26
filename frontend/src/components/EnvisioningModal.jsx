@@ -1,8 +1,12 @@
 import { useMemo, useState } from "react";
 import {
   ArrowLeft,
+  CheckCircle2,
   ChevronRight,
+  Cpu,
   Lightbulb,
+  Loader2,
+  Monitor,
   Rocket,
   Save,
   Target,
@@ -81,6 +85,15 @@ const DEFAULT_FORM = {
 };
 
 const URGENCY_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const AGENTIC_LOGS = [
+  { role: "IDENTITY DETECTED", message: "All agents on board.." },
+  { role: "MARKET ANALYST", message: "Calculating 1,000 market scenarios..." },
+  { role: "RISK ANALYSIS", message: "Stress-testing unit economics..." },
+  { role: "CUSTOMER AGENT", message: "Simulating target persona responses..." },
+  { role: "INVESTOR AGENT", message: "Scoring growth, defensibility, and runway..." },
+];
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
   const {
@@ -97,6 +110,9 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
   const [form, setForm] = useState({ ...DEFAULT_FORM, ...(bootDraft || {}) });
   const [errors, setErrors] = useState({});
   const [bannerMessage, setBannerMessage] = useState("");
+  const [simulationStage, setSimulationStage] = useState(false);
+  const [visibleLogCount, setVisibleLogCount] = useState(0);
+  const [isSimulationComplete, setIsSimulationComplete] = useState(false);
 
   const step = STEP_META[stepIndex];
   const progress = ((stepIndex + 1) / STEP_META.length) * 100;
@@ -193,18 +209,32 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
       return;
     }
 
+    setSimulationStage(true);
+    setVisibleLogCount(1);
+    setIsSimulationComplete(false);
+    setBannerMessage("");
+
     try {
-      await launchSimulationFromBrief(form);
+      const logPlayback = (async () => {
+        for (let index = 2; index <= AGENTIC_LOGS.length; index += 1) {
+          await wait(850);
+          setVisibleLogCount(index);
+        }
+      })();
+
+      await Promise.all([launchSimulationFromBrief(form), logPlayback]);
       patchIdeaFields(form);
       clearDraft();
+      setIsSimulationComplete(true);
       if (onSimulationLaunched) onSimulationLaunched(form);
-      onClose();
     } catch (error) {
+      setSimulationStage(false);
       setBannerMessage("Unable to launch simulation. Please try again.");
     }
   };
 
-  const StepIcon = step.icon;
+  const StepIcon = (simulationStage ? STEP_META[0].icon : step?.icon) || Rocket;
+  const visibleLogs = AGENTIC_LOGS.slice(0, visibleLogCount);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -217,9 +247,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
               <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-600 text-xs font-bold text-white">
                 P
               </div>
-              <span className="font-medium text-slate-200">
-                PentraAI <span className="mx-1 text-slate-600">/</span> {step.subtitle}
-              </span>
+              <span className="font-medium text-slate-200">PentraAI <span className="mx-1 text-slate-600">/</span> {simulationStage ? "Simulation" : step.subtitle}</span>
             </div>
             <button
               type="button"
@@ -231,23 +259,60 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
           </div>
 
           <div className="mb-2 flex items-end justify-between gap-3">
-            <h2 className="text-xl font-semibold text-white">{step.title}</h2>
+            <h2 className="text-xl font-semibold text-white">{simulationStage ? "Loading Agents.." : step.title}</h2>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-              Step {stepIndex + 1} of {STEP_META.length}
+              {simulationStage ? "Agentic Runtime" : `Step ${stepIndex + 1} of ${STEP_META.length}`}
             </p>
           </div>
 
           <div className="h-1.5 rounded-full bg-slate-800">
             <div
               className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300"
-              style={{ width: `${progress}%` }}
+              style={{ width: `${simulationStage ? 100 : progress}%` }}
             />
           </div>
         </header>
 
         <div className="grid flex-1 overflow-y-auto lg:grid-cols-[1.45fr_1fr]">
           <div className="border-r border-slate-800 p-6">
-            {stepIndex === 0 && (
+            {simulationStage ? (
+              <div className="flex h-full flex-col items-center justify-center gap-5 text-center">
+                <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-blue-500/70 bg-blue-500/5">
+                  <div className="absolute -top-1.5 h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.7)]" />
+                  <Monitor size={30} className="text-blue-300" />
+                </div>
+
+                <div className="w-full max-w-[500px] rounded-xl border border-slate-800 bg-black/40 p-5 text-left">
+                  <div className="mb-4 flex items-center gap-2 text-blue-300">
+                    {isSimulationComplete ? (
+                      <CheckCircle2 size={16} />
+                    ) : (
+                      <Loader2 size={16} className="animate-spin" />
+                    )}
+                    <span className="text-sm font-medium">
+                      {isSimulationComplete ? "Simulation completed." : "Running agent orchestration..."}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {visibleLogs.map((log, index) => {
+                      const isLatest = index === visibleLogs.length - 1 && !isSimulationComplete;
+                      return (
+                        <article key={log.role} className="flex gap-2.5">
+                          <Cpu size={14} className={`mt-0.5 ${isLatest ? "text-blue-300" : "text-slate-500"}`} />
+                          <div>
+                            <p className={`text-[11px] uppercase tracking-[0.16em] ${isLatest ? "text-blue-300" : "text-slate-500"}`}>
+                              {log.role}
+                            </p>
+                            <p className="text-sm text-slate-300">{log.message}</p>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : stepIndex === 0 && (
               <div className="space-y-5">
                 <InputField
                   label="Startup Name"
@@ -394,7 +459,9 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                 <StepIcon size={16} />
               </div>
               <div>
-                <p className="mb-1 text-[11px] uppercase tracking-[0.18em] text-slate-500">{step.tipTitle}</p>
+                <p className="mb-1 text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                  {simulationStage ? STEP_META[0].tipTitle : step.tipTitle}
+                </p>
                 <p className="text-xs text-slate-400">
                   Better inputs improve simulation signal quality and recommendation confidence.
                 </p>
@@ -402,7 +469,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
             </div>
 
             <div className="space-y-3">
-              {step.tips.map((tip) => (
+              {(simulationStage ? STEP_META[0].tips : step.tips).map((tip) => (
                 <p key={tip} className="flex gap-2 text-xs text-slate-400">
                   <Lightbulb size={13} className="mt-0.5 shrink-0 text-yellow-300/80" />
                   <span>{tip}</span>
@@ -414,7 +481,15 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
               <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Simulation Status</p>
               <div className="mt-2 flex items-center gap-2 text-xs text-slate-300">
                 <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-                <span>{isRunning ? "Launching simulation..." : "Waiting for launch input."}</span>
+                <span>
+                  {simulationStage
+                    ? isSimulationComplete
+                      ? "completed"
+                      : "running simulation"
+                    : isRunning
+                    ? "launching simulation..."
+                    : "waiting for launch input."}
+                </span>
               </div>
             </div>
 
@@ -427,48 +502,75 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
         </div>
 
         <footer className="flex items-center justify-between gap-3 border-t border-slate-800 px-6 py-4">
-          <button
-            type="button"
-            onClick={stepIndex === 0 ? onClose : goBack}
-            className="inline-flex items-center gap-2 text-xs text-slate-400 transition hover:text-slate-200"
-          >
-            <ArrowLeft size={13} />
-            {stepIndex === 0 ? "Back to Dashboard" : "Back"}
-          </button>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-700 px-4 py-2 text-xs font-medium text-slate-200 transition hover:bg-slate-800"
-            >
-              <Save size={13} />
-              Save Draft
-            </button>
-
-            {stepIndex < STEP_META.length - 1 ? (
+          {simulationStage ? (
+            <>
               <button
                 type="button"
-                onClick={goNext}
-                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-500"
+                onClick={onClose}
+                className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800"
               >
-                Next
-                <ChevronRight size={13} />
+                Cancel
               </button>
-            ) : (
+
               <button
                 type="button"
-                disabled={isRunning}
-                onClick={handleLaunch}
-                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-white transition ${
-                  isRunning ? "cursor-not-allowed bg-slate-700" : "bg-blue-600 hover:bg-blue-500"
+                disabled={!isSimulationComplete}
+                onClick={onClose}
+                className={`rounded-full border px-5 py-2 text-xs font-semibold transition ${
+                  isSimulationComplete
+                    ? "border-blue-500 text-blue-300 hover:bg-blue-500/10"
+                    : "cursor-not-allowed border-slate-700 text-slate-500"
                 }`}
               >
-                {isRunning ? "Launching..." : "Launch Simulation"}
-                <Rocket size={13} />
+                Completed
               </button>
-            )}
-          </div>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={stepIndex === 0 ? onClose : goBack}
+                className="inline-flex items-center gap-2 text-xs text-slate-400 transition hover:text-slate-200"
+              >
+                <ArrowLeft size={13} />
+                {stepIndex === 0 ? "Back to Dashboard" : "Back"}
+              </button>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSaveDraft}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-700 px-4 py-2 text-xs font-medium text-slate-200 transition hover:bg-slate-800"
+                >
+                  <Save size={13} />
+                  Save Draft
+                </button>
+
+                {stepIndex < STEP_META.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-500"
+                  >
+                    Next
+                    <ChevronRight size={13} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isRunning}
+                    onClick={handleLaunch}
+                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-white transition ${
+                      isRunning ? "cursor-not-allowed bg-slate-700" : "bg-blue-600 hover:bg-blue-500"
+                    }`}
+                  >
+                    {isRunning ? "Launching..." : "Launch Simulation"}
+                    <Rocket size={13} />
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </footer>
       </section>
     </div>
