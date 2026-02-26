@@ -14,6 +14,8 @@ const LoadingSpinner = () => (
 // Lazy-loaded pages
 const Login = lazy(() => import("../pages/auth/Login"));
 const Signup = lazy(() => import("../pages/auth/Signup"));
+const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword"));
+const ResetPassword = lazy(() => import("../pages/auth/ResetPassword"));
 const Dashboard = lazy(() => import("../pages/dashboard/Dashboard"));
 const IdeaForm = lazy(() => import("../pages/simulation/IdeaForm"));
 const SimulationRunner = lazy(() => import("../pages/simulation/SimulationRunner"));
@@ -47,12 +49,6 @@ const AuthLayout = ({ children }) => (
   </div>
 );
 
-const PublicLayout = ({ children }) => (
-  <div className="flex items-center justify-center min-h-screen bg-slate-950 text-slate-100 p-6">
-    {children}
-  </div>
-);
-
 export default function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
 
@@ -65,8 +61,10 @@ export default function App() {
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           {/* Public Routes */}
-          <Route path="/login" element={<PublicRoute><PublicLayout><Login /></PublicLayout></PublicRoute>} />
-          <Route path="/signup" element={<PublicRoute><PublicLayout><Signup /></PublicLayout></PublicRoute>} />
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+          <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+          <Route path="/reset-password/:token" element={<PublicRoute><ResetPassword /></PublicRoute>} />
 
           {/* Default Route */}
           <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
