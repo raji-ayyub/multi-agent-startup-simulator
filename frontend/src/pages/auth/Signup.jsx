@@ -70,7 +70,7 @@ export default function Signup() {
 
   return (
     <AuthLayout>
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0a0f1a]/92 p-6 shadow-2xl shadow-black/60 sm:p-8">
+      <div className="w-full max-w-sm   p-6 shadow-2xl  sm:p-8">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold mb-2">Create Account</h2>
             <p className="text-slate-400 text-xs">
