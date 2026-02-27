@@ -7,10 +7,17 @@ LLM, embedding, and MMR reranking utilities.
 import os
 import logging
 from typing import List, Optional, Tuple
-import numpy as np
 
 import openai
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+try:
+    import numpy as np
+except Exception:
+    np = None
+
+try:
+    from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+except Exception:
+    retry = None
 
 
 
@@ -24,25 +31,27 @@ logger = logging.getLogger(__name__)
 
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY environment variable not set")
-
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+client = openai.OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 
 
-# Retry Configuration
+def _noop_retry_decorator(func):
+    return func
 
-retry_decorator = retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
-    retry=retry_if_exception_type(
-        (openai.APIConnectionError, openai.APITimeoutError, openai.RateLimitError)
-    ),
-    before_sleep=lambda retry_state: logger.warning(
-        f"Retrying OpenAI call (attempt {retry_state.attempt_number})"
+
+if retry:
+    retry_decorator = retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(
+            (openai.APIConnectionError, openai.APITimeoutError, openai.RateLimitError)
+        ),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retrying OpenAI call (attempt {retry_state.attempt_number})"
+        )
     )
-)
+else:
+    retry_decorator = _noop_retry_decorator
 
 
 
@@ -57,6 +66,8 @@ def generate_embedding(
     Generate embedding vector for given text.
     """
     try:
+        if client is None:
+            raise ValueError("OPENAI_API_KEY environment variable not set")
         response = client.embeddings.create(
             model=model,
             input=text
@@ -69,8 +80,16 @@ def generate_embedding(
 
 
 
-def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+def cosine_similarity(a, b) -> float:
+    if np is not None:
+        return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+    numerator = sum(x * y for x, y in zip(a, b))
+    denom_a = sum(x * x for x in a) ** 0.5
+    denom_b = sum(y * y for y in b) ** 0.5
+    if denom_a == 0 or denom_b == 0:
+        return 0.0
+    return numerator / (denom_a * denom_b)
 
 
 def mmr_select(
@@ -95,9 +114,9 @@ def mmr_select(
     ]
     """
 
-    query_vec = np.array(query_embedding)
+    query_vec = np.array(query_embedding) if np is not None else query_embedding
     candidates = [
-        (text, np.array(emb), doc_id)
+        (text, np.array(emb) if np is not None else emb, doc_id)
         for text, emb, doc_id in candidate_chunks
     ]
 
@@ -113,7 +132,9 @@ def mmr_select(
     while len(selected) < min(top_k, len(candidates)):
 
         if len(selected) == 0:
-            idx = int(np.argmax(similarities))
+            idx = int(np.argmax(similarities)) if np is not None else max(
+                range(len(similarities)), key=lambda i: similarities[i]
+            )
             selected.append(candidates[idx])
             selected_indices.append(idx)
             continue
@@ -140,7 +161,9 @@ def mmr_select(
 
             mmr_scores.append(mmr_score)
 
-        idx = int(np.argmax(mmr_scores))
+        idx = int(np.argmax(mmr_scores)) if np is not None else max(
+            range(len(mmr_scores)), key=lambda i: mmr_scores[i]
+        )
         selected.append(candidates[idx])
         selected_indices.append(idx)
 
@@ -181,6 +204,8 @@ Answer:
 """
 
     try:
+        if client is None:
+            raise ValueError("OPENAI_API_KEY environment variable not set")
         response = client.chat.completions.create(
             model=model,
             messages=[
