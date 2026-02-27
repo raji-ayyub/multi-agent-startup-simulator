@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
+import { runSimulation } from "../services/simulationService";
 
 const INITIAL_IDEA = {
   name: "",
@@ -92,6 +93,7 @@ const useSimulationStore = create(
         isRunning: false,
         overallScore: null,
         recommendations: [],
+        simulationError: null,
         recentSimulations: [],
         dashboardMetrics: { ...DEFAULT_METRICS },
 
@@ -141,19 +143,26 @@ const useSimulationStore = create(
           })),
 
         startSimulation: async () => {
-          set({ isRunning: true });
+          set({ isRunning: true, simulationError: null });
           try {
-            await new Promise((resolve) => setTimeout(resolve, 1400));
             const { startupIdea, recentSimulations } = get();
-            const result = buildSimulationResult(startupIdea, "Strategy Run");
-            const recommendations = [
-              "Validate your strongest assumption with 10 customer interviews.",
-              "Tighten CAC forecasting before budget expansion.",
-              "Prioritize one segment before scaling channels.",
-            ];
+            const response = await runSimulation(startupIdea);
+            const result = {
+              startupName: response.startup_name,
+              overallScore: response.overall_score,
+              marketViability: response.metrics.marketViability,
+              investorConfidence: response.metrics.investorConfidence,
+              customerDemand: response.metrics.customerDemand,
+            };
+            const recommendations =
+              response.recommendations || [
+                "Validate your strongest assumption with 10 customer interviews.",
+                "Tighten CAC forecasting before budget expansion.",
+                "Prioritize one segment before scaling channels.",
+              ];
 
             const simulation = {
-              id: Date.now(),
+              id: response.simulation_id || Date.now(),
               name: result.startupName,
               createdAt: new Date().toISOString(),
               status: "Completed",
@@ -169,17 +178,21 @@ const useSimulationStore = create(
               isRunning: false,
               overallScore: result.overallScore,
               recommendations,
+              simulationError: null,
               dashboardMetrics: simulation.metrics,
               recentSimulations: [simulation, ...recentSimulations].slice(0, 8),
             });
           } catch (error) {
-            set({ isRunning: false });
+            set({
+              isRunning: false,
+              simulationError: error?.message || "Simulation failed.",
+            });
             throw error;
           }
         },
 
         launchSimulationFromBrief: async (brief) => {
-          set({ isRunning: true });
+          set({ isRunning: true, simulationError: null });
           try {
             set((state) => ({
               startupIdea: {
@@ -192,18 +205,24 @@ const useSimulationStore = create(
                 competitiveAdvantage: brief.elevatorPitch || state.startupIdea.competitiveAdvantage,
               },
             }));
-
-            await new Promise((resolve) => setTimeout(resolve, 1100));
             const { startupIdea, recentSimulations } = get();
-            const result = buildSimulationResult(startupIdea, "New Simulation");
-            const recommendations = [
-              "Benchmark top three competitors by pricing and positioning.",
-              "Stress-test runway using a worst-case CAC scenario.",
-              "Prioritize one acquisition channel for the next sprint.",
-            ];
+            const response = await runSimulation(startupIdea);
+            const result = {
+              startupName: response.startup_name,
+              overallScore: response.overall_score,
+              marketViability: response.metrics.marketViability,
+              investorConfidence: response.metrics.investorConfidence,
+              customerDemand: response.metrics.customerDemand,
+            };
+            const recommendations =
+              response.recommendations || [
+                "Benchmark top three competitors by pricing and positioning.",
+                "Stress-test runway using a worst-case CAC scenario.",
+                "Prioritize one acquisition channel for the next sprint.",
+              ];
 
             const simulation = {
-              id: Date.now(),
+              id: response.simulation_id || Date.now(),
               name: result.startupName,
               createdAt: new Date().toISOString(),
               status: "Completed",
@@ -219,13 +238,17 @@ const useSimulationStore = create(
               isRunning: false,
               overallScore: result.overallScore,
               recommendations,
+              simulationError: null,
               dashboardMetrics: simulation.metrics,
               recentSimulations: [simulation, ...recentSimulations].slice(0, 8),
             });
 
             return simulation;
           } catch (error) {
-            set({ isRunning: false });
+            set({
+              isRunning: false,
+              simulationError: error?.message || "Simulation failed.",
+            });
             throw error;
           }
         },
