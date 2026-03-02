@@ -1,6 +1,17 @@
 import api, { getApiErrorMessage } from "../api/axios";
 
+const getCurrentUserEmail = () => {
+  try {
+    const raw = localStorage.getItem("authUser");
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed?.email || null;
+  } catch {
+    return null;
+  }
+};
+
 const toBackendPayload = (brief) => ({
+  owner_email: getCurrentUserEmail(),
   startup_name: brief.startupName || brief.name || "",
   elevator_pitch: brief.elevatorPitch || "",
   problem_statement: brief.problemStatement || brief.problem || "",
@@ -23,5 +34,26 @@ export async function runSimulation(brief) {
     return data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Simulation request failed."));
+  }
+}
+
+export async function listSimulations() {
+  try {
+    const email = getCurrentUserEmail();
+    const { data } = await api.get("/api/v1/simulations", {
+      params: email ? { email, limit: 50 } : { limit: 50 },
+    });
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to load simulations."));
+  }
+}
+
+export async function getSimulation(simulationId) {
+  try {
+    const { data } = await api.get(`/api/v1/simulations/${simulationId}`);
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to load simulation details."));
   }
 }

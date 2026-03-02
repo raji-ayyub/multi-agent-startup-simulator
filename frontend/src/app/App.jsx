@@ -19,7 +19,6 @@ const ResetPassword = lazy(() => import("../pages/auth/ResetPassword"));
 const Landing = lazy(() => import("../pages/Landing"));
 const About = lazy(() => import("../pages/About"));
 const Dashboard = lazy(() => import("../pages/dashboard/Dashboard"));
-const IdeaForm = lazy(() => import("../pages/simulation/IdeaForm"));
 const SimulationRunner = lazy(() => import("../pages/simulation/SimulationRunner"));
 const ResultsView = lazy(() => import("../pages/simulation/ResultsView"));
 const Profile = lazy(() => import("../pages/Profile"));
@@ -80,7 +79,7 @@ export default function App() {
 
           {/* Protected Routes */}
           <Route path="/dashboard" element={<ProtectedRoute><AuthLayout><Dashboard /></AuthLayout></ProtectedRoute>} />
-          <Route path="/simulation" element={<ProtectedRoute><AuthLayout><IdeaForm /></AuthLayout></ProtectedRoute>} />
+          <Route path="/simulation" element={<ProtectedRoute><AuthLayout><ResultsView /></AuthLayout></ProtectedRoute>} />
           <Route path="/simulation/run" element={<ProtectedRoute><AuthLayout><SimulationRunner /></AuthLayout></ProtectedRoute>} />
           <Route path="/simulation/results" element={<ProtectedRoute><AuthLayout><ResultsView /></AuthLayout></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><AuthLayout><Profile /></AuthLayout></ProtectedRoute>} />
