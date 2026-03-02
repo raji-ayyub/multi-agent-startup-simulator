@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, PlayCircle, Rocket, Search } from "lucide-react";
 import EnvisioningModal from "../../components/EnvisioningModal";
 import useSimulationStore from "../../store/simulationStore";
@@ -21,7 +21,7 @@ const initials = (name) =>
 
 export default function Dashboard() {
   const { user } = useAuthStore();
-  const { dashboardMetrics, recentSimulations, overallScore } = useSimulationStore();
+  const { dashboardMetrics, recentSimulations, overallScore, fetchSimulations } = useSimulationStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const firstName = useMemo(() => {
@@ -37,6 +37,10 @@ export default function Dashboard() {
 
   const handleOpenModal = () => setIsModalOpen(true);
   const handleCloseModal = () => setIsModalOpen(false);
+
+  useEffect(() => {
+    fetchSimulations();
+  }, [fetchSimulations]);
 
   return (
     <section className="h-full text-slate-100">

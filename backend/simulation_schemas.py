@@ -1,12 +1,14 @@
-from typing import Dict, List, Literal, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 UrgencyLevel = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 
 
 class SimulationRunRequest(BaseModel):
+    owner_email: Optional[EmailStr] = None
     startup_name: str = Field(..., min_length=2, max_length=255)
     elevator_pitch: Optional[str] = ""
     problem_statement: str = Field(..., min_length=10, max_length=5000)
@@ -47,3 +49,17 @@ class SimulationRunResponse(BaseModel):
     agents: List[AgentFeedback]
     synthesis: str
     logs: List[SimulationLog]
+
+
+class SimulationRunSummary(BaseModel):
+    simulation_id: str
+    startup_name: str
+    status: str
+    overall_score: int
+    metrics: Dict[str, int]
+    created_at: datetime
+
+
+class SimulationRunDetail(SimulationRunResponse):
+    created_at: datetime
+    input_payload: Dict[str, Any]
