@@ -1,6 +1,5 @@
 import { create } from "zustand";
-import { devtools, persist } from "zustand/middleware";
-import { runSimulation } from "../services/simulationService";
+import { getSimulation, listSimulations, runSimulation } from "../services/simulationService";
 
 const INITIAL_IDEA = {
   name: "",
@@ -31,281 +30,204 @@ const DEFAULT_METRICS = {
   customerDemand: null,
 };
 
-const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+try {
+  localStorage.removeItem("simulation-storage");
+} catch {
+  // ignore storage access issues
+}
 
-const currencyToNumber = (value) => {
-  if (value == null) return 0;
-  const normalized = String(value).replace(/[^0-9.]/g, "");
-  return Number.parseFloat(normalized || "0");
-};
+const mapSummaryToRecent = (item) => ({
+  id: item.simulation_id,
+  name: item.startup_name,
+  createdAt: item.created_at,
+  status: item.status || "completed",
+  score: item.overall_score,
+  metrics: item.metrics || DEFAULT_METRICS,
+});
 
-const buildSimulationResult = (idea, fallbackName = "Untitled Simulation") => {
-  const urgencyBoost = { LOW: 2, MEDIUM: 5, HIGH: 10, CRITICAL: 13 }[idea.problemUrgency] || 0;
-  const burn = currencyToNumber(idea.monthlyBurn);
-  const cash = currencyToNumber(idea.currentCashInHand);
-  const cac = currencyToNumber(idea.estimatedCac);
+const useSimulationStore = create((set, get) => ({
+  startupIdea: { ...INITIAL_IDEA },
+  isRunning: false,
+  isLoadingHistory: false,
+  overallScore: null,
+  recommendations: [],
+  simulationError: null,
+  lastSimulationResult: null,
+  recentSimulations: [],
+  activeSimulation: null,
+  dashboardMetrics: { ...DEFAULT_METRICS },
 
-  const marketViability = clamp(
-    48 +
-      urgencyBoost +
-      (idea.primaryTargetSegment ? 10 : 0) +
-      (idea.marketSizeEstimate ? 8 : 0) +
-      (idea.competitorPatterns ? 4 : 0),
-    35,
-    95
-  );
+  updateField: (field, value) =>
+    set((state) => ({
+      startupIdea: {
+        ...state.startupIdea,
+        [field]: value,
+      },
+    })),
 
-  const investorConfidence = clamp(
-    42 +
-      (idea.elevatorPitch ? 8 : 0) +
-      (idea.marketingStrategy ? 6 : 0) +
-      (cash > 0 && burn > 0 ? Math.min((cash / Math.max(burn, 1)) * 6, 25) : 4),
-    30,
-    94
-  );
+  patchIdeaFields: (payload) =>
+    set((state) => ({
+      startupIdea: {
+        ...state.startupIdea,
+        ...payload,
+      },
+    })),
 
-  const customerDemand = clamp(
-    46 +
-      (idea.targetAudience ? 10 : 0) +
-      (idea.customerBehaviorPainPoints ? 10 : 0) +
-      (cac > 0 ? Math.max(16 - Math.round(cac / 200), 0) : 6),
-    32,
-    96
-  );
+  addAdditionalField: () =>
+    set((state) => ({
+      startupIdea: {
+        ...state.startupIdea,
+        additionalInfo: [...(state.startupIdea.additionalInfo || []), { label: "", value: "" }],
+      },
+    })),
 
-  const overallScore = Math.round((marketViability + investorConfidence + customerDemand) / 3);
-  const startupName = idea.startupName || idea.name || fallbackName;
+  updateAdditionalField: (index, field, value) =>
+    set((state) => {
+      const updated = [...(state.startupIdea.additionalInfo || [])];
+      if (!updated[index]) return state;
+      updated[index] = { ...updated[index], [field]: value };
+      return {
+        startupIdea: {
+          ...state.startupIdea,
+          additionalInfo: updated,
+        },
+      };
+    }),
 
-  return {
-    startupName,
-    overallScore,
-    marketViability,
-    investorConfidence,
-    customerDemand,
-  };
-};
+  removeAdditionalField: (index) =>
+    set((state) => ({
+      startupIdea: {
+        ...state.startupIdea,
+        additionalInfo: (state.startupIdea.additionalInfo || []).filter((_, i) => i !== index),
+      },
+    })),
 
-const useSimulationStore = create(
-  devtools(
-    persist(
-      (set, get) => ({
-        startupIdea: { ...INITIAL_IDEA },
+  fetchSimulations: async () => {
+    set({ isLoadingHistory: true, simulationError: null });
+    try {
+      const data = await listSimulations();
+      const recent = data.map(mapSummaryToRecent);
+      const latest = recent[0] || null;
+      set({
+        isLoadingHistory: false,
+        recentSimulations: recent,
+        overallScore: latest?.score ?? null,
+        dashboardMetrics: latest?.metrics || { ...DEFAULT_METRICS },
+      });
+      return recent;
+    } catch (error) {
+      set({
+        isLoadingHistory: false,
+        simulationError: error?.message || "Unable to load simulation history.",
+      });
+      return [];
+    }
+  },
+
+  fetchSimulationDetail: async (simulationId) => {
+    set({ simulationError: null });
+    try {
+      const detail = await getSimulation(simulationId);
+      set({
+        activeSimulation: detail,
+        lastSimulationResult: detail,
+      });
+      return detail;
+    } catch (error) {
+      set({
+        simulationError: error?.message || "Unable to load simulation details.",
+      });
+      return null;
+    }
+  },
+
+  startSimulation: async () => {
+    const { startupIdea } = get();
+    return get().launchSimulationFromBrief(startupIdea);
+  },
+
+  launchSimulationFromBrief: async (brief) => {
+    set({ isRunning: true, simulationError: null });
+    try {
+      set((state) => ({
+        startupIdea: {
+          ...state.startupIdea,
+          ...brief,
+          name: brief.startupName || state.startupIdea.name,
+          problem: brief.problemStatement || state.startupIdea.problem,
+          targetMarket: brief.primaryTargetSegment || state.startupIdea.targetMarket,
+          revenueModel: brief.marketingStrategy || state.startupIdea.revenueModel,
+          competitiveAdvantage: brief.elevatorPitch || state.startupIdea.competitiveAdvantage,
+        },
+      }));
+
+      const response = await runSimulation(get().startupIdea);
+      const summary = mapSummaryToRecent({
+        simulation_id: response.simulation_id,
+        startup_name: response.startup_name,
+        created_at: new Date().toISOString(),
+        status: response.status,
+        overall_score: response.overall_score,
+        metrics: response.metrics,
+      });
+
+      set((state) => ({
         isRunning: false,
-        overallScore: null,
-        recommendations: [],
+        overallScore: response.overall_score,
+        recommendations: response.recommendations || [],
         simulationError: null,
-        recentSimulations: [],
-        dashboardMetrics: { ...DEFAULT_METRICS },
+        lastSimulationResult: response,
+        activeSimulation: response,
+        dashboardMetrics: response.metrics || { ...DEFAULT_METRICS },
+        recentSimulations: [summary, ...state.recentSimulations.filter((x) => x.id !== summary.id)].slice(0, 50),
+      }));
 
-        updateField: (field, value) =>
-          set((state) => ({
-            startupIdea: {
-              ...state.startupIdea,
-              [field]: value,
-            },
-          })),
+      return response;
+    } catch (error) {
+      set({
+        isRunning: false,
+        simulationError: error?.message || "Simulation failed.",
+      });
+      throw error;
+    }
+  },
 
-        patchIdeaFields: (payload) =>
-          set((state) => ({
-            startupIdea: {
-              ...state.startupIdea,
-              ...payload,
-            },
-          })),
+  saveDraft: (draft) => {
+    localStorage.setItem("simulationDraft", JSON.stringify(draft));
+  },
 
-        addAdditionalField: () =>
-          set((state) => ({
-            startupIdea: {
-              ...state.startupIdea,
-              additionalInfo: [...(state.startupIdea.additionalInfo || []), { label: "", value: "" }],
-            },
-          })),
+  loadDraft: () => {
+    const raw = localStorage.getItem("simulationDraft");
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  },
 
-        updateAdditionalField: (index, field, value) =>
-          set((state) => {
-            const updated = [...(state.startupIdea.additionalInfo || [])];
-            if (!updated[index]) return state;
-            updated[index] = { ...updated[index], [field]: value };
-            return {
-              startupIdea: {
-                ...state.startupIdea,
-                additionalInfo: updated,
-              },
-            };
-          }),
+  clearDraft: () => {
+    localStorage.removeItem("simulationDraft");
+  },
 
-        removeAdditionalField: (index) =>
-          set((state) => ({
-            startupIdea: {
-              ...state.startupIdea,
-              additionalInfo: (state.startupIdea.additionalInfo || []).filter((_, i) => i !== index),
-            },
-          })),
+  finishSimulation: (score, recommendations) =>
+    set({
+      isRunning: false,
+      overallScore: score,
+      recommendations,
+    }),
 
-        startSimulation: async () => {
-          set({ isRunning: true, simulationError: null });
-          try {
-            const { startupIdea, recentSimulations } = get();
-            const response = await runSimulation(startupIdea);
-            const result = {
-              startupName: response.startup_name,
-              overallScore: response.overall_score,
-              marketViability: response.metrics.marketViability,
-              investorConfidence: response.metrics.investorConfidence,
-              customerDemand: response.metrics.customerDemand,
-            };
-            const recommendations =
-              response.recommendations || [
-                "Validate your strongest assumption with 10 customer interviews.",
-                "Tighten CAC forecasting before budget expansion.",
-                "Prioritize one segment before scaling channels.",
-              ];
-
-            const simulation = {
-              id: response.simulation_id || Date.now(),
-              name: result.startupName,
-              createdAt: new Date().toISOString(),
-              status: "Completed",
-              score: result.overallScore,
-              metrics: {
-                marketViability: result.marketViability,
-                investorConfidence: result.investorConfidence,
-                customerDemand: result.customerDemand,
-              },
-            };
-
-            set({
-              isRunning: false,
-              overallScore: result.overallScore,
-              recommendations,
-              simulationError: null,
-              dashboardMetrics: simulation.metrics,
-              recentSimulations: [simulation, ...recentSimulations].slice(0, 8),
-            });
-          } catch (error) {
-            set({
-              isRunning: false,
-              simulationError: error?.message || "Simulation failed.",
-            });
-            throw error;
-          }
-        },
-
-        launchSimulationFromBrief: async (brief) => {
-          set({ isRunning: true, simulationError: null });
-          try {
-            set((state) => ({
-              startupIdea: {
-                ...state.startupIdea,
-                ...brief,
-                name: brief.startupName || state.startupIdea.name,
-                problem: brief.problemStatement || state.startupIdea.problem,
-                targetMarket: brief.primaryTargetSegment || state.startupIdea.targetMarket,
-                revenueModel: brief.marketingStrategy || state.startupIdea.revenueModel,
-                competitiveAdvantage: brief.elevatorPitch || state.startupIdea.competitiveAdvantage,
-              },
-            }));
-            const { startupIdea, recentSimulations } = get();
-            const response = await runSimulation(startupIdea);
-            const result = {
-              startupName: response.startup_name,
-              overallScore: response.overall_score,
-              marketViability: response.metrics.marketViability,
-              investorConfidence: response.metrics.investorConfidence,
-              customerDemand: response.metrics.customerDemand,
-            };
-            const recommendations =
-              response.recommendations || [
-                "Benchmark top three competitors by pricing and positioning.",
-                "Stress-test runway using a worst-case CAC scenario.",
-                "Prioritize one acquisition channel for the next sprint.",
-              ];
-
-            const simulation = {
-              id: response.simulation_id || Date.now(),
-              name: result.startupName,
-              createdAt: new Date().toISOString(),
-              status: "Completed",
-              score: result.overallScore,
-              metrics: {
-                marketViability: result.marketViability,
-                investorConfidence: result.investorConfidence,
-                customerDemand: result.customerDemand,
-              },
-            };
-
-            set({
-              isRunning: false,
-              overallScore: result.overallScore,
-              recommendations,
-              simulationError: null,
-              dashboardMetrics: simulation.metrics,
-              recentSimulations: [simulation, ...recentSimulations].slice(0, 8),
-            });
-
-            return simulation;
-          } catch (error) {
-            set({
-              isRunning: false,
-              simulationError: error?.message || "Simulation failed.",
-            });
-            throw error;
-          }
-        },
-
-        saveDraft: (draft) => {
-          localStorage.setItem("simulationDraft", JSON.stringify(draft));
-        },
-
-        loadDraft: () => {
-          const raw = localStorage.getItem("simulationDraft");
-          if (!raw) return null;
-          try {
-            return JSON.parse(raw);
-          } catch {
-            return null;
-          }
-        },
-
-        clearDraft: () => {
-          localStorage.removeItem("simulationDraft");
-        },
-
-        finishSimulation: (score, recommendations) =>
-          set({
-            isRunning: false,
-            overallScore: score,
-            recommendations,
-          }),
-
-        resetSimulation: () =>
-          set({
-            startupIdea: { ...INITIAL_IDEA },
-            isRunning: false,
-            overallScore: null,
-            recommendations: [],
-          }),
-      }),
-      {
-        name: "simulation-storage",
-        merge: (persistedState, currentState) => ({
-          ...currentState,
-          ...persistedState,
-          startupIdea: {
-            ...INITIAL_IDEA,
-            ...(persistedState?.startupIdea || {}),
-          },
-          dashboardMetrics: {
-            ...DEFAULT_METRICS,
-            ...(persistedState?.dashboardMetrics || {}),
-          },
-          recentSimulations: Array.isArray(persistedState?.recentSimulations)
-            ? persistedState.recentSimulations
-            : [],
-        }),
-      }
-    )
-  )
-);
+  resetSimulation: () =>
+    set({
+      startupIdea: { ...INITIAL_IDEA },
+      isRunning: false,
+      overallScore: null,
+      recommendations: [],
+      simulationError: null,
+      lastSimulationResult: null,
+      activeSimulation: null,
+      dashboardMetrics: { ...DEFAULT_METRICS },
+    }),
+}));
 
 export default useSimulationStore;

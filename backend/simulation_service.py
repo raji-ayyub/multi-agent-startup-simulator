@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import re
+import uuid
 from typing import List
 
 from simulation_schemas import (
@@ -133,7 +134,7 @@ def run_simulation(payload: SimulationRunRequest) -> SimulationRunResponse:
         "show promise, but execution risk remains around validation cadence and capital efficiency."
     )
 
-    simulation_id = f"sim-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+    simulation_id = str(uuid.uuid4())
     return SimulationRunResponse(
         simulation_id=simulation_id,
         startup_name=payload.startup_name,

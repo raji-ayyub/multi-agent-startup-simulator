@@ -85,12 +85,11 @@ const DEFAULT_FORM = {
 };
 
 const URGENCY_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
-const AGENTIC_LOGS = [
+const FALLBACK_LOGS = [
   { role: "IDENTITY DETECTED", message: "All agents on board.." },
-  { role: "MARKET ANALYST", message: "Calculating 1,000 market scenarios..." },
-  { role: "RISK ANALYSIS", message: "Stress-testing unit economics..." },
+  { role: "MARKET ANALYST", message: "Calculating market scenarios..." },
   { role: "CUSTOMER AGENT", message: "Simulating target persona responses..." },
-  { role: "INVESTOR AGENT", message: "Scoring growth, defensibility, and runway..." },
+  { role: "INVESTOR AGENT", message: "Scoring growth and runway..." },
 ];
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -103,6 +102,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     clearDraft,
     launchSimulationFromBrief,
     patchIdeaFields,
+    simulationError,
   } = useSimulationStore();
 
   const bootDraft = loadDraft();
@@ -113,6 +113,10 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
   const [simulationStage, setSimulationStage] = useState(false);
   const [visibleLogCount, setVisibleLogCount] = useState(0);
   const [isSimulationComplete, setIsSimulationComplete] = useState(false);
+  const [runtimeLogs, setRuntimeLogs] = useState(FALLBACK_LOGS);
+  const [runtimeSynthesis, setRuntimeSynthesis] = useState("");
+  const [runtimeRecommendations, setRuntimeRecommendations] = useState([]);
+  const [runtimeAgents, setRuntimeAgents] = useState([]);
 
   const step = STEP_META[stepIndex];
   const progress = ((stepIndex + 1) / STEP_META.length) * 100;
@@ -213,28 +217,36 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     setVisibleLogCount(1);
     setIsSimulationComplete(false);
     setBannerMessage("");
+    setRuntimeLogs(FALLBACK_LOGS);
+    setRuntimeSynthesis("");
+    setRuntimeRecommendations([]);
+    setRuntimeAgents([]);
 
     try {
-      const logPlayback = (async () => {
-        for (let index = 2; index <= AGENTIC_LOGS.length; index += 1) {
-          await wait(850);
-          setVisibleLogCount(index);
-        }
-      })();
+      const result = await launchSimulationFromBrief(form);
+      const resultLogs = Array.isArray(result?.logs) && result.logs.length > 0 ? result.logs : FALLBACK_LOGS;
+      setRuntimeLogs(resultLogs);
+      setRuntimeSynthesis(result?.synthesis || "");
+      setRuntimeRecommendations(result?.recommendations || []);
+      setRuntimeAgents(result?.agents || []);
 
-      await Promise.all([launchSimulationFromBrief(form), logPlayback]);
+      for (let index = 2; index <= resultLogs.length; index += 1) {
+        await wait(450);
+        setVisibleLogCount(index);
+      }
+
       patchIdeaFields(form);
       clearDraft();
       setIsSimulationComplete(true);
       if (onSimulationLaunched) onSimulationLaunched(form);
     } catch (error) {
       setSimulationStage(false);
-      setBannerMessage("Unable to launch simulation. Please try again.");
+      setBannerMessage(simulationError || "Unable to launch simulation. Please try again.");
     }
   };
 
   const StepIcon = (simulationStage ? STEP_META[0].icon : step?.icon) || Rocket;
-  const visibleLogs = AGENTIC_LOGS.slice(0, visibleLogCount);
+  const visibleLogs = runtimeLogs.slice(0, visibleLogCount);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -469,12 +481,23 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
             </div>
 
             <div className="space-y-3">
-              {(simulationStage ? STEP_META[0].tips : step.tips).map((tip) => (
-                <p key={tip} className="flex gap-2 text-xs text-slate-400">
-                  <Lightbulb size={13} className="mt-0.5 shrink-0 text-yellow-300/80" />
-                  <span>{tip}</span>
-                </p>
-              ))}
+              {simulationStage && isSimulationComplete && runtimeAgents.length > 0 ? (
+                runtimeAgents.map((agent) => (
+                  <p key={agent.perspective} className="flex gap-2 text-xs text-slate-400">
+                    <Lightbulb size={13} className="mt-0.5 shrink-0 text-yellow-300/80" />
+                    <span>
+                      <span className="text-slate-200">{agent.perspective}:</span> {agent.summary}
+                    </span>
+                  </p>
+                ))
+              ) : (
+                (simulationStage ? STEP_META[0].tips : step.tips).map((tip) => (
+                  <p key={tip} className="flex gap-2 text-xs text-slate-400">
+                    <Lightbulb size={13} className="mt-0.5 shrink-0 text-yellow-300/80" />
+                    <span>{tip}</span>
+                  </p>
+                ))
+              )}
             </div>
 
             <div className="mt-8 rounded-xl border border-slate-700 bg-slate-900/60 p-4">
@@ -492,6 +515,24 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                 </span>
               </div>
             </div>
+
+            {simulationStage && isSimulationComplete && runtimeSynthesis ? (
+              <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Board Synthesis</p>
+                <p className="mt-2 text-xs text-slate-300">{runtimeSynthesis}</p>
+              </div>
+            ) : null}
+
+            {simulationStage && isSimulationComplete && runtimeRecommendations.length > 0 ? (
+              <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Recommended Next Steps</p>
+                <div className="mt-2 space-y-1.5">
+                  {runtimeRecommendations.map((item) => (
+                    <p key={item} className="text-xs text-slate-300">- {item}</p>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             {bannerMessage && (
               <div className="mt-4 rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-200">
