@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "sonner";
 import { useAuthStore } from "../store/authStore";
 import Sidebar from "../components/layout/Sidebar";
 import ManagementSidebar from "../components/layout/ManagementSidebar";
@@ -75,6 +76,7 @@ export default function App() {
   return (
     <Router>
       <Suspense fallback={<LoadingSpinner />}>
+        <Toaster richColors position="top-center" />
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
