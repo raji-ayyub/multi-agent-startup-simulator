@@ -37,6 +37,19 @@ export async function runSimulation(brief) {
   }
 }
 
+export async function intakeSimulationTurn(payload) {
+  try {
+    const { data } = await api.post("/api/v1/simulations/intake/turn", {
+      draft: payload?.draft || {},
+      user_message: payload?.userMessage || "",
+      history: Array.isArray(payload?.history) ? payload.history : [],
+    });
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Intake assistant request failed."));
+  }
+}
+
 export async function listSimulations() {
   try {
     const email = getCurrentUserEmail();

@@ -1,71 +1,18 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft,
+  Bot,
   CheckCircle2,
-  ChevronRight,
   Cpu,
   Lightbulb,
   Loader2,
   Monitor,
   Rocket,
   Save,
-  Target,
-  TrendingUp,
-  Wallet,
+  Send,
+  User,
   X,
 } from "lucide-react";
 import useSimulationStore from "../store/simulationStore";
-
-const STEP_META = [
-  {
-    id: "core",
-    title: "01. What are you building?",
-    subtitle: "Define the Core Problem",
-    icon: Target,
-    tipTitle: "Pro-Tip: Precision",
-    tips: [
-      "Avoid broad claims. State the exact operational pain point.",
-      "Quantify impact where possible with time, cost, or conversion loss.",
-    ],
-    fields: ["startupName", "elevatorPitch", "problemStatement", "targetAudience"],
-  },
-  {
-    id: "market",
-    title: "02. Defining your reach?",
-    subtitle: "Market Analysis",
-    icon: TrendingUp,
-    tipTitle: "Pro-Tip: Segment First",
-    tips: [
-      "Clear segment and geography reduce noisy assumptions in simulation.",
-      "Call out current alternatives your audience uses today.",
-    ],
-    fields: ["primaryTargetSegment", "geography", "marketSizeEstimate", "customerBehaviorPainPoints"],
-  },
-  {
-    id: "cost",
-    title: "03. The math of survival",
-    subtitle: "Estimated Cost",
-    icon: Wallet,
-    tipTitle: "Pro-Tip: Runway Logic",
-    tips: [
-      "Monthly burn and current cash define realistic runway constraints.",
-      "Customer acquisition cost should reflect your first 90 days.",
-    ],
-    fields: ["monthlyBurn", "estimatedCac", "currentCashInHand", "marketingStrategy"],
-  },
-  {
-    id: "review",
-    title: "04. Review & Launch Simulation",
-    subtitle: "Ready to Launch",
-    icon: Rocket,
-    tipTitle: "Pro-Tip: Launch With Intent",
-    tips: [
-      "Run with focused assumptions, then iterate each weak metric.",
-      "Use one simulation per strategy variant for cleaner comparisons.",
-    ],
-    fields: [],
-  },
-];
 
 const DEFAULT_FORM = {
   startupName: "",
@@ -84,7 +31,6 @@ const DEFAULT_FORM = {
   marketingStrategy: "",
 };
 
-const URGENCY_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 const FALLBACK_LOGS = [
   { role: "IDENTITY DETECTED", message: "All agents on board.." },
   { role: "MARKET ANALYST", message: "Calculating market scenarios..." },
@@ -102,13 +48,18 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     clearDraft,
     launchSimulationFromBrief,
     patchIdeaFields,
+    runIntakeTurn,
     simulationError,
   } = useSimulationStore();
 
   const bootDraft = loadDraft();
-  const [stepIndex, setStepIndex] = useState(0);
   const [form, setForm] = useState({ ...DEFAULT_FORM, ...(bootDraft || {}) });
-  const [errors, setErrors] = useState({});
+  const [messages, setMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isIntakeLoading, setIsIntakeLoading] = useState(false);
+  const [intakeReady, setIntakeReady] = useState(false);
+  const [completion, setCompletion] = useState(0);
+  const [missingFields, setMissingFields] = useState([]);
   const [bannerMessage, setBannerMessage] = useState("");
   const [simulationStage, setSimulationStage] = useState(false);
   const [visibleLogCount, setVisibleLogCount] = useState(0);
@@ -117,102 +68,78 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
   const [runtimeSynthesis, setRuntimeSynthesis] = useState("");
   const [runtimeRecommendations, setRuntimeRecommendations] = useState([]);
   const [runtimeAgents, setRuntimeAgents] = useState([]);
+  const messagesAnchorRef = useRef(null);
 
-  const step = STEP_META[stepIndex];
-  const progress = ((stepIndex + 1) / STEP_META.length) * 100;
-
-  const reviewCards = useMemo(
+  const collectedPreview = useMemo(
     () => [
-      { label: "Core Problem", value: form.problemStatement || "Not provided" },
+      { label: "Startup", value: form.startupName || "Pending" },
+      { label: "Problem", value: form.problemStatement || "Pending" },
+      { label: "Audience", value: form.targetAudience || "Pending" },
       {
-        label: "Market Segment",
+        label: "Segment",
         value: form.primaryTargetSegment && form.geography
           ? `${form.primaryTargetSegment} | ${form.geography}`
-          : "Not provided",
+          : "Pending",
       },
       {
-        label: "Cost Baseline",
+        label: "Economics",
         value:
           form.monthlyBurn || form.currentCashInHand
-            ? `Burn ${form.monthlyBurn || "$0"} | Cash ${form.currentCashInHand || "$0"}`
-            : "Not provided",
+            ? `Burn ${form.monthlyBurn || "N/A"} | Cash ${form.currentCashInHand || "N/A"}`
+            : "Pending",
       },
-      { label: "Go-to-Market", value: form.marketingStrategy || "Not provided" },
     ],
     [form]
   );
 
-  const setField = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: "" }));
-  };
+  useEffect(() => {
+    let active = true;
 
-  const validateStep = () => {
-    const nextErrors = {};
-
-    if (stepIndex === 0) {
-      if (!form.startupName.trim()) nextErrors.startupName = "Startup name is required.";
-      if (!form.problemStatement.trim()) nextErrors.problemStatement = "Problem statement is required.";
-      if (!form.targetAudience.trim()) nextErrors.targetAudience = "Target audience is required.";
-    }
-
-    if (stepIndex === 1) {
-      if (!form.primaryTargetSegment.trim()) nextErrors.primaryTargetSegment = "Primary target segment is required.";
-      if (!form.geography.trim()) nextErrors.geography = "Geography is required.";
-      if (!form.customerBehaviorPainPoints.trim()) {
-        nextErrors.customerBehaviorPainPoints = "Customer behavior and pain points are required.";
+    const bootstrap = async () => {
+      setIsIntakeLoading(true);
+      try {
+        const response = await runIntakeTurn({
+          draft: form,
+          userMessage: "",
+          history: [],
+        });
+        if (!active) return;
+        setForm((prev) => ({ ...prev, ...(response?.collected_fields || {}) }));
+        setMessages([
+          {
+            role: "assistant",
+            content:
+              response?.assistant_message ||
+              "Tell me about your startup idea and I will collect what is needed for simulation.",
+          },
+        ]);
+        setIntakeReady(Boolean(response?.ready_to_run));
+        setCompletion(Number(response?.completion_percent || 0));
+        setMissingFields(Array.isArray(response?.missing_fields) ? response.missing_fields : []);
+      } catch (error) {
+        if (!active) return;
+        setMessages([
+          {
+            role: "assistant",
+            content: "Tell me about your startup idea and I will collect what is needed for simulation.",
+          },
+        ]);
+      } finally {
+        if (active) setIsIntakeLoading(false);
       }
-    }
+    };
 
-    if (stepIndex === 2) {
-      if (!form.monthlyBurn.trim()) nextErrors.monthlyBurn = "Monthly burn is required.";
-      if (!form.currentCashInHand.trim()) nextErrors.currentCashInHand = "Current cash in hand is required.";
-    }
+    bootstrap();
+    return () => {
+      active = false;
+    };
+  }, []);
 
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
-  };
+  useEffect(() => {
+    messagesAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages]);
 
-  const goNext = () => {
-    if (!validateStep()) return;
-    setStepIndex((prev) => Math.min(prev + 1, STEP_META.length - 1));
-  };
-
-  const goBack = () => {
-    setStepIndex((prev) => Math.max(prev - 1, 0));
-  };
-
-  const handleSaveDraft = () => {
-    saveDraft(form);
-    patchIdeaFields(form);
-    setBannerMessage("Draft saved.");
-  };
-
-  const handleLaunch = async () => {
-    const requiredFields = [
-      "startupName",
-      "problemStatement",
-      "targetAudience",
-      "primaryTargetSegment",
-      "geography",
-      "monthlyBurn",
-      "currentCashInHand",
-    ];
-    const nextErrors = {};
-
-    requiredFields.forEach((field) => {
-      if (!String(form[field] || "").trim()) {
-        nextErrors[field] = "Required";
-      }
-    });
-
-    if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors);
-      setStepIndex(0);
-      setBannerMessage("Complete required fields before launch.");
-      return;
-    }
-
+  const launchSimulation = async (launchForm) => {
     setSimulationStage(true);
     setVisibleLogCount(1);
     setIsSimulationComplete(false);
@@ -223,7 +150,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     setRuntimeAgents([]);
 
     try {
-      const result = await launchSimulationFromBrief(form);
+      const result = await launchSimulationFromBrief(launchForm);
       const resultLogs = Array.isArray(result?.logs) && result.logs.length > 0 ? result.logs : FALLBACK_LOGS;
       setRuntimeLogs(resultLogs);
       setRuntimeSynthesis(result?.synthesis || "");
@@ -235,17 +162,67 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
         setVisibleLogCount(index);
       }
 
-      patchIdeaFields(form);
+      patchIdeaFields(launchForm);
       clearDraft();
       setIsSimulationComplete(true);
-      if (onSimulationLaunched) onSimulationLaunched(form);
     } catch (error) {
       setSimulationStage(false);
       setBannerMessage(simulationError || "Unable to launch simulation. Please try again.");
     }
   };
 
-  const StepIcon = (simulationStage ? STEP_META[0].icon : step?.icon) || Rocket;
+  const handleSend = async () => {
+    const content = chatInput.trim();
+    if (!content || isIntakeLoading || simulationStage) return;
+
+    const nextMessages = [...messages, { role: "user", content }];
+    setMessages(nextMessages);
+    setChatInput("");
+    setIsIntakeLoading(true);
+    setBannerMessage("");
+
+    try {
+      const response = await runIntakeTurn({
+        draft: form,
+        userMessage: content,
+        history: nextMessages.map((item) => ({ role: item.role, content: item.content })),
+      });
+
+      const mergedForm = { ...form, ...(response?.collected_fields || {}) };
+      setForm(mergedForm);
+      patchIdeaFields(response?.collected_fields || {});
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: response?.assistant_message || "Noted. Continue." },
+      ]);
+      setIntakeReady(Boolean(response?.ready_to_run));
+      setCompletion(Number(response?.completion_percent || 0));
+      setMissingFields(Array.isArray(response?.missing_fields) ? response.missing_fields : []);
+
+      if (response?.ready_to_run && !simulationStage && !isRunning) {
+        await launchSimulation(mergedForm);
+      }
+    } catch (error) {
+      setBannerMessage(simulationError || "Unable to process your message. Try again.");
+    } finally {
+      setIsIntakeLoading(false);
+    }
+  };
+
+  const handleSaveDraft = () => {
+    saveDraft(form);
+    patchIdeaFields(form);
+    setBannerMessage("Draft saved.");
+  };
+
+  const handleLaunch = async () => {
+    if (!intakeReady) {
+      setBannerMessage("Complete required answers first.");
+      return;
+    }
+    await launchSimulation(form);
+  };
+
   const visibleLogs = runtimeLogs.slice(0, visibleLogCount);
 
   return (
@@ -259,7 +236,9 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
               <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-600 text-xs font-bold text-white">
                 P
               </div>
-              <span className="font-medium text-slate-200">PentraAI <span className="mx-1 text-slate-600">/</span> {simulationStage ? "Simulation" : step.subtitle}</span>
+              <span className="font-medium text-slate-200">
+                PentraAI <span className="mx-1 text-slate-600">/</span> {simulationStage ? "Simulation" : "AI Intake"}
+              </span>
             </div>
             <button
               type="button"
@@ -271,16 +250,18 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
           </div>
 
           <div className="mb-2 flex items-end justify-between gap-3">
-            <h2 className="text-xl font-semibold text-white">{simulationStage ? "Loading Agents.." : step.title}</h2>
+            <h2 className="text-xl font-semibold text-white">
+              {simulationStage ? "Loading Agents.." : "Describe your startup in chat"}
+            </h2>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-              {simulationStage ? "Agentic Runtime" : `Step ${stepIndex + 1} of ${STEP_META.length}`}
+              {simulationStage ? "Agentic Runtime" : `${completion}% complete`}
             </p>
           </div>
 
           <div className="h-1.5 rounded-full bg-slate-800">
             <div
               className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300"
-              style={{ width: `${simulationStage ? 100 : progress}%` }}
+              style={{ width: `${simulationStage ? 100 : completion}%` }}
             />
           </div>
         </header>
@@ -310,7 +291,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                     {visibleLogs.map((log, index) => {
                       const isLatest = index === visibleLogs.length - 1 && !isSimulationComplete;
                       return (
-                        <article key={log.role} className="flex gap-2.5">
+                        <article key={`${log.role}-${index}`} className="flex gap-2.5">
                           <Cpu size={14} className={`mt-0.5 ${isLatest ? "text-blue-300" : "text-slate-500"}`} />
                           <div>
                             <p className={`text-[11px] uppercase tracking-[0.16em] ${isLatest ? "text-blue-300" : "text-slate-500"}`}>
@@ -324,142 +305,67 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                   </div>
                 </div>
               </div>
-            ) : stepIndex === 0 && (
-              <div className="space-y-5">
-                <InputField
-                  label="Startup Name"
-                  value={form.startupName}
-                  onChange={(value) => setField("startupName", value)}
-                  error={errors.startupName}
-                  placeholder="e.g. Lumina Analytics"
-                />
-                <InputField
-                  label="Elevator Pitch"
-                  value={form.elevatorPitch}
-                  onChange={(value) => setField("elevatorPitch", value)}
-                  placeholder="Describe your solution in one sentence..."
-                />
-                <TextAreaField
-                  label="Problem Statement"
-                  value={form.problemStatement}
-                  onChange={(value) => setField("problemStatement", value)}
-                  error={errors.problemStatement}
-                  placeholder="What specific pain point are you addressing?"
-                />
-                <InputField
-                  label="Target Audience"
-                  value={form.targetAudience}
-                  onChange={(value) => setField("targetAudience", value)}
-                  error={errors.targetAudience}
-                  placeholder="e.g. Growth-stage SaaS founders"
-                />
-                <div className="space-y-2">
-                  <Label>Problem Urgency</Label>
-                  <div className="grid grid-cols-4 rounded-xl border border-slate-700 bg-black/40 p-1">
-                    {URGENCY_LEVELS.map((level) => (
-                      <button
-                        key={level}
-                        type="button"
-                        onClick={() => setField("problemUrgency", level)}
-                        className={`rounded-lg py-2 text-[11px] font-semibold tracking-wide transition ${
-                          form.problemUrgency === level
-                            ? "border border-blue-500/40 bg-blue-500/10 text-blue-300"
-                            : "text-slate-500 hover:text-slate-300"
+            ) : (
+              <div className="flex h-full flex-col">
+                <div className="flex-1 space-y-3 overflow-y-auto rounded-xl border border-slate-800 bg-black/35 p-4">
+                  {messages.map((item, index) => (
+                    <article
+                      key={`${item.role}-${index}`}
+                      className={`flex gap-2 ${item.role === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      {item.role === "assistant" ? (
+                        <div className="mt-0.5 rounded-full border border-blue-500/40 bg-blue-500/10 h-[2rem] w-[2rem] flex items-center justify-center p-1.5 text-blue-300">
+                          <Bot size={13} />
+                        </div>
+                      ) : null}
+                      <div
+                        className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                          item.role === "assistant"
+                            ? "border border-slate-700 bg-slate-900/80 text-slate-200"
+                            : "bg-blue-600 text-white"
                         }`}
                       >
-                        {level}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {stepIndex === 1 && (
-              <div className="space-y-5">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <InputField
-                    label="Primary Target Segment"
-                    value={form.primaryTargetSegment}
-                    onChange={(value) => setField("primaryTargetSegment", value)}
-                    error={errors.primaryTargetSegment}
-                    placeholder="e.g. Enterprise SaaS & Logistics"
-                  />
-                  <InputField
-                    label="Geography"
-                    value={form.geography}
-                    onChange={(value) => setField("geography", value)}
-                    error={errors.geography}
-                    placeholder="e.g. North America"
-                  />
-                </div>
-                <InputField
-                  label="Market Size Estimate (TAM)"
-                  value={form.marketSizeEstimate}
-                  onChange={(value) => setField("marketSizeEstimate", value)}
-                  placeholder="e.g. $2.5B with 10% YoY growth"
-                />
-                <TextAreaField
-                  label="Customer Behavior & Pain Points"
-                  value={form.customerBehaviorPainPoints}
-                  onChange={(value) => setField("customerBehaviorPainPoints", value)}
-                  error={errors.customerBehaviorPainPoints}
-                  placeholder="Describe current behaviors and blockers."
-                />
-                <TextAreaField
-                  label="Competitor Patterns"
-                  value={form.competitorPatterns}
-                  onChange={(value) => setField("competitorPatterns", value)}
-                  placeholder="Who is active and where are their gaps?"
-                />
-              </div>
-            )}
-
-            {stepIndex === 2 && (
-              <div className="space-y-5">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <InputField
-                    label="Monthly Burn"
-                    value={form.monthlyBurn}
-                    onChange={(value) => setField("monthlyBurn", value)}
-                    error={errors.monthlyBurn}
-                    placeholder="$25,000"
-                  />
-                  <InputField
-                    label="Estimated CAC"
-                    value={form.estimatedCac}
-                    onChange={(value) => setField("estimatedCac", value)}
-                    placeholder="$200"
-                  />
-                </div>
-                <InputField
-                  label="Current Cash In Hand"
-                  value={form.currentCashInHand}
-                  onChange={(value) => setField("currentCashInHand", value)}
-                  error={errors.currentCashInHand}
-                  placeholder="$600,000"
-                />
-                <TextAreaField
-                  label="Marketing Strategy"
-                  value={form.marketingStrategy}
-                  onChange={(value) => setField("marketingStrategy", value)}
-                  placeholder="Positioning, channels, and initial GTM motion."
-                />
-              </div>
-            )}
-
-            {stepIndex === 3 && (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-400">
-                  Verify your key inputs before launching a high-fidelity simulation.
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {reviewCards.map((card) => (
-                    <article key={card.label} className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-                      <p className="mb-2 text-[11px] uppercase tracking-wider text-slate-500">{card.label}</p>
-                      <p className="text-sm text-slate-200">{card.value}</p>
+                        {item.content}
+                      </div>
+                      {item.role === "user" ? (
+                        <div className="mt-0.5 rounded-full border border-slate-600 bg-slate-800 p-1.5 w-[2rem] h-[2rem] flex items-center justify-center text-slate-300">
+                          <User size={13} />
+                        </div>
+                      ) : null}
                     </article>
                   ))}
+                  {isIntakeLoading ? (
+                    <p className="text-xs text-slate-500">Assistant is thinking...</p>
+                  ) : null}
+                  <div ref={messagesAnchorRef} />
+                </div>
+
+                <div className="mt-4 flex items-end gap-3">
+                  <textarea
+                    rows={2}
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && !event.shiftKey) {
+                        event.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder="Reply with details about your startup..."
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSend}
+                    disabled={isIntakeLoading || !chatInput.trim()}
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
+                      isIntakeLoading || !chatInput.trim()
+                        ? "cursor-not-allowed bg-slate-700 text-slate-500"
+                        : "bg-blue-600 text-white hover:bg-blue-500"
+                    }`}
+                  >
+                    <Send size={14} />
+                  </button>
                 </div>
               </div>
             )}
@@ -468,39 +374,43 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
           <aside className="bg-[#0b1018] p-6">
             <div className="mb-6 flex items-start gap-3">
               <div className="mt-0.5 rounded-full border border-slate-600 p-2 text-slate-300">
-                <StepIcon size={16} />
+                {simulationStage ? <Rocket size={16} /> : <Bot size={16} />}
               </div>
               <div>
                 <p className="mb-1 text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                  {simulationStage ? STEP_META[0].tipTitle : step.tipTitle}
+                  {simulationStage ? "Agentic Runtime" : "Intake Guidance"}
                 </p>
                 <p className="text-xs text-slate-400">
-                  Better inputs improve simulation signal quality and recommendation confidence.
+                  {simulationStage
+                    ? "Watch each board advisor evaluate your strategy."
+                    : "Answer naturally. The system extracts fields and asks the next needed question."}
                 </p>
               </div>
             </div>
 
-            <div className="space-y-3">
-              {simulationStage && isSimulationComplete && runtimeAgents.length > 0 ? (
-                runtimeAgents.map((agent) => (
+            {simulationStage && isSimulationComplete && runtimeAgents.length > 0 ? (
+              <div className="space-y-3 h-[10rem] overflow-auto">
+                {runtimeAgents.map((agent) => (
                   <p key={agent.perspective} className="flex gap-2 text-xs text-slate-400">
                     <Lightbulb size={13} className="mt-0.5 shrink-0 text-yellow-300/80" />
                     <span>
                       <span className="text-slate-200">{agent.perspective}:</span> {agent.summary}
                     </span>
                   </p>
-                ))
-              ) : (
-                (simulationStage ? STEP_META[0].tips : step.tips).map((tip) => (
-                  <p key={tip} className="flex gap-2 text-xs text-slate-400">
-                    <Lightbulb size={13} className="mt-0.5 shrink-0 text-yellow-300/80" />
-                    <span>{tip}</span>
-                  </p>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3 h-[10rem] overflow-auto">
+                {collectedPreview.map((item) => (
+                  <article key={item.label} className="rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-2.5">
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
+                    <p className="mt-1 text-xs text-slate-300">{item.value}</p>
+                  </article>
+                ))}
+              </div>
+            )}
 
-            <div className="mt-8 rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+            <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/60 p-4">
               <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Simulation Status</p>
               <div className="mt-2 flex items-center gap-2 text-xs text-slate-300">
                 <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
@@ -509,11 +419,14 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                     ? isSimulationComplete
                       ? "completed"
                       : "running simulation"
-                    : isRunning
-                    ? "launching simulation..."
-                    : "waiting for launch input."}
+                    : intakeReady
+                    ? "ready to run"
+                    : "collecting required fields"}
                 </span>
               </div>
+              {!simulationStage && missingFields.length > 0 ? (
+                <p className="mt-2 text-xs text-slate-500">Missing: {missingFields.join(", ")}</p>
+              ) : null}
             </div>
 
             {simulationStage && isSimulationComplete && runtimeSynthesis ? (
@@ -531,6 +444,12 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                     <p key={item} className="text-xs text-slate-300">- {item}</p>
                   ))}
                 </div>
+              </div>
+            ) : null}
+
+            {simulationStage && isSimulationComplete ? (
+              <div className="mt-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+                Simulation complete. Review outputs and confirm to close.
               </div>
             ) : null}
 
@@ -552,31 +471,28 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
               >
                 Cancel
               </button>
-
               <button
                 type="button"
                 disabled={!isSimulationComplete}
                 onClick={onClose}
                 className={`rounded-full border px-5 py-2 text-xs font-semibold transition ${
                   isSimulationComplete
-                    ? "border-blue-500 text-blue-300 hover:bg-blue-500/10"
+                    ? "border-emerald-500 text-emerald-300 hover:bg-emerald-500/10"
                     : "cursor-not-allowed border-slate-700 text-slate-500"
                 }`}
               >
-                Completed
+                Confirm & Close
               </button>
             </>
           ) : (
             <>
               <button
                 type="button"
-                onClick={stepIndex === 0 ? onClose : goBack}
-                className="inline-flex items-center gap-2 text-xs text-slate-400 transition hover:text-slate-200"
+                onClick={onClose}
+                className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800"
               >
-                <ArrowLeft size={13} />
-                {stepIndex === 0 ? "Back to Dashboard" : "Back"}
+                Back to Dashboard
               </button>
-
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -586,73 +502,22 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                   <Save size={13} />
                   Save Draft
                 </button>
-
-                {stepIndex < STEP_META.length - 1 ? (
-                  <button
-                    type="button"
-                    onClick={goNext}
-                    className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-500"
-                  >
-                    Next
-                    <ChevronRight size={13} />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={isRunning}
-                    onClick={handleLaunch}
-                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-white transition ${
-                      isRunning ? "cursor-not-allowed bg-slate-700" : "bg-blue-600 hover:bg-blue-500"
-                    }`}
-                  >
-                    {isRunning ? "Launching..." : "Launch Simulation"}
-                    <Rocket size={13} />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  disabled={isRunning || !intakeReady}
+                  onClick={handleLaunch}
+                  className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold text-white transition ${
+                    isRunning || !intakeReady ? "cursor-not-allowed bg-slate-700" : "bg-blue-600 hover:bg-blue-500"
+                  }`}
+                >
+                  {isRunning ? "Launching..." : "Run Simulation"}
+                  <Rocket size={13} />
+                </button>
               </div>
             </>
           )}
         </footer>
       </section>
-    </div>
-  );
-}
-
-function Label({ children }) {
-  return <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">{children}</label>;
-}
-
-function InputField({ label, value, onChange, placeholder, error }) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className={`w-full rounded-lg border bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 outline-none transition ${
-          error ? "border-red-500/60" : "border-slate-700 focus:border-blue-500"
-        }`}
-      />
-      {error ? <p className="text-xs text-red-400">{error}</p> : null}
-    </div>
-  );
-}
-
-function TextAreaField({ label, value, onChange, placeholder, error }) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <textarea
-        rows={4}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        className={`w-full rounded-lg border bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 outline-none transition ${
-          error ? "border-red-500/60" : "border-slate-700 focus:border-blue-500"
-        }`}
-      />
-      {error ? <p className="text-xs text-red-400">{error}</p> : null}
     </div>
   );
 }
