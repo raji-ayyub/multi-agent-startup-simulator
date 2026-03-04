@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Paperclip,
   Bot,
   CheckCircle2,
   Cpu,
@@ -68,7 +69,9 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
   const [runtimeSynthesis, setRuntimeSynthesis] = useState("");
   const [runtimeRecommendations, setRuntimeRecommendations] = useState([]);
   const [runtimeAgents, setRuntimeAgents] = useState([]);
+  const [isUploadLoading, setIsUploadLoading] = useState(false);
   const messagesAnchorRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const collectedPreview = useMemo(
     () => [
@@ -91,6 +94,18 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     ],
     [form]
   );
+
+  const showRunDecisionActions = useMemo(() => {
+    if (simulationStage || isIntakeLoading || messages.length === 0) return false;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return false;
+    const content = String(last.content || "").toLowerCase();
+    return (
+      content.includes("do you want me to run simulation now") ||
+      content.includes("do you want me to run simulation") ||
+      content.includes("tell me when to run simulation")
+    );
+  }, [messages, simulationStage, isIntakeLoading]);
 
   useEffect(() => {
     let active = true;
@@ -171,13 +186,11 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     }
   };
 
-  const handleSend = async () => {
-    const content = chatInput.trim();
+  const submitMessage = async (content) => {
     if (!content || isIntakeLoading || simulationStage) return;
 
     const nextMessages = [...messages, { role: "user", content }];
     setMessages(nextMessages);
-    setChatInput("");
     setIsIntakeLoading(true);
     setBannerMessage("");
 
@@ -209,10 +222,63 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     }
   };
 
+  const handleSend = async () => {
+    const content = chatInput.trim();
+    if (!content) return;
+    setChatInput("");
+    await submitMessage(content);
+  };
+
+  const handlePickFile = () => {
+    if (isIntakeLoading || simulationStage || isUploadLoading) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (simulationStage || isIntakeLoading) return;
+
+    setIsUploadLoading(true);
+    setBannerMessage("");
+    try {
+      const maxBytes = 2 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        setBannerMessage("File too large. Please upload files up to 2MB.");
+        return;
+      }
+
+      const fileText = await file.text();
+      const trimmed = fileText.trim();
+      if (!trimmed) {
+        setBannerMessage("Uploaded file is empty.");
+        return;
+      }
+
+      const clipped = trimmed.slice(0, 6000);
+      const uploadMessage = `Uploaded file: ${file.name}\n\n${clipped}`;
+      await submitMessage(uploadMessage);
+    } catch (error) {
+      setBannerMessage("Unable to read that file. Try a text-based file.");
+    } finally {
+      setIsUploadLoading(false);
+    }
+  };
+
   const handleSaveDraft = () => {
     saveDraft(form);
     patchIdeaFields(form);
     setBannerMessage("Draft saved.");
+  };
+
+  const handleQuickRunNow = async () => {
+    await submitMessage("Run simulation now.");
+  };
+
+  const handleQuickAddMore = async () => {
+    await submitMessage("I want to add more details first.");
   };
 
   const handleLaunch = async () => {
@@ -234,7 +300,11 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
           <div className="mb-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-600 text-xs font-bold text-white">
-                P
+                <img
+                  src="/images/Icon.svg"
+                  alt="Logo"
+                  className="min-w-8 h-8 bg-black p-1 rounded-lg"
+                />
               </div>
               <span className="font-medium text-slate-200">
                 PentraAI <span className="mx-1 text-slate-600">/</span> {simulationStage ? "Simulation" : "AI Intake"}
@@ -341,6 +411,13 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                 </div>
 
                 <div className="mt-4 flex items-end gap-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    accept=".txt,.md,.csv,.json,.log,text/plain,text/markdown,text/csv,application/json"
+                  />
                   <textarea
                     rows={2}
                     value={chatInput}
@@ -356,6 +433,19 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                   />
                   <button
                     type="button"
+                    onClick={handlePickFile}
+                    disabled={isIntakeLoading || simulationStage || isUploadLoading}
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
+                      isIntakeLoading || simulationStage || isUploadLoading
+                        ? "cursor-not-allowed bg-slate-700 text-slate-500"
+                        : "bg-slate-700 text-slate-100 hover:bg-slate-600"
+                    }`}
+                    title="Upload text file"
+                  >
+                    {isUploadLoading ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleSend}
                     disabled={isIntakeLoading || !chatInput.trim()}
                     className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
@@ -367,6 +457,35 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                     <Send size={14} />
                   </button>
                 </div>
+
+                {showRunDecisionActions ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleQuickRunNow}
+                      disabled={isIntakeLoading || simulationStage}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                        isIntakeLoading || simulationStage
+                          ? "cursor-not-allowed bg-slate-700 text-slate-500"
+                          : "bg-emerald-500 text-black hover:bg-emerald-400"
+                      }`}
+                    >
+                      Run simulation now
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleQuickAddMore}
+                      disabled={isIntakeLoading || simulationStage}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                        isIntakeLoading || simulationStage
+                          ? "cursor-not-allowed bg-slate-700 text-slate-500"
+                          : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                      }`}
+                    >
+                      Add more details
+                    </button>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>

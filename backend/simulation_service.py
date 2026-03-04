@@ -72,6 +72,8 @@ INTAKE_REQUIRED_FIELDS = [
     "marketingStrategy",
 ]
 
+MAX_INTAKE_USER_TURNS = 3
+
 INTAKE_QUESTIONS = {
     "startupName": "Startup name?",
     "problemStatement": "What exact problem are you solving?",
@@ -203,136 +205,6 @@ def _merge_updates(draft: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, 
     return merged
 
 
-def _first_sentence(text: str) -> str:
-    sentence = re.split(r"[.!?]\s+", text.strip(), maxsplit=1)[0].strip()
-    return sentence[:240]
-
-
-def _extract_numeric_phrase(message: str, keywords: List[str]) -> str:
-    lines = [segment.strip() for segment in re.split(r"[\n;]", message) if segment.strip()]
-    for line in lines:
-        lowered = line.lower()
-        if any(keyword in lowered for keyword in keywords):
-            amount = re.search(r"(\$?\s?\d[\d,]*(?:\.\d+)?\s*[kKmMbB]?)", line)
-            if amount:
-                return amount.group(1).replace(" ", "")
-            return line[:120]
-    return ""
-
-
-def _extract_geography(message: str) -> str:
-    patterns = [
-        r"(?:geography|region|market|launch(?:ing)? in|starting in|focus(?:ed)? on)\s*[:\-]?\s*([^\n,.]+)",
-        r"\b(?:in|across)\s+((?:north america|europe|africa|asia|global|worldwide|usa|us|uk|canada|nigeria|india|latam)[^,.\n]*)",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, message, flags=re.IGNORECASE)
-        if match:
-            return match.group(1).strip()
-    return ""
-
-
-def _extract_target_audience(message: str) -> str:
-    patterns = [
-        r"(?:target audience|ideal customer|icp|for)\s*[:\-]?\s*([^\n.]+)",
-        r"(?:serv(?:e|ing)|help(?:s|ing))\s+([^\n.]+)",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, message, flags=re.IGNORECASE)
-        if match:
-            value = match.group(1).strip()
-            if len(value) > 3:
-                return value[:220]
-    return ""
-
-
-def _regex_intake_updates(draft: Dict[str, Any], user_message: str) -> Dict[str, Any]:
-    if not user_message.strip():
-        return {}
-
-    updates: Dict[str, Any] = {}
-    text = user_message.strip()
-    lowered = text.lower()
-
-    if _is_blank(draft.get("elevatorPitch")) and len(text) > 20:
-        updates["elevatorPitch"] = _first_sentence(text)
-
-    if _is_blank(draft.get("problemStatement")):
-        prob_match = re.search(
-            r"(?:problem(?: statement)?|we solve|solving)\s*[:\-]?\s*([^\n]+)",
-            text,
-            flags=re.IGNORECASE,
-        )
-        if prob_match:
-            updates["problemStatement"] = prob_match.group(1).strip()[:500]
-
-    if _is_blank(draft.get("targetAudience")):
-        target = _extract_target_audience(text)
-        if target:
-            updates["targetAudience"] = target
-
-    if _is_blank(draft.get("primaryTargetSegment")):
-        seg_match = re.search(
-            r"(?:segment|primary segment|target segment)\s*[:\-]?\s*([^\n.]+)",
-            text,
-            flags=re.IGNORECASE,
-        )
-        if seg_match:
-            updates["primaryTargetSegment"] = seg_match.group(1).strip()[:220]
-        elif "b2b" in lowered or "b2c" in lowered:
-            updates["primaryTargetSegment"] = "B2B" if "b2b" in lowered else "B2C"
-
-    if _is_blank(draft.get("geography")):
-        geography = _extract_geography(text)
-        if geography:
-            updates["geography"] = geography
-
-    if _is_blank(draft.get("monthlyBurn")):
-        burn = _extract_numeric_phrase(text, ["monthly burn", "burn rate", "burn"])
-        if burn:
-            updates["monthlyBurn"] = burn
-
-    if _is_blank(draft.get("currentCashInHand")):
-        cash = _extract_numeric_phrase(text, ["cash in hand", "cash runway", "cash on hand", "cash"])
-        if cash:
-            updates["currentCashInHand"] = cash
-
-    if _is_blank(draft.get("estimatedCac")):
-        cac = _extract_numeric_phrase(text, ["cac", "customer acquisition cost", "acquisition cost"])
-        if cac:
-            updates["estimatedCac"] = cac
-
-    if _is_blank(draft.get("marketingStrategy")):
-        gtm_match = re.search(
-            r"(?:marketing strategy|go[- ]to[- ]market|gtm|acquisition channel)\s*[:\-]?\s*([^\n]+)",
-            text,
-            flags=re.IGNORECASE,
-        )
-        if gtm_match:
-            updates["marketingStrategy"] = gtm_match.group(1).strip()[:400]
-
-    if _is_blank(draft.get("problemUrgency")) or draft.get("problemUrgency", "").upper() not in {
-        "LOW",
-        "MEDIUM",
-        "HIGH",
-        "CRITICAL",
-    }:
-        urgency_match = re.search(r"\b(low|medium|high|critical)\b", lowered)
-        if urgency_match:
-            updates["problemUrgency"] = urgency_match.group(1).upper()
-
-    if _is_blank(draft.get("startupName")):
-        name_match = re.search(
-            r"(?:startup(?: name)?|company(?: name)?|called|building)\s*[:\-]?\s*([A-Za-z0-9][^\n,.]{1,80})",
-            text,
-            flags=re.IGNORECASE,
-        )
-        if name_match:
-            updates["startupName"] = name_match.group(1).strip()
-
-    return updates
-
-
 def _extract_intake_updates(
     draft: Dict[str, Any],
     user_message: str,
@@ -344,16 +216,7 @@ def _extract_intake_updates(
     if not user_message.strip():
         return fallback["updates"]
 
-    heuristic_updates = _regex_intake_updates(draft, user_message)
     if client is None:
-        if heuristic_updates:
-            return heuristic_updates
-        # Deterministic fallback for first question in environments without LLM.
-        first_missing = next((f for f in INTAKE_REQUIRED_FIELDS if _is_blank(draft.get(f))), "")
-        if first_missing == "startupName":
-            return {"startupName": user_message.strip()[:120]}
-        if first_missing == "problemStatement":
-            return {"problemStatement": user_message.strip()[:800]}
         return {}
 
     system_prompt = (
@@ -376,8 +239,7 @@ def _extract_intake_updates(
     )
     result = _invoke_json(system_prompt, user_prompt, fallback)
     updates = result.get("updates", {}) if isinstance(result, dict) else {}
-    llm_updates = updates if isinstance(updates, dict) else {}
-    return {**heuristic_updates, **llm_updates}
+    return updates if isinstance(updates, dict) else {}
 
 
 def _next_intake_question(draft: Dict[str, Any], newly_filled: List[str] | None = None) -> str:
@@ -405,6 +267,116 @@ def _remaining_required_summary(missing: List[str]) -> str:
     return ", ".join(labels)
 
 
+def _count_user_turns(history: List[Dict[str, str]] | None, user_message: str) -> int:
+    history = history or []
+    turns = sum(1 for item in history if str(item.get("role", "")).lower() == "user")
+    if user_message.strip():
+        if not history:
+            turns += 1
+        else:
+            last = history[-1]
+            last_role = str(last.get("role", "")).lower()
+            last_content = str(last.get("content", "")).strip()
+            if last_role != "user" or last_content != user_message.strip():
+                turns += 1
+    return turns
+
+
+def _classify_intake_intent(
+    user_message: str,
+    history: List[Dict[str, str]] | None = None,
+) -> str:
+    history = history or []
+    text = user_message.strip()
+    if not text:
+        return "EMPTY"
+    if client is None:
+        return "STARTUP"
+
+    system_prompt = (
+        "Classify the user's latest message for a startup intake assistant.\n"
+        "Return JSON only: {\"intent\":\"STARTUP|SOCIAL|OFFTOPIC_PERSONAL\"}.\n"
+        "STARTUP: message relates to startup/business idea or simulation fields.\n"
+        "SOCIAL: greeting/small-talk/acknowledgement.\n"
+        "OFFTOPIC_PERSONAL: unrelated personal/health/life question."
+    )
+    user_prompt = (
+        f"Recent conversation:\n{json.dumps(history[-8:], ensure_ascii=True)}\n\n"
+        f"Latest user message:\n{text}"
+    )
+    result = _invoke_json(system_prompt, user_prompt, {"intent": "STARTUP"})
+    intent = str(result.get("intent", "STARTUP")).upper() if isinstance(result, dict) else "STARTUP"
+    return intent if intent in {"STARTUP", "SOCIAL", "OFFTOPIC_PERSONAL"} else "STARTUP"
+
+
+def _classify_run_decision(
+    user_message: str,
+    history: List[Dict[str, str]] | None = None,
+) -> str:
+    text = user_message.strip()
+    if not text:
+        return "UNKNOWN"
+    history = history or []
+
+    if client is None:
+        lowered = text.lower()
+        if "run" in lowered and ("yes" in lowered or "go" in lowered or "start" in lowered):
+            return "CONFIRM_RUN"
+        if "more" in lowered or "add" in lowered:
+            return "ADD_MORE"
+        return "UNKNOWN"
+
+    system_prompt = (
+        "Classify the user's latest message about startup simulation execution.\n"
+        "Return JSON only: {\"decision\":\"CONFIRM_RUN|ADD_MORE|UNKNOWN\"}.\n"
+        "CONFIRM_RUN: user clearly wants to run now.\n"
+        "ADD_MORE: user clearly wants to add more before running.\n"
+        "UNKNOWN: unclear."
+    )
+    user_prompt = (
+        f"Recent conversation:\n{json.dumps(history[-10:], ensure_ascii=True)}\n\n"
+        f"Latest user message:\n{text}"
+    )
+    result = _invoke_json(system_prompt, user_prompt, {"decision": "UNKNOWN"})
+    decision = str(result.get("decision", "UNKNOWN")).upper() if isinstance(result, dict) else "UNKNOWN"
+    return decision if decision in {"CONFIRM_RUN", "ADD_MORE", "UNKNOWN"} else "UNKNOWN"
+
+
+def _build_add_more_suggestions(draft: Dict[str, Any]) -> str:
+    optional_priority = [
+        "elevatorPitch",
+        "marketSizeEstimate",
+        "competitorPatterns",
+        "estimatedCac",
+        "problemUrgency",
+    ]
+    ideas = [FIELD_LABELS.get(field, field) for field in optional_priority if _is_blank(draft.get(field))]
+    if not ideas:
+        return "competitor edge, pricing assumptions, and first 90-day milestones"
+    return ", ".join(ideas[:3])
+
+
+def _autofill_required_fields(draft: Dict[str, Any]) -> Dict[str, Any]:
+    filled = {**draft}
+    defaults = {
+        "startupName": "Untitled Startup",
+        "problemStatement": "Problem details are still being refined for this simulation run.",
+        "targetAudience": "Early adopters in the intended target market.",
+        "primaryTargetSegment": "General Market",
+        "geography": "Global",
+        "customerBehaviorPainPoints": "Pain points are under validation with target users.",
+        "monthlyBurn": "$0",
+        "currentCashInHand": "$0",
+        "marketingStrategy": "Initial go-to-market assumptions will be validated after this run.",
+    }
+    for key, default_value in defaults.items():
+        if _is_blank(filled.get(key)):
+            filled[key] = default_value
+    if _is_blank(filled.get("problemUrgency")):
+        filled["problemUrgency"] = "HIGH"
+    return filled
+
+
 def run_intake_turn(
     draft: Dict[str, Any] | None,
     user_message: str = "",
@@ -413,33 +385,100 @@ def run_intake_turn(
     normalized = _normalize_intake_draft(draft)
     updates = _extract_intake_updates(normalized, user_message, history)
     merged = _merge_updates(normalized, updates)
-    newly_filled = [field for field in INTAKE_FIELDS if _is_blank(normalized.get(field)) and not _is_blank(merged.get(field))]
+
+    intent = _classify_intake_intent(user_message, history)
+    social_message = intent == "SOCIAL"
+    off_topic_personal = intent == "OFFTOPIC_PERSONAL"
+
+    startup_like_input = bool(user_message.strip()) and intent == "STARTUP"
+    effective_user_turns = _count_user_turns(history, user_message) if startup_like_input else 0
+    force_run = effective_user_turns >= MAX_INTAKE_USER_TURNS
+
+    if force_run:
+        merged = _autofill_required_fields(merged)
 
     missing = [field for field in INTAKE_REQUIRED_FIELDS if _is_blank(merged.get(field))]
     required_done = len(INTAKE_REQUIRED_FIELDS) - len(missing)
     completion = _clamp((required_done / len(INTAKE_REQUIRED_FIELDS)) * 100)
-    ready = len(missing) == 0
+    candidate_ready = len(missing) == 0 or force_run
+    run_decision = _classify_run_decision(user_message, history) if user_message.strip() else "UNKNOWN"
+    early_confirm_gate = startup_like_input and effective_user_turns >= 2 and not candidate_ready
+
+    # If user explicitly asks to run, proceed with assumptions even when required fields are incomplete.
+    if startup_like_input and run_decision == "CONFIRM_RUN" and not candidate_ready:
+        merged = _autofill_required_fields(merged)
+        missing = [field for field in INTAKE_REQUIRED_FIELDS if _is_blank(merged.get(field))]
+        required_done = len(INTAKE_REQUIRED_FIELDS) - len(missing)
+        completion = _clamp((required_done / len(INTAKE_REQUIRED_FIELDS)) * 100)
+        candidate_ready = True
+
+    ready = candidate_ready and run_decision == "CONFIRM_RUN"
 
     if not user_message.strip():
         assistant_message = (
-            "Hi, share your startup idea in one message: what you are building, who it is for, "
-            "problem, segment, geography, burn, cash, and go-to-market."
+            "Hi. Share your startup idea in one message. "
+            "I can run with assumptions after up to 3 replies."
         )
-    elif ready:
-        assistant_message = "Core data complete. Running simulation now."
-    else:
-        captured = ", ".join(FIELD_LABELS.get(field, field) for field in newly_filled[:6])
-        remaining = _remaining_required_summary(missing)
-        if captured:
+    elif off_topic_personal:
+        assistant_message = (
+            "Sorry you're dealing with that. I'm not a medical provider, "
+            "but I can continue the startup simulation whenever you're ready."
+        )
+    elif social_message and not ready:
+        assistant_message = (
+            "Hey. Share your startup idea whenever you are ready, "
+            "and I will simulate it quickly."
+        )
+    elif force_run:
+        if run_decision == "CONFIRM_RUN":
+            assistant_message = "Great, confirmed. Running first-pass simulation now."
+        elif run_decision == "ADD_MORE":
+            suggestions = _build_add_more_suggestions(merged)
             assistant_message = (
-                f"Captured: {captured}. Remaining required fields: {remaining}. "
-                "Reply with any or all remaining fields in one message."
+                f"Perfect. Add anything else you want before we run. "
+                f"Useful extras: {suggestions}. "
+                "When ready, tell me to run simulation."
             )
         else:
             assistant_message = (
-                f"Remaining required fields: {remaining}. "
-                "Reply with any or all remaining fields in one message."
+                "I have enough context for a first-pass run. "
+                "Do you want me to run simulation now, or do you want to add more details first?"
             )
+    elif early_confirm_gate:
+        if run_decision == "ADD_MORE":
+            suggestions = _build_add_more_suggestions(merged)
+            assistant_message = (
+                f"Got it. Add anything else you want and I will include it. "
+                f"Useful extras: {suggestions}. "
+                "When you're ready, tell me to run simulation."
+            )
+        else:
+            assistant_message = (
+                "I can run a first-pass simulation now with assumptions, or we can keep refining. "
+                "Do you want to run now or add more details first?"
+            )
+    elif candidate_ready and ready:
+        assistant_message = "Great, I have enough context. Running simulation now."
+    elif candidate_ready:
+        if run_decision == "ADD_MORE":
+            suggestions = _build_add_more_suggestions(merged)
+            assistant_message = (
+                f"Sure, add more context and I'll include it. "
+                f"Useful extras: {suggestions}. "
+                "Tell me when to run simulation."
+            )
+        else:
+            assistant_message = (
+                "I have enough context to run. "
+                "Do you want me to run simulation now, or do you want to add more first?"
+            )
+    else:
+        remaining = _remaining_required_summary(missing)
+        turns_left = max(0, MAX_INTAKE_USER_TURNS - effective_user_turns)
+        assistant_message = (
+            f"Need these to improve accuracy: {remaining}. "
+            f"Reply once with what you can ({turns_left} turn(s) left before auto-run)."
+        )
 
     return SimulationIntakeTurnResponse(
         assistant_message=assistant_message,
