@@ -280,7 +280,11 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
           <div className="mb-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-600 text-xs font-bold text-white">
-                P
+                <img
+                  src="/images/Icon.svg"
+                  alt="Logo"
+                  className="min-w-8 h-8 bg-black p-1 rounded-lg"
+                />
               </div>
               <span className="font-medium text-slate-200">
                 PentraAI <span className="mx-1 text-slate-600">/</span> {simulationStage ? "Simulation" : "AI Intake"}

@@ -1,12 +1,12 @@
-import { Bell, BarChart3, LayoutDashboard, Settings, Sparkles, UserCircle2 } from "lucide-react";
+import { Bell, BriefcaseBusiness, ClipboardList, LineChart, Settings, UserCircle2 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import ModeSwitch from "./ModeSwitch";
 
 const menuItems = [
-  { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { title: "Simulations", icon: Sparkles, path: "/simulation" },
-  { title: "Reports", icon: BarChart3, path: "/simulation/results" },
+  { title: "Management Home", icon: BriefcaseBusiness, path: "/management" },
+  { title: "Activity Planner", icon: ClipboardList, path: "/management" },
+  { title: "Execution Signals", icon: LineChart, path: "/management" },
 ];
 
 const systemItems = [
@@ -14,22 +14,18 @@ const systemItems = [
   { title: "Settings", icon: Settings, path: "/settings" },
 ];
 
-export default function Sidebar() {
+export default function ManagementSidebar() {
   const { user } = useAuthStore();
 
   return (
-    <aside className="flex h-screen w-[248px] flex-col justify-between border-r border-slate-800 bg-[#070b11] px-4 py-5 text-slate-300">
+    <aside className="flex h-screen w-[248px] flex-col justify-between border-r border-slate-800 bg-[#070d14] px-4 py-5 text-slate-300">
       <div>
         <div className="px-2">
           <div className="flex items-center gap-2">
-            <img
-              src="/images/Icon.svg"
-              alt="Logo"
-              className="w-8 h-8 bg-black p-1 rounded-lg"
-            />
-            <h1 className="text-sm font-semibold tracking-wide text-[#E2E78D]">PentraAI</h1>
+            <img src="/images/Icon.svg" alt="Logo" className="h-8 w-8 rounded-lg bg-black p-1" />
+            <h1 className="text-sm font-semibold tracking-wide text-cyan-300">Pentra Manage</h1>
           </div>
-          <p className="mt-1 text-xs text-slate-500">The Startup Consultant</p>
+          <p className="mt-1 text-xs text-slate-500">Startup Management OS</p>
         </div>
 
         <nav className="mt-6 space-y-1.5">
@@ -45,20 +41,20 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        <div className="my-6 px-2">
-          <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-slate-500 ">Mode</p>
-          <ModeSwitch mode="simulation" />
+        <div className="mt-6 px-2">
+          <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">Mode</p>
+          <ModeSwitch mode="management" />
         </div>
       </div>
 
       <div className="space-y-4">
-        <article className="rounded-2xl border border-slate-700 bg-gradient-to-b from-slate-100 to-slate-300 p-4 text-center text-slate-900">
-          <p className="text-xs font-semibold leading-tight">AI FOR RESULT ANALYTICS</p>
+        <article className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-4 text-center">
+          <p className="text-xs font-semibold leading-tight text-cyan-200">AGENTIC EXECUTION BOARD</p>
           <button
             type="button"
-            className="mt-3 rounded-full bg-slate-900 px-4 py-1.5 text-[11px] font-semibold text-white transition hover:bg-black"
+            className="mt-3 rounded-full bg-cyan-500 px-4 py-1.5 text-[11px] font-semibold text-black transition hover:bg-cyan-400"
           >
-            TRY NOW
+            OPEN PLANNER
           </button>
         </article>
 
@@ -68,7 +64,7 @@ export default function Sidebar() {
           </div>
           <div>
             <p className="text-sm font-medium text-slate-200">{user?.fullName || user?.name || "Olivia Trent"}</p>
-            <p className="text-xs text-slate-500">Dev Lead</p>
+            <p className="text-xs text-slate-500">Operations Lead</p>
           </div>
         </div>
       </div>
@@ -81,10 +77,8 @@ function NavItem({ title, icon: Icon, path }) {
     <NavLink
       to={path}
       className={({ isActive }) =>
-        `mx-1.5 flex items-center gap-2.5  px-3 py-2 text-sm transition ${
-          isActive
-            ? "border-l-4 border-blue-500/70  text-blue-500"
-            : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+        `mx-1.5 flex items-center gap-2.5 px-3 py-2 text-sm transition ${
+          isActive ? "border-l-4 border-cyan-500/70 text-cyan-300" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
         }`
       }
     >
