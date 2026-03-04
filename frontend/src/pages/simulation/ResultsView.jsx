@@ -71,8 +71,8 @@ export default function ResultsView() {
 
   return (
     <div className="grid gap-5 xl:grid-cols-[290px_1fr]">
-      <aside className="rounded-2xl border border-[#3a320b] bg-[#090a0d] p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[#f6d30c]">Simulation History</h2>
+      <aside className="rounded-2xl border border-amber-200 bg-[#090a0d] p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-amber-200">Simulation History</h2>
         <div className="space-y-2">
           {recentSimulations.map((item) => (
             <button
@@ -81,7 +81,7 @@ export default function ResultsView() {
               onClick={() => fetchSimulationDetail(item.id)}
               className={`w-full rounded-lg border px-3 py-2 text-left transition ${
                 item.id === activeSimulation.simulation_id
-                  ? "border-[#f6d30c] bg-[#1a1607]"
+                  ? "border-amber-200 bg-amber-200/10"
                   : "border-slate-800 bg-[#0f1117] hover:border-slate-600"
               }`}
             >
@@ -92,14 +92,14 @@ export default function ResultsView() {
         </div>
         <Link
           to="/dashboard"
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#f6d30c] px-4 py-2.5 text-sm font-semibold text-black"
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-200 px-4 py-2.5 text-sm font-semibold text-black"
         >
           <Rocket size={14} />
           New Simulation
         </Link>
       </aside>
 
-      <section className="space-y-4 rounded-2xl border border-[#3a320b] bg-[#0a0b10] p-5">
+      <section className="space-y-4 rounded-2xl border border-amber-200 bg-[#0a0b10] p-5">
         <header className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-800 pb-3">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Active Simulation</p>
@@ -145,14 +145,14 @@ export default function ResultsView() {
           })}
         </div>
 
-        <article className="rounded-xl border border-[#6f5f10] bg-[linear-gradient(90deg,#2d2506,#11131a)] p-5">
+        <article className="rounded-xl border border-amber-200 bg-[linear-gradient(90deg, amber ,#11131a)] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Strategic Verdict</p>
-              <p className="mt-1 inline-flex rounded bg-[#f6d30c] px-2 py-1 text-[11px] font-semibold text-black">{confidenceLabel(score)}</p>
+              <p className="mt-1 inline-flex rounded bg-amber-200 px-2 py-1 text-[11px] font-semibold text-black">{confidenceLabel(score)}</p>
               <h2 className="mt-2 text-5xl font-bold text-white">{score >= 65 ? "PROCEED TO SEED" : "ITERATE BEFORE SCALE"}</h2>
             </div>
-            <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-[#f6d30c] px-5 py-3 text-sm font-semibold text-black">
+            <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-amber-200 px-5 py-3 text-sm font-semibold text-black">
               <Download size={16} />
               Download Full Strategy Deck
             </button>
@@ -160,7 +160,7 @@ export default function ResultsView() {
           <p className="mt-3 text-sm text-slate-300">{activeSimulation.synthesis}</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div>
-              <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-[#f6d30c]">Core Strengths</p>
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-amber-200">Core Strengths</p>
               <div className="space-y-1.5">
                 {strengths.map((item) => (
                   <p key={item} className="text-sm text-slate-200">- {item}</p>
@@ -186,7 +186,7 @@ export default function ResultsView() {
 
 function Panel({ title, value }) {
   return (
-    <article className="rounded-lg border border-slate-800 bg-[#0f1118] p-3">
+    <article className="rounded-lg border border-slate-800 bg-[#0f1118] p-3 max-h-[20rem] overflow-auto">
       <p className="mb-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">{title}</p>
       <p className="text-sm text-slate-200">{value || "Not provided"}</p>
     </article>

@@ -63,3 +63,17 @@ class SimulationRunSummary(BaseModel):
 class SimulationRunDetail(SimulationRunResponse):
     created_at: datetime
     input_payload: Dict[str, Any]
+
+
+class SimulationIntakeTurnRequest(BaseModel):
+    draft: Dict[str, Any] = Field(default_factory=dict)
+    user_message: str = ""
+    history: List[Dict[str, str]] = Field(default_factory=list)
+
+
+class SimulationIntakeTurnResponse(BaseModel):
+    assistant_message: str
+    collected_fields: Dict[str, Any]
+    missing_fields: List[str]
+    ready_to_run: bool
+    completion_percent: int = Field(..., ge=0, le=100)

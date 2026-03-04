@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import { getSimulation, listSimulations, runSimulation } from "../services/simulationService";
+import {
+  getSimulation,
+  intakeSimulationTurn,
+  listSimulations,
+  runSimulation,
+} from "../services/simulationService";
 
 const INITIAL_IDEA = {
   name: "",
@@ -187,6 +192,26 @@ const useSimulationStore = create((set, get) => ({
       set({
         isRunning: false,
         simulationError: error?.message || "Simulation failed.",
+      });
+      throw error;
+    }
+  },
+
+  runIntakeTurn: async ({ draft, userMessage, history }) => {
+    try {
+      const response = await intakeSimulationTurn({ draft, userMessage, history });
+      if (response?.collected_fields) {
+        set((state) => ({
+          startupIdea: {
+            ...state.startupIdea,
+            ...response.collected_fields,
+          },
+        }));
+      }
+      return response;
+    } catch (error) {
+      set({
+        simulationError: error?.message || "Unable to process intake conversation.",
       });
       throw error;
     }

@@ -112,7 +112,7 @@ def retrieve_docs(
             with conn.cursor() as cur:
                 # Build WHERE clause if filters provided
                 where_clause = ""
-                params = [embedding_str, top_k]
+                params = [embedding_str]
 
                 if filters:
                     conditions = []
@@ -120,12 +120,13 @@ def retrieve_docs(
                     for key, val in filters.items():
                         if key == "document_type":
                             conditions.append(f"dc.document_type = %s")
+                            params.append(val)
                         elif key == "user_id":
                             conditions.append(f"dc.user_id = %s")
+                            params.append(val)
                         elif key == "source":
                             conditions.append(f"dc.source ILIKE %s")
-                        if conditions:
-                            params.append(val)
+                            params.append(f"%{val}%")
                     if conditions:
                         where_clause = "WHERE " + " AND ".join(conditions)
 
@@ -141,6 +142,7 @@ def retrieve_docs(
                     ORDER BY dc.embedding <=> %s::vector
                     LIMIT %s
                 """
+                params.extend([embedding_str, top_k])
                 cur.execute(query_sql, params)
                 rows = cur.fetchall()
 
@@ -384,7 +386,6 @@ __all__ = [
     "retrieve_docs",
     "rerank_with_mmr",
     "generate_answer",
-    "search_web",
     "build_context",
     "rag_pipeline",
     "generate_embedding",
