@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 from database import create_tables
 from routes import router as auth_router
 from routes import rag_router
-from management_routes import management_router
-from simulation_routes import simulation_router
+from modules.management.routes import management_router
+from modules.simulation.routes import simulation_router
 
 load_dotenv()
 
