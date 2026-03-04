@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Paperclip,
   Bot,
   CheckCircle2,
   Cpu,
@@ -68,7 +69,9 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
   const [runtimeSynthesis, setRuntimeSynthesis] = useState("");
   const [runtimeRecommendations, setRuntimeRecommendations] = useState([]);
   const [runtimeAgents, setRuntimeAgents] = useState([]);
+  const [isUploadLoading, setIsUploadLoading] = useState(false);
   const messagesAnchorRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const collectedPreview = useMemo(
     () => [
@@ -171,13 +174,11 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     }
   };
 
-  const handleSend = async () => {
-    const content = chatInput.trim();
+  const submitMessage = async (content) => {
     if (!content || isIntakeLoading || simulationStage) return;
 
     const nextMessages = [...messages, { role: "user", content }];
     setMessages(nextMessages);
-    setChatInput("");
     setIsIntakeLoading(true);
     setBannerMessage("");
 
@@ -206,6 +207,51 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
       setBannerMessage(simulationError || "Unable to process your message. Try again.");
     } finally {
       setIsIntakeLoading(false);
+    }
+  };
+
+  const handleSend = async () => {
+    const content = chatInput.trim();
+    if (!content) return;
+    setChatInput("");
+    await submitMessage(content);
+  };
+
+  const handlePickFile = () => {
+    if (isIntakeLoading || simulationStage || isUploadLoading) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (simulationStage || isIntakeLoading) return;
+
+    setIsUploadLoading(true);
+    setBannerMessage("");
+    try {
+      const maxBytes = 2 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        setBannerMessage("File too large. Please upload files up to 2MB.");
+        return;
+      }
+
+      const fileText = await file.text();
+      const trimmed = fileText.trim();
+      if (!trimmed) {
+        setBannerMessage("Uploaded file is empty.");
+        return;
+      }
+
+      const clipped = trimmed.slice(0, 6000);
+      const uploadMessage = `Uploaded file: ${file.name}\n\n${clipped}`;
+      await submitMessage(uploadMessage);
+    } catch (error) {
+      setBannerMessage("Unable to read that file. Try a text-based file.");
+    } finally {
+      setIsUploadLoading(false);
     }
   };
 
@@ -341,6 +387,13 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                 </div>
 
                 <div className="mt-4 flex items-end gap-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    accept=".txt,.md,.csv,.json,.log,text/plain,text/markdown,text/csv,application/json"
+                  />
                   <textarea
                     rows={2}
                     value={chatInput}
@@ -354,6 +407,19 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                     placeholder="Reply with details about your startup..."
                     className="w-full rounded-xl border border-slate-700 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-blue-500"
                   />
+                  <button
+                    type="button"
+                    onClick={handlePickFile}
+                    disabled={isIntakeLoading || simulationStage || isUploadLoading}
+                    className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
+                      isIntakeLoading || simulationStage || isUploadLoading
+                        ? "cursor-not-allowed bg-slate-700 text-slate-500"
+                        : "bg-slate-700 text-slate-100 hover:bg-slate-600"
+                    }`}
+                    title="Upload text file"
+                  >
+                    {isUploadLoading ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
+                  </button>
                   <button
                     type="button"
                     onClick={handleSend}

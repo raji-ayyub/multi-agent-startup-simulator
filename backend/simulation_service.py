@@ -72,6 +72,8 @@ INTAKE_REQUIRED_FIELDS = [
     "marketingStrategy",
 ]
 
+MAX_INTAKE_USER_TURNS = 3
+
 INTAKE_QUESTIONS = {
     "startupName": "Startup name?",
     "problemStatement": "What exact problem are you solving?",
@@ -405,6 +407,74 @@ def _remaining_required_summary(missing: List[str]) -> str:
     return ", ".join(labels)
 
 
+def _count_user_turns(history: List[Dict[str, str]] | None, user_message: str) -> int:
+    history = history or []
+    turns = sum(1 for item in history if str(item.get("role", "")).lower() == "user")
+    if user_message.strip():
+        if not history:
+            turns += 1
+        else:
+            last = history[-1]
+            last_role = str(last.get("role", "")).lower()
+            last_content = str(last.get("content", "")).strip()
+            if last_role != "user" or last_content != user_message.strip():
+                turns += 1
+    return turns
+
+
+def _is_social_message(message: str) -> bool:
+    text = message.strip().lower()
+    if not text:
+        return False
+
+    startup_markers = [
+        "startup",
+        "build",
+        "problem",
+        "audience",
+        "segment",
+        "market",
+        "burn",
+        "cash",
+        "cac",
+        "marketing",
+        "gtm",
+        "customer",
+        "revenue",
+    ]
+    if any(marker in text for marker in startup_markers):
+        return False
+
+    social_patterns = [
+        r"^(hi|hello|hey|yo)\b",
+        r"\b(how are you|what's up|whats up)\b",
+        r"\b(thanks|thank you|cool|nice|great)\b",
+    ]
+    is_short = len(text.split()) <= 12
+    return is_short and any(re.search(pattern, text) for pattern in social_patterns)
+
+
+def _autofill_required_fields(draft: Dict[str, Any]) -> Dict[str, Any]:
+    filled = {**draft}
+    defaults = {
+        "startupName": "Untitled Startup",
+        "problemStatement": "Problem details are still being refined for this simulation run.",
+        "targetAudience": "Early adopters in the intended target market.",
+        "primaryTargetSegment": "General Market",
+        "geography": "Global",
+        "customerBehaviorPainPoints": "Pain points are under validation with target users.",
+        "monthlyBurn": "$0",
+        "currentCashInHand": "$0",
+        "marketingStrategy": "Initial go-to-market assumptions will be validated after this run.",
+    }
+    for key, default_value in defaults.items():
+        if _is_blank(filled.get(key)):
+            filled[key] = default_value
+    if _is_blank(filled.get("problemUrgency")):
+        filled["problemUrgency"] = "HIGH"
+    return filled
+
+
 def run_intake_turn(
     draft: Dict[str, Any] | None,
     user_message: str = "",
@@ -413,33 +483,43 @@ def run_intake_turn(
     normalized = _normalize_intake_draft(draft)
     updates = _extract_intake_updates(normalized, user_message, history)
     merged = _merge_updates(normalized, updates)
-    newly_filled = [field for field in INTAKE_FIELDS if _is_blank(normalized.get(field)) and not _is_blank(merged.get(field))]
+
+    user_turns = _count_user_turns(history, user_message)
+    force_run = user_turns >= MAX_INTAKE_USER_TURNS
+    social_message = _is_social_message(user_message)
+
+    if force_run:
+        merged = _autofill_required_fields(merged)
 
     missing = [field for field in INTAKE_REQUIRED_FIELDS if _is_blank(merged.get(field))]
     required_done = len(INTAKE_REQUIRED_FIELDS) - len(missing)
     completion = _clamp((required_done / len(INTAKE_REQUIRED_FIELDS)) * 100)
-    ready = len(missing) == 0
+    ready = len(missing) == 0 or force_run
 
     if not user_message.strip():
         assistant_message = (
-            "Hi, share your startup idea in one message: what you are building, who it is for, "
-            "problem, segment, geography, burn, cash, and go-to-market."
+            "Hi. Share your startup idea in one message. "
+            "I can run with assumptions after up to 3 replies."
+        )
+    elif social_message and not ready:
+        assistant_message = (
+            "Hey. Share your startup idea whenever you are ready, "
+            "and I will simulate it quickly."
+        )
+    elif force_run:
+        assistant_message = (
+            "I have enough context for a first-pass run. "
+            "Running simulation now with your inputs plus assumptions."
         )
     elif ready:
-        assistant_message = "Core data complete. Running simulation now."
+        assistant_message = "Great, I have enough context. Running simulation now."
     else:
-        captured = ", ".join(FIELD_LABELS.get(field, field) for field in newly_filled[:6])
         remaining = _remaining_required_summary(missing)
-        if captured:
-            assistant_message = (
-                f"Captured: {captured}. Remaining required fields: {remaining}. "
-                "Reply with any or all remaining fields in one message."
-            )
-        else:
-            assistant_message = (
-                f"Remaining required fields: {remaining}. "
-                "Reply with any or all remaining fields in one message."
-            )
+        turns_left = max(0, MAX_INTAKE_USER_TURNS - user_turns)
+        assistant_message = (
+            f"Need these to improve accuracy: {remaining}. "
+            f"Reply once with what you can ({turns_left} turn(s) left before auto-run)."
+        )
 
     return SimulationIntakeTurnResponse(
         assistant_message=assistant_message,
