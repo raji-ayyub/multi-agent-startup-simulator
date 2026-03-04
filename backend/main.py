@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from database import create_tables
 from routes import router as auth_router
 from routes import rag_router
+from management_routes import management_router
 from simulation_routes import simulation_router
 
 load_dotenv()
@@ -50,6 +51,7 @@ def startup_event():
 app.include_router(auth_router)
 app.include_router(rag_router)
 app.include_router(simulation_router)
+app.include_router(management_router)
 
 
 @app.get("/", tags=["root"])
