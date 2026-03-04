@@ -25,6 +25,24 @@ class SimulationRunRequest(BaseModel):
     marketing_strategy: Optional[str] = ""
 
 
+class SimulationRerunRequest(BaseModel):
+    run_as_new_version: bool = False
+    startup_name: Optional[str] = Field(default=None, min_length=2, max_length=255)
+    elevator_pitch: Optional[str] = ""
+    problem_statement: Optional[str] = Field(default=None, min_length=10, max_length=5000)
+    target_audience: Optional[str] = Field(default=None, min_length=2, max_length=500)
+    problem_urgency: Optional[UrgencyLevel] = None
+    primary_target_segment: Optional[str] = Field(default=None, min_length=2, max_length=500)
+    geography: Optional[str] = Field(default=None, min_length=2, max_length=255)
+    market_size_estimate: Optional[str] = ""
+    customer_behavior_pain_points: Optional[str] = Field(default=None, min_length=5, max_length=5000)
+    competitor_patterns: Optional[str] = ""
+    monthly_burn: Optional[str] = ""
+    estimated_cac: Optional[str] = ""
+    current_cash_in_hand: Optional[str] = ""
+    marketing_strategy: Optional[str] = ""
+
+
 class AgentFeedback(BaseModel):
     perspective: str
     summary: str

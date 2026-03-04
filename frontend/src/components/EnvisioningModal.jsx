@@ -95,6 +95,18 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     [form]
   );
 
+  const showRunDecisionActions = useMemo(() => {
+    if (simulationStage || isIntakeLoading || messages.length === 0) return false;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return false;
+    const content = String(last.content || "").toLowerCase();
+    return (
+      content.includes("do you want me to run simulation now") ||
+      content.includes("do you want me to run simulation") ||
+      content.includes("tell me when to run simulation")
+    );
+  }, [messages, simulationStage, isIntakeLoading]);
+
   useEffect(() => {
     let active = true;
 
@@ -259,6 +271,14 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     saveDraft(form);
     patchIdeaFields(form);
     setBannerMessage("Draft saved.");
+  };
+
+  const handleQuickRunNow = async () => {
+    await submitMessage("Run simulation now.");
+  };
+
+  const handleQuickAddMore = async () => {
+    await submitMessage("I want to add more details first.");
   };
 
   const handleLaunch = async () => {
@@ -437,6 +457,35 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                     <Send size={14} />
                   </button>
                 </div>
+
+                {showRunDecisionActions ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleQuickRunNow}
+                      disabled={isIntakeLoading || simulationStage}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                        isIntakeLoading || simulationStage
+                          ? "cursor-not-allowed bg-slate-700 text-slate-500"
+                          : "bg-emerald-500 text-black hover:bg-emerald-400"
+                      }`}
+                    >
+                      Run simulation now
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleQuickAddMore}
+                      disabled={isIntakeLoading || simulationStage}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                        isIntakeLoading || simulationStage
+                          ? "cursor-not-allowed bg-slate-700 text-slate-500"
+                          : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                      }`}
+                    >
+                      Add more details
+                    </button>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
