@@ -4,14 +4,28 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import SimulationRun
 from simulation_schemas import (
+    SimulationIntakeTurnRequest,
+    SimulationIntakeTurnResponse,
     SimulationRunDetail,
     SimulationRunRequest,
     SimulationRunResponse,
     SimulationRunSummary,
 )
-from simulation_service import run_simulation
+from simulation_service import run_intake_turn, run_simulation
 
 simulation_router = APIRouter(prefix="/api/v1/simulations", tags=["simulations"])
+
+
+@simulation_router.post("/intake/turn", response_model=SimulationIntakeTurnResponse)
+def simulation_intake_turn(payload: SimulationIntakeTurnRequest):
+    try:
+        return run_intake_turn(
+            draft=payload.draft,
+            user_message=payload.user_message,
+            history=payload.history,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Intake turn failed: {str(exc)}")
 
 
 @simulation_router.post("/run", response_model=SimulationRunResponse)
