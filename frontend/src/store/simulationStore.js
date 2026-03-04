@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import {
+  deleteSimulation,
   getSimulation,
   intakeSimulationTurn,
   listSimulations,
+  rerunSimulation,
   runSimulation,
 } from "../services/simulationService";
 
@@ -143,6 +145,64 @@ const useSimulationStore = create((set, get) => ({
         simulationError: error?.message || "Unable to load simulation details.",
       });
       return null;
+    }
+  },
+
+  rerunSimulationFromExisting: async ({ simulationId, overrides = {}, runAsNewVersion = false }) => {
+    set({ isRunning: true, simulationError: null });
+    try {
+      const response = await rerunSimulation(simulationId, {
+        ...overrides,
+        run_as_new_version: Boolean(runAsNewVersion),
+      });
+      const summary = mapSummaryToRecent({
+        simulation_id: response.simulation_id,
+        startup_name: response.startup_name,
+        created_at: new Date().toISOString(),
+        status: response.status,
+        overall_score: response.overall_score,
+        metrics: response.metrics,
+      });
+
+      set((state) => ({
+        isRunning: false,
+        overallScore: response.overall_score,
+        recommendations: response.recommendations || [],
+        simulationError: null,
+        lastSimulationResult: response,
+        activeSimulation: response,
+        dashboardMetrics: response.metrics || { ...DEFAULT_METRICS },
+        recentSimulations: [summary, ...state.recentSimulations.filter((x) => x.id !== summary.id)].slice(0, 50),
+      }));
+      return response;
+    } catch (error) {
+      set({
+        isRunning: false,
+        simulationError: error?.message || "Simulation rerun failed.",
+      });
+      throw error;
+    }
+  },
+
+  removeSimulation: async (simulationId) => {
+    set({ simulationError: null });
+    try {
+      await deleteSimulation(simulationId);
+      set((state) => {
+        const filtered = state.recentSimulations.filter((item) => item.id !== simulationId);
+        const shouldClearActive = state.activeSimulation?.simulation_id === simulationId;
+        return {
+          recentSimulations: filtered,
+          activeSimulation: shouldClearActive ? null : state.activeSimulation,
+          lastSimulationResult: shouldClearActive ? null : state.lastSimulationResult,
+        };
+      });
+      return true;
+    } catch (error) {
+      set({
+        simulationError: error?.message || "Unable to delete simulation.",
+      });
+      return false;
     }
   },
 
