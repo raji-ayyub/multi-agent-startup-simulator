@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { BarChart3, Download, Pencil, Rocket, Trash2, TrendingUp, Users, Wallet, X } from "lucide-react";
+import { toast } from "sonner";
 import useSimulationStore from "../../store/simulationStore";
 
 const AGENT_ICON = {
@@ -91,22 +92,36 @@ export default function ResultsView() {
 
   const runRerun = async (runAsNewVersion = false) => {
     if (!activeSimulation?.simulation_id) return;
-    await rerunSimulationFromExisting({
-      simulationId: activeSimulation.simulation_id,
-      overrides: rerunDraft,
-      runAsNewVersion,
-    });
-    setShowRerunModal(false);
+    try {
+      await rerunSimulationFromExisting({
+        simulationId: activeSimulation.simulation_id,
+        overrides: rerunDraft,
+        runAsNewVersion,
+      });
+      setShowRerunModal(false);
+      toast.success(runAsNewVersion ? "New version simulation completed." : "Simulation rerun completed.");
+    } catch (error) {
+      toast.error(error?.message || "Simulation rerun failed.");
+    }
   };
 
   const handleDelete = async (simulationId) => {
-    const ok = window.confirm("Delete this simulation permanently?");
-    if (!ok) return;
-    const deleted = await removeSimulation(simulationId);
-    if (deleted) {
-      const next = recentSimulations.find((item) => item.id !== simulationId);
-      if (next) await fetchSimulationDetail(next.id);
-    }
+    toast("Delete this simulation?", {
+      description: "This action cannot be undone.",
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          const deleted = await removeSimulation(simulationId);
+          if (deleted) {
+            toast.success("Simulation deleted.");
+            const next = recentSimulations.find((item) => item.id !== simulationId);
+            if (next) await fetchSimulationDetail(next.id);
+          } else {
+            toast.error("Unable to delete simulation.");
+          }
+        },
+      },
+    });
   };
 
   return (

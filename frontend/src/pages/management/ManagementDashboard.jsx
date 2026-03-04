@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Archive, Building2, Sparkles, TrendingUp, Users2 } from "lucide-react";
+import { toast } from "sonner";
 import { useAuthStore } from "../../store/authStore";
 import useManagementStore from "../../store/managementStore";
 import ActivityPlanModal from "../../components/management/ActivityPlanModal";
@@ -66,42 +67,60 @@ export default function ManagementDashboard() {
 
   const handleCreateWorkspace = async (payload) => {
     if (!user?.email) return;
-    return createWorkspace({
-      owner_email: user.email,
-      company_name: payload.company_name,
-      workspace_name: payload.workspace_name,
-      description: payload.description || "",
-      industry: payload.industry || "",
-      stage: payload.stage || "",
-      annual_revenue: payload.annual_revenue || "",
-      employee_count: Number(payload.employee_count || 0),
-      qualifications: Array.isArray(payload.qualifications) ? payload.qualifications : [],
-    });
+    try {
+      const result = await createWorkspace({
+        owner_email: user.email,
+        company_name: payload.company_name,
+        workspace_name: payload.workspace_name,
+        description: payload.description || "",
+        industry: payload.industry || "",
+        stage: payload.stage || "",
+        annual_revenue: payload.annual_revenue || "",
+        employee_count: Number(payload.employee_count || 0),
+        qualifications: Array.isArray(payload.qualifications) ? payload.qualifications : [],
+        team_members: Array.isArray(payload.team_members) ? payload.team_members : [],
+      });
+      toast.success("Management workspace created.");
+      return result;
+    } catch (error) {
+      toast.error(error?.message || "Unable to create workspace.");
+      throw error;
+    }
   };
 
   const handleUpdateWorkspace = async (event) => {
     event.preventDefault();
     if (!profileDraft) return;
-    await updateActiveWorkspace({
-      workspace_name: profileDraft.workspace_name,
-      description: profileDraft.description,
-      industry: profileDraft.industry,
-      stage: profileDraft.stage,
-      annual_revenue: profileDraft.annual_revenue,
-      employee_count: Number(profileDraft.employee_count || 0),
-      qualifications: parseQualifications(qualificationInput),
-    });
-    setShowEditModal(false);
+    try {
+      await updateActiveWorkspace({
+        workspace_name: profileDraft.workspace_name,
+        description: profileDraft.description,
+        industry: profileDraft.industry,
+        stage: profileDraft.stage,
+        annual_revenue: profileDraft.annual_revenue,
+        employee_count: Number(profileDraft.employee_count || 0),
+        qualifications: parseQualifications(qualificationInput),
+      });
+      setShowEditModal(false);
+      toast.success("Workspace updated.");
+    } catch (error) {
+      toast.error(error?.message || "Unable to update workspace.");
+    }
   };
 
   const handleGeneratePlan = async (event) => {
     event.preventDefault();
     if (!objective.trim()) return;
-    await createPlan({
-      objective: objective.trim(),
-      time_horizon_weeks: Number(timeHorizonWeeks || 4),
-    });
-    setShowPlanModal(false);
+    try {
+      await createPlan({
+        objective: objective.trim(),
+        time_horizon_weeks: Number(timeHorizonWeeks || 4),
+      });
+      setShowPlanModal(false);
+      toast.success("Activity plan generated.");
+    } catch (error) {
+      toast.error(error?.message || "Unable to generate plan.");
+    }
   };
 
   const openEditModal = () => {

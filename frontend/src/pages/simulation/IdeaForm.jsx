@@ -100,6 +100,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import useSimulationStore from "../../store/simulationStore";
 
 export default function IdeaForm() {
@@ -119,7 +120,7 @@ export default function IdeaForm() {
     e.preventDefault();
 
     if (!startupIdea.name || !startupIdea.problem) {
-      alert("Startup Name and Problem Statement are required.");
+      toast.error("Startup Name and Problem Statement are required.");
       return;
     }
 
