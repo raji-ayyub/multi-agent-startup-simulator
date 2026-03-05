@@ -70,21 +70,21 @@ export default function Signup() {
 
   return (
     <AuthLayout>
-      <div className="w-full max-w-sm   p-6 shadow-2xl  sm:p-8">
+      <div className="auth-screen auth-form-panel w-full max-w-sm p-6 sm:p-8">
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold mb-2">Create Account</h2>
-            <p className="text-slate-400 text-xs">
+            <h2 className="auth-deep-title text-2xl font-bold mb-2">Create Account</h2>
+            <p className="auth-deep-subtitle text-slate-400 text-xs">
               Join the next generation AI movement enterprise.
             </p>
           </div>
 
           <div className="flex flex-col space-y-2 mb-4">
-            <button className="flex items-center justify-center bg-transparent text-white border border-slate-800 py-2 rounded-lg hover:opacity-90 transition text-sm">
+            <button className="auth-social-btn flex items-center justify-center bg-transparent text-white border border-slate-800 py-2 rounded-lg hover:opacity-90 transition text-sm">
               <img src="/images/google.svg" alt="Google Logo" className="w-4 h-4 mr-2" />
               Sign up with Google
             </button>
 
-            <button className="flex items-center justify-center bg-transparent text-white border border-slate-800 py-2 rounded-lg hover:opacity-90 transition text-sm">
+            <button className="auth-social-btn flex items-center justify-center bg-transparent text-white border border-slate-800 py-2 rounded-lg hover:opacity-90 transition text-sm">
               <img src="/images/Key.svg" alt="SSO Logo" className="w-4 h-4 mr-2" />
               Single Sign-On (SSO)
             </button>
@@ -104,7 +104,7 @@ export default function Signup() {
                 name="fullName"
                 value={formData.fullName}
                 onChange={handleChange}
-                className="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-2.5 focus:ring-1 focus:ring-[#B8C45A] outline-none text-sm"
+                className="auth-input w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-2.5 focus:ring-1 focus:ring-[#B8C45A] outline-none text-sm"
                 required
               />
             </div>
@@ -116,7 +116,7 @@ export default function Signup() {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className={`w-full bg-[#0f172a] border rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-600 outline-none ${
+                className={`auth-input w-full bg-[#0f172a] border rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-600 outline-none ${
                   emailValid ? "border-slate-700" : "border-red-500"
                 }`}
                 required
@@ -136,7 +136,7 @@ export default function Signup() {
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Minimum 8 characters"
-                className="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-2.5 pr-10 focus:ring-1 focus:ring-[#B8C45A] outline-none text-sm"
+                className="auth-input w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-2.5 pr-10 focus:ring-1 focus:ring-[#B8C45A] outline-none text-sm"
                 required
               />
               <button

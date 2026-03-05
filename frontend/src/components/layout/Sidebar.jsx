@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { Bell, BarChart3, LayoutDashboard, Settings, Sparkles, UserCircle2 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
+import ModeSwitch from "./ModeSwitch";
 
 const menuItems = [
   { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -16,7 +16,6 @@ const systemItems = [
 
 export default function Sidebar() {
   const { user } = useAuthStore();
-  const [mode, setMode] = useState("Simulation");
 
   return (
     <aside className="flex h-screen w-[248px] flex-col justify-between border-r border-slate-800 bg-[#070b11] px-4 py-5 text-slate-300">
@@ -46,29 +45,9 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        <div className="mt-6 px-2">
+        <div className="my-6 px-2">
           <p className="mb-2 text-[10px] uppercase tracking-[0.2em] text-slate-500 ">Mode</p>
-          <div className="flex mt-4">
-            {["Simulation", "Manage"].map((item, index) => {
-              const isActive = mode === item;
-
-              return (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setMode(item)}
-                  className={`
-                    flex-1 bg-slate-900 h-[2rem] px-3 py-1 text-[11px] font-medium transition
-                    ${isActive ? "outline-8 z-10 outline-blue-400/20 border-slate-700 text-white" : "text-slate-400 hover:text-slate-200"}
-                    ${index === 0 ? "rounded-l-full" : ""}
-                    ${index === 1 ? "rounded-r-full" : ""}
-                  `}
-                >
-                  {item}
-                </button>
-              );
-            })}
-          </div>
+          <ModeSwitch mode="simulation" />
         </div>
       </div>
 

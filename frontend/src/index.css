@@ -1,1 +1,133 @@
 @import "tailwindcss";
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+}
+
+body {
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+}
+
+html[data-theme="light"] body {
+  background: #f4f7fc;
+  color: #0f172a;
+}
+
+html[data-theme="light"] .light-theme-toggle {
+  border-color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
+}
+
+html[data-theme="light"] [class*="bg-[#"],
+html[data-theme="light"] [class*="bg-[radial-gradient"],
+html[data-theme="light"] [class*="bg-[linear-gradient"],
+html[data-theme="light"] [class*="bg-gradient"],
+html[data-theme="light"] .bg-black,
+html[data-theme="light"] .bg-slate-950,
+html[data-theme="light"] .bg-slate-900,
+html[data-theme="light"] .bg-slate-900\/70,
+html[data-theme="light"] .bg-slate-900\/50,
+html[data-theme="light"] .bg-slate-900\/40,
+html[data-theme="light"] .bg-slate-800 {
+  background-image: none !important;
+  background-color: #ffffff !important;
+}
+
+html[data-theme="light"] [class*="text-slate-"],
+html[data-theme="light"] .text-white,
+html[data-theme="light"] .text-slate-100,
+html[data-theme="light"] .text-slate-200,
+html[data-theme="light"] .text-slate-300,
+html[data-theme="light"] .text-slate-400,
+html[data-theme="light"] .text-slate-500 {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] [class*="border-slate-"],
+html[data-theme="light"] .border-slate-700,
+html[data-theme="light"] .border-slate-800,
+html[data-theme="light"] .border-slate-900 {
+  border-color: #dbe3f0 !important;
+}
+
+html[data-theme="dark"] body {
+  background: #0b111c;
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] [class*="bg-[#"],
+html[data-theme="dark"] [class*="bg-[radial-gradient"],
+html[data-theme="dark"] [class*="bg-[linear-gradient"],
+html[data-theme="dark"] [class*="bg-gradient"],
+html[data-theme="dark"] .bg-\[\#f4f7fc\],
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] .bg-\[linear-gradient\(120deg\,\#edf3ff\,\#e8eef7\)\] {
+  background-color: #0b111c !important;
+  background-image: none !important;
+}
+
+html[data-theme="dark"] [class*="text-slate-"],
+html[data-theme="dark"] .text-slate-900,
+html[data-theme="dark"] .text-slate-800,
+html[data-theme="dark"] .text-slate-700,
+html[data-theme="dark"] .text-slate-600 {
+  color: #e2e8f0 !important;
+}
+
+html[data-theme="dark"] [class*="border-slate-"],
+html[data-theme="dark"] .border-slate-200,
+html[data-theme="dark"] .border-slate-300 {
+  border-color: #2f3a4d !important;
+}
+
+html[data-theme="light"] .auth-screen {
+  color: #0f172a;
+}
+
+html[data-theme="light"] .auth-screen .auth-deep-title {
+  color: #0b1220;
+}
+
+html[data-theme="light"] .auth-screen .auth-deep-subtitle {
+  color: #334155 !important;
+}
+
+html[data-theme="light"] .auth-screen .auth-form-panel {
+  background: transparent !important;
+  border-color: #94a3b8 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"] .auth-screen .auth-input {
+  background: transparent !important;
+  border-color: #475569 !important;
+  color: #0b1220 !important;
+}
+
+html[data-theme="light"] .auth-screen .auth-input::placeholder {
+  color: #475569;
+}
+
+html[data-theme="light"] .auth-screen .auth-social-btn {
+  color: #0b1220 !important;
+  border-color: #475569 !important;
+}

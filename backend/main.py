@@ -1,46 +1,60 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from database import create_tables
 from routes import router as auth_router
 from routes import rag_router
+from modules.management.routes import management_router
+from modules.simulation.routes import simulation_router
 
 load_dotenv()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Create database tables during app startup."""
+    create_tables()
+    print("✓ Database tables initialized")
+    yield
+
+
+def get_cors_origins():
+    """Resolve CORS origins from env, with local-safe defaults."""
+    env_origins = os.getenv("CORS_ORIGINS", "").strip()
+    if env_origins:
+        return [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+
+    return [
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+    ]
 
 app = FastAPI(
     title="PetraAI - Multi-Agent AI Startup Strategy Simulator API",
     description="A generative AI–powered decision-support system for startup founders",
     version="0.1.0",
+    lifespan=lifespan,
 )
-
-# CORS configuration
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:5173",
-]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    # allow_origins=get_cors_origins(),
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-def startup_event():
-    """Create database tables on server startup."""
-    create_tables()
-    print("✓ Database tables initialized")
-
-
 # Include routes
 app.include_router(auth_router)
 app.include_router(rag_router)
+app.include_router(simulation_router)
+app.include_router(management_router)
 
 
 @app.get("/", tags=["root"])
@@ -69,6 +83,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=int(os.getenv("PORT", "8000")),
         reload=True,
     )

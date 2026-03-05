@@ -371,3 +371,11 @@ async def rag_search(question: str):
     answer = generate_answer(context, question)
     sources = [c[1] for c in chunks]
     return {"answer": answer, "sources": sources}
+
+
+
+
+
+
+
+    

@@ -334,6 +334,24 @@ backend/
 
 ---
 
+### Tools
+
+- Pooled connections - Avoids opening/closing DB connections for each query (performance)
+- MMR reranking - Reduces duplicate/similar results for diverse context
+- Embedding Generation (generate_embedding)
+- Vector Retrieval (retrieve_docs)
+  - Queries pgvector with <=> operator (cosine similarity)
+  - Supports optional filtering (by user_id, document_type, source)
+  - Returns scored, ranked results
+- Answer Generation (generate_answer)
+  - Takes query + context → calls GPT-4o-mini (configurable)
+  - Built-in RAG system prompt
+- Context Building (build_context)
+  - Formats chunks with sources + similarity scores
+- Complete Pipeline (rag_pipeline)
+  - Orchestrates: retrieve → rerank → generate → return
+  - One call returns: answer + sources + builder context
+
 ## Next Steps
 
 1. **Frontend Integration**: Connect React frontend to these endpoints
