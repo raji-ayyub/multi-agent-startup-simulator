@@ -6,6 +6,8 @@ import Sidebar from "../components/layout/Sidebar";
 import ManagementSidebar from "../components/layout/ManagementSidebar";
 import ManagementTopbar from "../components/layout/ManagementTopbar";
 import Navbar from "../components/layout/Navbar";
+import ThemeToggle from "../components/layout/ThemeToggle";
+import useUIStore from "../store/uiStore";
 
 // Loading Spinner
 const LoadingSpinner = () => (
@@ -44,11 +46,13 @@ const PublicRoute = ({ children }) => {
 
 const SimulationLayout = ({ children }) => {
   return (
-    <div className="flex h-screen bg-[#05090f] text-slate-100">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-[100dvh] bg-[#05090f] text-slate-100 lg:h-[100dvh]">
+      <div className="hidden lg:block">
+        <Sidebar />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Navbar />
-        <main className="flex-1 overflow-y-auto bg-[#0b1017] p-5 md:p-6">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto bg-[#0b1017] p-3 sm:p-5 md:p-6">{children}</main>
       </div>
     </div>
   );
@@ -56,11 +60,13 @@ const SimulationLayout = ({ children }) => {
 
 const ManagementLayout = ({ children }) => {
   return (
-    <div className="flex h-screen bg-[#040910] text-slate-100">
-      <ManagementSidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-[100dvh] bg-[#040910] text-slate-100 lg:h-[100dvh]">
+      <div className="hidden lg:block">
+        <ManagementSidebar />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <ManagementTopbar />
-        <main className="flex-1 overflow-y-auto bg-[#09111d] p-5 md:p-6">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto bg-[#09111d] p-3 sm:p-5 md:p-6">{children}</main>
       </div>
     </div>
   );
@@ -68,15 +74,22 @@ const ManagementLayout = ({ children }) => {
 
 export default function App() {
   const { isAuthenticated, checkAuth } = useAuthStore();
+  const { theme } = useUIStore();
 
   useEffect(() => {
     if (checkAuth) checkAuth();
   }, [checkAuth]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute("data-theme", theme);
+  }, [theme]);
+
   return (
     <Router>
       <Suspense fallback={<LoadingSpinner />}>
         <Toaster richColors position="top-center" />
+        <ThemeToggle />
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
