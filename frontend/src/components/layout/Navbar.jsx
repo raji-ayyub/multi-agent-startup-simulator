@@ -161,24 +161,24 @@ export default function Navbar() {
   };
 
   return (
-    <header className="h-16 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-8 relative">
+    <header className="relative flex min-h-16 items-center justify-between border-b border-slate-800 bg-slate-950 px-3 py-2 sm:px-5 lg:px-8">
 
       {/* ===== LEFT SECTION ===== */}
-      <div>
-        <h2 className="text-lg font-semibold">
+      <div className="min-w-0">
+        <h2 className="truncate text-sm font-semibold sm:text-base lg:text-lg">
           Multi-Agent Strategy Simulator
         </h2>
-        <p className="text-xs text-slate-400">
+        <p className="hidden text-xs text-slate-400 sm:block">
           Strategic Intelligence for Founders
         </p>
       </div>
 
       {/* ===== RIGHT SECTION ===== */}
-      <div className="flex items-center gap-6 relative">
+      <div className="relative flex items-center gap-2 sm:gap-4">
 
         {/* ===== Overall Score ===== */}
         {overallScore !== null && (
-          <div className="bg-slate-800 px-4 py-2 rounded-xl text-sm">
+          <div className="hidden rounded-xl bg-slate-800 px-3 py-1.5 text-xs sm:block sm:text-sm">
             Score:{" "}
             <span
               className={`font-semibold ${
@@ -210,7 +210,7 @@ export default function Navbar() {
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-3 w-72 bg-slate-900 border border-slate-800 rounded-xl shadow-xl z-50">
+            <div className="absolute right-0 z-50 mt-3 w-[min(18rem,calc(100vw-1.25rem))] rounded-xl border border-slate-800 bg-slate-900 shadow-xl">
               <div className="p-4 border-b border-slate-800 font-medium">
                 Notifications
               </div>
@@ -232,16 +232,16 @@ export default function Navbar() {
               setShowUserMenu(!showUserMenu);
               setShowNotifications(false);
             }}
-            className="flex items-center gap-3 bg-slate-800 px-3 py-2 rounded-xl hover:bg-slate-700 transition"
+            className="flex items-center gap-2 rounded-xl bg-slate-800 px-2 py-1.5 transition hover:bg-slate-700 sm:gap-3 sm:px-3 sm:py-2"
           >
-            <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center font-semibold">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-xs font-semibold sm:h-8 sm:w-8">
               {user?.name?.charAt(0) || "U"}
             </div>
             <span className="hidden md:block text-sm">{user?.name || "User"}</span>
           </button>
 
           {showUserMenu && (
-            <div className="absolute right-0 mt-3 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-xl z-50">
+            <div className="absolute right-0 z-50 mt-3 w-44 rounded-xl border border-slate-800 bg-slate-900 shadow-xl sm:w-48">
 
               <button
                 onClick={() => navigate("/profile")}

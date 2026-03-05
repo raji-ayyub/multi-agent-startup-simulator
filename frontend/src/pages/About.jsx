@@ -113,8 +113,8 @@ export default function About() {
             <div className="mt-6 flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-slate-300" />
               <div>
-                <p className="font-semibold">Alexander Pentra</p>
-                <p className="text-sm text-slate-600">Founding Partner</p>
+                <p className="font-semibold">Raji Ayyub</p>
+                <p className="text-sm text-slate-600">TeamLead</p>
               </div>
             </div>
           </div>
@@ -149,7 +149,7 @@ export default function About() {
             <p>Terms of Service</p>
             <p>Contact</p>
           </div>
-          <p>&copy; 2024 PentraAI Systems Inc. All rights reserved.</p>
+          <p>&copy; 2026 PentraAI Systems Inc. All rights reserved.</p>
         </div>
       </footer>
     </div>

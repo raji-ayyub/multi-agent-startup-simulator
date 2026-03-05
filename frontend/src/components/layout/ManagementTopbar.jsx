@@ -12,11 +12,11 @@ const initials = (name) =>
 export default function ManagementTopbar() {
   const { user } = useAuthStore();
   return (
-    <header className="h-16 border-b border-slate-800 bg-[#060d16] px-8">
+    <header className="min-h-16 border-b border-slate-800 bg-[#060d16] px-3 py-2 sm:px-5 lg:px-8">
       <div className="flex h-full items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-slate-100">Startup Management Agentics</h2>
-          <p className="text-xs text-slate-400">Execution planning and operating memory</p>
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-semibold text-slate-100 sm:text-base lg:text-lg">Startup Management Agentics</h2>
+          <p className="hidden text-xs text-slate-400 sm:block">Execution planning and operating memory</p>
         </div>
         <div className="flex items-center gap-2">
           <button
