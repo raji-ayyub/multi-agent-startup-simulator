@@ -19,19 +19,19 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout>
-      <div className="w-full max-w-sm  ">
+      <div className="auth-screen w-full max-w-sm">
         <div className="flex justify-center mb-5">
           <img src="/images/reset.svg" alt="Reset" className="h-10 w-auto" />
         </div>
 
         <div className="text-center mb-7">
-          <h2 className="text-2xl font-bold mb-2">Forgot Password</h2>
-          <p className="text-slate-400 text-xs leading-relaxed">
+          <h2 className="auth-deep-title text-2xl font-bold mb-2">Forgot Password</h2>
+          <p className="auth-deep-subtitle text-slate-400 text-xs leading-relaxed">
             Enter your email and we will issue a password reset token.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl border border-white/10 bg-[#0a0f1a]/92 p-6 shadow-2xl shadow-black/60 sm:p-8">
+        <form onSubmit={handleSubmit} className="auth-form-panel space-y-5 rounded-2xl border border-white/10 bg-[#0a0f1a]/92 p-6 shadow-2xl shadow-black/60 sm:p-8">
           <div>
             <label className="block text-xs mb-2 text-slate-300">Email Address</label>
             <div className="relative">
@@ -46,7 +46,7 @@ export default function ForgotPassword() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@company.com"
-                className="w-full bg-[#0f172a] border border-slate-700 rounded-lg pl-9 pr-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-[#B8C45A] transition text-sm"
+                className="auth-input w-full bg-[#0f172a] border border-slate-700 rounded-lg pl-9 pr-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-[#B8C45A] transition text-sm"
                 required
               />
             </div>

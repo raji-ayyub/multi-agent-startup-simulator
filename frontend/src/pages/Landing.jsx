@@ -118,7 +118,7 @@ export default function Landing() {
               </Link>
             </div>
 
-            <p className="mt-5 text-xs text-slate-500">Trusted by early-stage teams, operators, and venture studios.</p>
+            <p className="mt-5 text-xs text-slate-500">Trusted by early-stage teams, operators,and venture studios.</p>
           </div>
 
           <div className="rounded-2xl border border-slate-700 bg-gradient-to-br from-slate-900 via-[#081322] to-[#0f1c30] p-4 shadow-[0_20px_40px_rgba(0,0,0,0.45)]">
@@ -198,7 +198,7 @@ export default function Landing() {
           <div className="rounded-3xl border border-blue-500/30 bg-gradient-to-r from-[#0e2d63] via-[#133a79] to-[#0a2d58] p-8 sm:p-10">
             <h2 className="text-4xl font-semibold leading-tight text-white">Stop Guessing. Start Simulating.</h2>
             <p className="mt-4 max-w-2xl text-slate-200/85">
-              PentraAI helps founders move from intuition to evidence-backed execution. Launch your first strategy run today.
+              PentraAI helps founders move from intuition to evidence-backed execution.Launch your first strategy run today.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link to={primaryHref} className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-200">
@@ -217,7 +217,7 @@ export default function Landing() {
           <div>
             <p className="text-base font-semibold text-white">PentraAI</p>
             <p className="mt-3 text-sm text-slate-500">
-              Strategic simulation infrastructure for founders, operators, and venture teams.
+              Strategic simulation infrastructure for founders, operators,and venture teams.
             </p>
           </div>
           <FooterCol title="Product" links={["Market Analysis", "Risk Modeling", "Pricing Engine", "API Reference"]} />

@@ -32,12 +32,15 @@ const DEFAULT_FORM = {
   marketingStrategy: "",
 };
 
-const FALLBACK_LOGS = [
+const URGENCY_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+
+const AGENTIC_LOGS = [
   { role: "IDENTITY DETECTED", message: "All agents on board.." },
   { role: "MARKET ANALYST", message: "Calculating market scenarios..." },
   { role: "CUSTOMER AGENT", message: "Simulating target persona responses..." },
   { role: "INVESTOR AGENT", message: "Scoring growth and runway..." },
 ];
+const FALLBACK_LOGS = AGENTIC_LOGS;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -295,20 +298,17 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={onClose} />
 
-      <section className="relative z-10 flex w-full max-w-6xl max-h-[94vh] flex-col overflow-hidden rounded-2xl border border-slate-700/80 bg-[#080b11] text-slate-100 shadow-[0_24px_70px_rgba(0,0,0,0.65)]">
+      <section className="relative z-10 flex max-h-[90dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-700/80 bg-[#080b11] text-slate-100 shadow-[0_24px_70px_rgba(0,0,0,0.65)] md:max-h-[94vh]">
         <header className="border-b border-slate-800 px-6 py-5">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sm text-slate-400">
-              <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-600 text-xs font-bold text-white">
-                <img
-                  src="/images/Icon.svg"
-                  alt="Logo"
-                  className="min-w-8 h-8 bg-black p-1 rounded-lg"
-                />
-              </div>
-              <span className="font-medium text-slate-200">
-                PentraAI <span className="mx-1 text-slate-600">/</span> {simulationStage ? "Simulation" : "AI Intake"}
-              </span>
+              <img
+                src="/images/Icon.svg"
+                alt="Logo"
+                className="w-8 h-8 bg-black p-1 rounded-lg"
+              />
+              <span className="font-medium text-slate-200">PentraAI <span className="mx-1 text-slate-600">/</span> {simulationStage ? "Simulation" : "Intake"}</span>
+            
             </div>
             <button
               type="button"
@@ -336,8 +336,8 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
           </div>
         </header>
 
-        <div className="grid flex-1 overflow-y-auto lg:grid-cols-[1.45fr_1fr]">
-          <div className="border-r border-slate-800 p-6">
+        <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[1.45fr_1fr]">
+          <div className="min-h-0 border-r border-slate-800 p-4 sm:p-6">
             {simulationStage ? (
               <div className="flex h-full flex-col items-center justify-center gap-5 text-center">
                 <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-blue-500/70 bg-blue-500/5">
@@ -376,8 +376,8 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                 </div>
               </div>
             ) : (
-              <div className="flex h-full flex-col">
-                <div className="flex-1 space-y-3 overflow-y-auto rounded-xl border border-slate-800 bg-black/35 p-4">
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-xl border border-slate-800 bg-black/35 p-4">
                   {messages.map((item, index) => (
                     <article
                       key={`${item.role}-${index}`}
@@ -410,7 +410,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                   <div ref={messagesAnchorRef} />
                 </div>
 
-                <div className="mt-4 flex items-end gap-3">
+                <div className="mt-3 shrink-0 flex items-end gap-3">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -459,7 +459,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                 </div>
 
                 {showRunDecisionActions ? (
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 shrink-0 flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={handleQuickRunNow}
@@ -490,7 +490,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
             )}
           </div>
 
-          <aside className="bg-[#0b1018] p-6">
+          <aside className="min-h-0 overflow-y-auto bg-[#0b1018] p-4 sm:p-6">
             <div className="mb-6 flex items-start gap-3">
               <div className="mt-0.5 rounded-full border border-slate-600 p-2 text-slate-300">
                 {simulationStage ? <Rocket size={16} /> : <Bot size={16} />}
@@ -580,7 +580,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
           </aside>
         </div>
 
-        <footer className="flex items-center justify-between gap-3 border-t border-slate-800 px-6 py-4">
+        <footer className="flex items-center justify-between gap-3 border-t border-slate-800 px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6">
           {simulationStage ? (
             <>
               <button

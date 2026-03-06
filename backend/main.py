@@ -1,14 +1,23 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from database import create_tables
 from routes import router as auth_router
 from routes import rag_router
-from management_routes import management_router
-from simulation_routes import simulation_router
+from modules.management.routes import management_router
+from modules.simulation.routes import simulation_router
 
 load_dotenv()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Create database tables during app startup."""
+    create_tables()
+    print("✓ Database tables initialized")
+    yield
 
 
 def get_cors_origins():
@@ -29,6 +38,7 @@ app = FastAPI(
     title="PetraAI - Multi-Agent AI Startup Strategy Simulator API",
     description="A generative AI–powered decision-support system for startup founders",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -39,13 +49,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-def startup_event():
-    """Create database tables on server startup."""
-    create_tables()
-    print("✓ Database tables initialized")
-
 
 # Include routes
 app.include_router(auth_router)
@@ -74,12 +77,12 @@ def health_check():
     }
 
 
-if __name__ == "__main__":
-    import uvicorn
+# if __name__ == "__main__":
+#     import uvicorn
 
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=int(os.getenv("PORT", "8000")),
-        reload=True,
-    )
+#     uvicorn.run(
+#         "main:app",
+#         host="0.0.0.0",
+#         port= "8000",
+        
+#     )

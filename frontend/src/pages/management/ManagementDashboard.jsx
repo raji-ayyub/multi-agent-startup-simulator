@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
-import { Archive, Building2, Sparkles, TrendingUp, Users2 } from "lucide-react";
+import { Archive, Building2, Pencil, Sparkles, Trash2, TrendingUp, UserPlus, Users2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "../../store/authStore";
 import useManagementStore from "../../store/managementStore";
 import ActivityPlanModal from "../../components/management/ActivityPlanModal";
+import TeamMemberModal from "../../components/management/TeamMemberModal";
 import WorkspaceProfileModal from "../../components/management/WorkspaceProfileModal";
 import WorkspaceSetupModal from "../../components/management/WorkspaceSetupModal";
 
 const parseQualifications = (input) => String(input || "").split(",").map((item) => item.trim()).filter(Boolean);
+const defaultTeamDraft = {
+  name: "",
+  role: "",
+  cvFileName: "",
+  qualifications: [],
+  qualification_notes: "",
+  additional_notes: "",
+  cvError: "",
+};
 
 export default function ManagementDashboard() {
   const { user } = useAuthStore();
@@ -23,6 +33,9 @@ export default function ManagementDashboard() {
     selectWorkspace,
     updateActiveWorkspace,
     createPlan,
+    addTeamMember,
+    updateTeamMember,
+    deleteTeamMember,
     latestPlan,
     planHistory,
   } = useManagementStore();
@@ -34,6 +47,9 @@ export default function ManagementDashboard() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState(null);
+  const [teamDraft, setTeamDraft] = useState(defaultTeamDraft);
 
   useEffect(() => {
     if (user?.email) {
@@ -64,6 +80,26 @@ export default function ManagementDashboard() {
     const highPriority = latestPlan.activities.filter((item) => item.priority === "HIGH").length;
     return Math.min(100, highPriority * 28 + 12);
   }, [latestPlan]);
+
+  const executionCalendar = useMemo(() => {
+    const plans = Array.isArray(planHistory) ? planHistory : [];
+    const items = plans.slice(0, 8).flatMap((plan) => {
+      const baseDate = new Date(plan.created_at || Date.now());
+      const activities = Array.isArray(plan.activities) ? plan.activities : [];
+      return activities.map((activity, index) => {
+        const dueDate = new Date(baseDate);
+        dueDate.setDate(baseDate.getDate() + Math.max(0, (Number(activity.week_target || 1) - 1) * 7));
+        return {
+          id: `${plan.plan_id || "plan"}-${index}-${activity.title}`,
+          title: activity.title,
+          owner: activity.owner || "Unassigned",
+          dueDate,
+          priority: activity.priority || "MEDIUM",
+        };
+      });
+    });
+    return items.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime()).slice(0, 12);
+  }, [planHistory]);
 
   const handleCreateWorkspace = async (payload) => {
     if (!user?.email) return;
@@ -136,6 +172,61 @@ export default function ManagementDashboard() {
     });
     setQualificationInput((activeWorkspace.qualifications || []).join(", "));
     setShowEditModal(true);
+  };
+
+  const openCreateTeamModal = () => {
+    setEditingMemberId(null);
+    setTeamDraft(defaultTeamDraft);
+    setShowTeamModal(true);
+  };
+
+  const openEditTeamModal = (member) => {
+    setEditingMemberId(member.member_id);
+    setTeamDraft({
+      name: member.name || "",
+      role: member.role || "",
+      cvFileName: "",
+      qualifications: member.qualifications || [],
+      qualification_notes: member.qualification_notes || "",
+      additional_notes: "",
+      cvError: "",
+    });
+    setShowTeamModal(true);
+  };
+
+  const handleSaveTeamMember = async (event) => {
+    event.preventDefault();
+    const notes = [teamDraft.qualification_notes, teamDraft.additional_notes.trim()].filter(Boolean).join("\n\n");
+    const payload = {
+      name: teamDraft.name.trim(),
+      role: teamDraft.role.trim(),
+      qualifications: teamDraft.qualifications || [],
+      qualification_notes: notes.slice(0, 20000),
+    };
+    if (!payload.name) return;
+    try {
+      if (editingMemberId) {
+        await updateTeamMember(editingMemberId, payload);
+        toast.success("Team member updated.");
+      } else {
+        await addTeamMember(payload);
+        toast.success("Team member added.");
+      }
+      setShowTeamModal(false);
+      setEditingMemberId(null);
+      setTeamDraft(defaultTeamDraft);
+    } catch (error) {
+      toast.error(error?.message || "Unable to save team member.");
+    }
+  };
+
+  const handleDeleteTeamMember = async (memberId) => {
+    try {
+      await deleteTeamMember(memberId);
+      toast.success("Team member removed.");
+    } catch (error) {
+      toast.error(error?.message || "Unable to remove team member.");
+    }
   };
 
   return (
@@ -318,11 +409,66 @@ export default function ManagementDashboard() {
               <Users2 size={15} />
               Team Capability Snapshot
             </h4>
-            <p className="text-sm text-slate-400">
-              {activeWorkspace?.qualifications?.length
-                ? activeWorkspace.qualifications.join(", ")
-                : "No qualifications added yet."}
-            </p>
+            {!activeWorkspace ? (
+              <p className="text-sm text-slate-500">Select a workspace to manage team members.</p>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-slate-400">
+                    {(activeWorkspace.team_members || []).length} member(s) with persisted roles and qualifications.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openCreateTeamModal}
+                    className="inline-flex items-center gap-1 rounded-full bg-cyan-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-cyan-400"
+                  >
+                    <UserPlus size={12} />
+                    Add Member
+                  </button>
+                </div>
+                {(activeWorkspace.team_members || []).length === 0 ? (
+                  <p className="text-sm text-slate-500">No team members added yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {(activeWorkspace.team_members || []).map((member) => (
+                      <article key={member.member_id} className="rounded-lg border border-slate-700 bg-slate-900/40 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-200">{member.name}</p>
+                            <p className="text-xs text-slate-400">{member.role || "Role pending"}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openEditTeamModal(member)}
+                              className="rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-slate-400"
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                <Pencil size={12} />
+                                Edit
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTeamMember(member.member_id)}
+                              className="rounded-md border border-rose-500/60 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10"
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                <Trash2 size={12} />
+                                Delete
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                        {member.qualifications?.length ? (
+                          <p className="mt-2 text-xs text-slate-400">{member.qualifications.join(", ")}</p>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </article>
 
           <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
@@ -335,9 +481,39 @@ export default function ManagementDashboard() {
             ) : (
               <div className="space-y-2">
                 {planHistory.slice(0, 6).map((item) => (
-                  <div key={item.id} className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2">
+                  <div key={item.plan_id} className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2">
                     <p className="text-sm font-semibold text-slate-200">{item.objective}</p>
-                    <p className="text-xs text-slate-500">{new Date(item.createdAt).toLocaleString()}</p>
+                    <p className="text-xs text-slate-500">{new Date(item.created_at).toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </article>
+        </section>
+
+        <section>
+          <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
+            <h4 className="mb-3 text-sm font-semibold text-slate-200">Execution Calendar</h4>
+            {executionCalendar.length === 0 ? (
+              <p className="text-sm text-slate-500">Generate a plan to populate the execution calendar.</p>
+            ) : (
+              <div className="grid gap-2 md:grid-cols-2">
+                {executionCalendar.map((item) => (
+                  <div key={item.id} className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2">
+                    <p className="text-sm font-semibold text-slate-200">{item.title}</p>
+                    <p className="text-xs text-slate-400">Owner: {item.owner}</p>
+                    <p className="text-xs text-slate-500">Due: {item.dueDate.toLocaleDateString()}</p>
+                    <p
+                      className={`mt-1 text-xs font-semibold ${
+                        item.priority === "HIGH"
+                          ? "text-rose-400"
+                          : item.priority === "MEDIUM"
+                          ? "text-amber-400"
+                          : "text-emerald-400"
+                      }`}
+                    >
+                      {item.priority}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -381,6 +557,22 @@ export default function ManagementDashboard() {
           onGenerate={handleGeneratePlan}
           isPlanning={isPlanning}
           canRun={Boolean(activeWorkspace)}
+        />
+      ) : null}
+
+      {showTeamModal ? (
+        <TeamMemberModal
+          open={showTeamModal}
+          onClose={() => {
+            setShowTeamModal(false);
+            setEditingMemberId(null);
+            setTeamDraft(defaultTeamDraft);
+          }}
+          title={editingMemberId ? "Edit Team Member" : "Add Team Member"}
+          draft={teamDraft}
+          setDraft={setTeamDraft}
+          onSubmit={handleSaveTeamMember}
+          isSaving={isSaving}
         />
       ) : null}
     </section>

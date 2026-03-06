@@ -1,12 +1,7 @@
 import { useMemo, useState } from "react";
 import { Info, Plus, Upload } from "lucide-react";
 import ModalShell from "./ModalShell";
-
-const parseSkills = (raw) =>
-  String(raw || "")
-    .split(/[\n,;|]/g)
-    .map((item) => item.trim())
-    .filter(Boolean);
+import { parseManagementCv } from "../../services/managementService";
 
 const nextId = () => `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 
@@ -23,7 +18,10 @@ const defaultTeamMember = () => ({
   id: nextId(),
   name: "",
   role: "",
-  qualificationsText: "",
+  cvFileName: "",
+  qualifications: [],
+  qualification_notes: "",
+  cvError: "",
 });
 
 export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving = false }) {
@@ -46,7 +44,7 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
   }, [companyName, workspaceName, primaryGoal]);
 
   const aggregatedQualifications = useMemo(() => {
-    const pool = team.flatMap((member) => parseSkills(member.qualificationsText));
+    const pool = team.flatMap((member) => member.qualifications || []);
     return Array.from(new Set(pool)).slice(0, 100);
   }, [team]);
 
@@ -62,20 +60,44 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
   const addMember = () => setTeam((prev) => [...prev, defaultTeamMember()]);
   const removeMember = (id) => setTeam((prev) => prev.filter((item) => item.id !== id));
 
-  const handleUploadQualifications = async (memberId, file) => {
+  const handleUploadCv = async (memberId, file) => {
     if (!file) return;
-    const text = await file.text();
-    const parsed = parseSkills(text).join(", ");
-    setTeam((prev) =>
-      prev.map((member) => {
-        if (member.id !== memberId) return member;
-        const merged = [member.qualificationsText, parsed].filter(Boolean).join(", ");
-        return { ...member, qualificationsText: merged };
-      })
-    );
+    try {
+      const parsed = await parseManagementCv(file);
+      setTeam((prev) =>
+        prev.map((member) =>
+          member.id === memberId
+            ? {
+                ...member,
+                cvFileName: parsed.source_file_name || file.name,
+                name: parsed.name || member.name,
+                role: parsed.role || member.role,
+                qualifications: Array.isArray(parsed.qualifications) ? parsed.qualifications : [],
+                qualification_notes: parsed.qualification_notes || "",
+                cvError: "",
+              }
+            : member
+        )
+      );
+    } catch (error) {
+      setTeam((prev) =>
+        prev.map((member) =>
+          member.id === memberId ? { ...member, cvError: error?.message || "Unable to parse CV." } : member
+        )
+      );
+    }
   };
 
   const handleLaunch = async () => {
+    const teamMembers = team
+      .filter((member) => member.name.trim())
+      .map((member) => ({
+        name: member.name.trim(),
+        role: member.role.trim(),
+        qualifications: member.qualifications || [],
+        qualification_notes: (member.qualification_notes || "").slice(0, 20000),
+      }));
+
     const teamSummary = team
       .filter((member) => member.name.trim() || member.role.trim())
       .map((member) => `- ${member.name || "Unassigned"} | ${member.role || "Role pending"}`)
@@ -97,6 +119,7 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
       annual_revenue: annualRevenue.trim(),
       employee_count: Number(employeeCount || team.length || 0),
       qualifications: aggregatedQualifications,
+      team_members: teamMembers,
     });
     onClose();
     setStep(1);
@@ -182,7 +205,7 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
         <div className="space-y-4">
           <h4 className="text-3xl font-semibold text-white">Team Access & Skills</h4>
           <p className="text-sm text-slate-400">
-            Add operators and optionally upload qualification files (txt, md, csv, json) for each member.
+            Add operators and upload each member CV to auto-fill name, role, and qualifications.
           </p>
           <div className="space-y-3">
             {team.map((member) => (
@@ -202,26 +225,27 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
                       className={inputClass}
                     />
                   </Field>
-                  <Field label="Qualifications (comma-separated)" className="md:col-span-2">
-                    <textarea
-                      rows={2}
-                      value={member.qualificationsText}
-                      onChange={(event) => updateMember(member.id, { qualificationsText: event.target.value })}
-                      className={inputClass}
-                    />
+                  <Field label="CV File" className="md:col-span-2">
+                    <label className="inline-flex w-full cursor-pointer items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500">
+                      <Upload size={14} />
+                      {member.cvFileName || "Upload CV (.pdf, .docx, .txt, .md, .csv, .json, .rtf)"}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.docx,.doc,.txt,.md,.csv,.json,.log,.rtf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain,text/markdown,text/csv,application/json,text/rtf"
+                        onChange={(event) => handleUploadCv(member.id, event.target.files?.[0])}
+                      />
+                    </label>
+                    {member.cvError ? <p className="mt-1 text-xs text-rose-400">{member.cvError}</p> : null}
+                    {member.qualifications.length ? (
+                      <p className="mt-2 text-xs text-slate-400">
+                        Extracted: {member.qualifications.join(", ")}
+                      </p>
+                    ) : null}
                   </Field>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:border-slate-500">
-                    <Upload size={12} />
-                    Upload Qualification File
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".txt,.md,.csv,.json,.log,text/plain,text/markdown,text/csv,application/json"
-                      onChange={(event) => handleUploadQualifications(member.id, event.target.files?.[0])}
-                    />
-                  </label>
+                  <span className="text-xs text-slate-500">CV is parsed on backend and can still be edited manually.</span>
                   {team.length > 1 ? (
                     <button type="button" onClick={() => removeMember(member.id)} className="text-xs text-rose-400">
                       Remove

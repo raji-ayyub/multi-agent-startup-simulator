@@ -1,82 +1,135 @@
+# Multi-Agent Startup Simulator
 
-# Multi-Agent AI Startup Strategy Simulator
+Production-oriented startup simulation and management workspace platform.
 
-## Overview
+## What This Project Does
 
-The Multi-Agent AI Startup Strategy Simulator is a Generative AI–powered decision-support system designed to help early-stage startup founders evaluate and refine their business strategies before committing significant resources.
+### Simulation App
+- AI intake chat captures startup brief details.
+- Multi-agent simulation runs market/customer/investor analysis.
+- Results are persisted and viewable in history.
+- Revisit + edit + rerun from any saved simulation.
+- Optional rerun as new version (`_v2`, `_v3`, ...).
+- Delete simulation runs.
 
-Instead of providing a single monolithic response, the system simulates multiple real-world stakeholders — such as market analysts, customers, and investors — within a coordinated reasoning framework. The result is structured, multi-perspective strategic feedback that mirrors real startup evaluation dynamics.
+### Management App
+- Separate dashboard shell from simulation mode.
+- Create management workspaces with guided modal setup.
+- Multi-step workspace modal: Configuration -> Team -> Review.
+- Optional per-employee qualification file upload (text-based) during setup.
+- Team members persisted on backend and used in planning context.
+- Generate AI activity plans for execution.
 
-> Status: 🚧 Planning & Architecture Phase (No implementation yet)
+## Recent Major Updates
 
----
+### AI Intake / Conversation Quality
+- Removed rule-based extraction for geography/target audience/CAC/etc.
+- Switched intake extraction to LLM-driven parsing.
+- Added LLM intent classification (`STARTUP`, `SOCIAL`, `OFFTOPIC_PERSONAL`).
+- Added explicit run-confirmation behavior:
+  - assistant asks whether to run now or keep adding context
+  - simulation runs only after explicit go-ahead
 
-## Problem Statement
+### Simulation Lifecycle
+- Added rerun endpoint from existing simulation payload.
+- Added "run as new version" naming strategy (`_vN`).
+- Added delete endpoint for simulations.
+- Added frontend edit-and-rerun modal in results view.
 
-Early-stage founders make critical decisions under high uncertainty, often relying on limited experience, anecdotal advice, or isolated mentorship.
+### UX / Notifications
+- Added global external toast notifications (`sonner`).
+- Replaced browser `alert`/`confirm` usage with toast-based interactions.
 
-Existing AI tools provide single-perspective outputs and fail to reflect:
-- Multi-stakeholder trade-offs
-- Conflicting strategic incentives
-- Real-world evaluation dynamics
+### Codebase Layout Cleanup
+- Introduced backend modular folders:
+  - `backend/modules/simulation/`
+  - `backend/modules/management/`
+- Kept compatibility wrapper files at old paths to avoid import breakage.
 
-This project reframes AI from a single advisor into a simulated decision ecosystem.
+## Current Backend Structure
 
----
-
-## High-Level Architecture
-
+```text
+backend/
+  modules/
+    simulation/
+      routes.py
+      schemas.py
+      service.py
+    management/
+      routes.py
+      schemas.py
+      service.py
+  rag/
+  main.py
+  models.py
+  routes.py            # auth + ingestion/rag routes
+  auth.py
+  database.py
 ```
 
-Frontend (React + Vite + TailwindCSS)
-↓
-FastAPI Backend (API + Orchestration Entry)
-↓
-Agent Orchestration Layer (LangGraph)
-↓
-RAG Layer (Retriever + Vector Database)
-↓
-Data Layer (Documents, Metadata, Embeddings, Logs)
+## API Highlights
 
+### Simulation
+- `POST /api/v1/simulations/intake/turn`
+- `POST /api/v1/simulations/run`
+- `GET /api/v1/simulations`
+- `GET /api/v1/simulations/{simulation_id}`
+- `POST /api/v1/simulations/{simulation_id}/rerun`
+- `DELETE /api/v1/simulations/{simulation_id}`
+
+### Management
+- `POST /api/v1/management/workspaces`
+- `GET /api/v1/management/workspaces`
+- `GET /api/v1/management/workspaces/{workspace_id}`
+- `PATCH /api/v1/management/workspaces/{workspace_id}`
+- `GET /api/v1/management/workspaces/{workspace_id}/team`
+- `POST /api/v1/management/workspaces/{workspace_id}/team`
+- `PATCH /api/v1/management/workspaces/{workspace_id}/team/{member_id}`
+- `DELETE /api/v1/management/workspaces/{workspace_id}/team/{member_id}`
+- `POST /api/v1/management/workspaces/{workspace_id}/plan`
+- `GET /api/v1/management/workspaces/{workspace_id}/plans`
+
+## What Is Still Left (Recommended Next)
+
+1. Data migrations:
+- Current startup table creation is automatic.
+- Add proper migration tooling (Alembic) for schema versioning in deployed environments.
+
+2. Persistent conversation memory:
+- Chat history is currently passed per request from frontend.
+- Add dedicated session/message tables for long-term conversational memory.
+
+3. File handling for employee qualifications:
+- Frontend currently parses text-like files client-side.
+- Add backend file ingestion/storage and normalized extraction per employee.
+
+4. Authorization hardening:
+- Several endpoints still rely on email scoping from request context.
+- Enforce authenticated user scoping from validated JWT claims server-side.
+
+5. Versioning metadata:
+- Reruns currently create new run records; add explicit parent-child linkage fields in DB.
+
+6. Testing:
+- Add backend tests for rerun/version/delete flows and management team CRUD.
+- Add frontend integration tests for modal workflows.
+
+## Run Locally
+
+### Backend
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload
 ```
 
----
-
-## Core Concept
-
-Multiple specialized AI agents independently analyze a startup idea from different perspectives:
-
-- Market Analyst Agent
-- Customer Persona Agent
-- Investor Agent
-
-Their outputs are aggregated into structured strategic feedback for founders.
-
----
-
-## Planned Stack
-
-- Frontend: React (Vite) + TailwindCSS
-- Backend: FastAPI
-- Orchestration: LangGraph
-- Retrieval: RAG + Vector Database
-- Data Storage: Document Store + Embeddings DB
-
----
-
-## Current Status
-
-- System design in progress
-- Agent roles being defined
-- Architecture and data pipeline under planning
-
-Implementation will begin after finalizing agent interaction logic and data schema.
-
----
-
-## Vision
-
-To build a realistic AI-powered startup evaluation simulator that helps founders reduce bias, improve clarity, and make better strategic decisions before entering the market.
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
----
+## Notes
+- Frontend uses localStorage for auth token/user and some local drafts.
+- Simulation and management records are persisted in the backend database.
