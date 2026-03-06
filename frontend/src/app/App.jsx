@@ -60,13 +60,13 @@ const SimulationLayout = ({ children }) => {
 
 const ManagementLayout = ({ children }) => {
   return (
-    <div className="flex min-h-[100dvh] bg-[#040910] text-slate-100 lg:h-[100dvh]">
+    <div className="management-shell flex min-h-[100dvh] bg-[#05090f] text-slate-100 lg:h-[100dvh]">
       <div className="hidden lg:block">
         <ManagementSidebar />
       </div>
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <ManagementTopbar />
-        <main className="min-w-0 flex-1 overflow-y-auto bg-[#09111d] p-3 sm:p-5 md:p-6">{children}</main>
+        <main className="min-w-0 flex-1 overflow-y-auto bg-[#0b1017] p-3 sm:p-5 md:p-6">{children}</main>
       </div>
     </div>
   );
@@ -164,6 +164,26 @@ export default function App() {
           />
           <Route
             path="/management"
+            element={
+              <ProtectedRoute>
+                <ManagementLayout>
+                  <ManagementDashboard />
+                </ManagementLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/management/planner"
+            element={
+              <ProtectedRoute>
+                <ManagementLayout>
+                  <ManagementDashboard />
+                </ManagementLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/management/signals"
             element={
               <ProtectedRoute>
                 <ManagementLayout>

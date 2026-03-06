@@ -16,9 +16,11 @@ Production-oriented startup simulation and management workspace platform.
 - Separate dashboard shell from simulation mode.
 - Create management workspaces with guided modal setup.
 - Multi-step workspace modal: Configuration -> Team -> Review.
-- Optional per-employee qualification file upload (text-based) during setup.
+- CV upload per team member with backend parsing (`pdf/docx/txt/md/csv/json/rtf`).
+- Auto-fill of team member `name`, `role`, and qualifications from parsed CV data.
 - Team members persisted on backend and used in planning context.
-- Generate AI activity plans for execution.
+- AI activity planning with persisted plan history.
+- Persistent management memory and activity monitoring for behind-the-scenes agentics.
 
 ## Recent Major Updates
 
@@ -40,6 +42,25 @@ Production-oriented startup simulation and management workspace platform.
 - Added global external toast notifications (`sonner`).
 - Replaced browser `alert`/`confirm` usage with toast-based interactions.
 
+### Management Intelligence + Monitoring
+- Added backend CV parsing endpoint with AI-assisted name/role extraction + heuristic fallback.
+- Added persistent agent memory records (`management_agent_memory`) for:
+  - team profile intelligence snapshots
+  - plan run summaries
+  - monitor signal updates
+- Added persistent activity monitor records (`management_activity_monitor`) seeded from plan activities.
+- Management planning now uses persisted memory context in prompt generation.
+
+### Management UX + Navigation
+- Added dedicated management routes:
+  - `/management`
+  - `/management/planner`
+  - `/management/signals`
+- Fixed sidebar active-state behavior so only one management tab is active at a time.
+- Added animated Agent Activity Stream panel for background actions (load/save/plan/team updates).
+- Added topbar live status indicator: `Agents Running` / `Agents Idle`.
+- Improved management light-mode readability and aligned accent colors with simulation mode.
+
 ### Codebase Layout Cleanup
 - Introduced backend modular folders:
   - `backend/modules/simulation/`
@@ -56,6 +77,7 @@ backend/
       schemas.py
       service.py
     management/
+      cv_parser.py
       routes.py
       schemas.py
       service.py
@@ -88,6 +110,10 @@ backend/
 - `DELETE /api/v1/management/workspaces/{workspace_id}/team/{member_id}`
 - `POST /api/v1/management/workspaces/{workspace_id}/plan`
 - `GET /api/v1/management/workspaces/{workspace_id}/plans`
+- `GET /api/v1/management/workspaces/{workspace_id}/memory`
+- `GET /api/v1/management/workspaces/{workspace_id}/monitor`
+- `PATCH /api/v1/management/workspaces/{workspace_id}/monitor/{item_id}`
+- `POST /api/v1/management/cv/parse`
 
 ## What Is Still Left (Recommended Next)
 
@@ -99,20 +125,16 @@ backend/
 - Chat history is currently passed per request from frontend.
 - Add dedicated session/message tables for long-term conversational memory.
 
-3. File handling for employee qualifications:
-- Frontend currently parses text-like files client-side.
-- Add backend file ingestion/storage and normalized extraction per employee.
-
-4. Authorization hardening:
+3. Authorization hardening:
 - Several endpoints still rely on email scoping from request context.
 - Enforce authenticated user scoping from validated JWT claims server-side.
 
-5. Versioning metadata:
+4. Versioning metadata:
 - Reruns currently create new run records; add explicit parent-child linkage fields in DB.
 
-6. Testing:
+5. Testing:
 - Add backend tests for rerun/version/delete flows and management team CRUD.
-- Add frontend integration tests for modal workflows.
+- Add frontend integration tests for management route/tab behavior and activity stream updates.
 
 ## Run Locally
 

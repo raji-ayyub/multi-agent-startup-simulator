@@ -5,10 +5,13 @@ import re
 import tempfile
 from typing import Dict, List, Tuple
 
+import openai
 import pdfplumber
 
 
 ALLOWED_CV_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".csv", ".json", ".log", ".rtf"}
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+client = openai.OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 
 def get_extension(file_name: str) -> str:
@@ -113,13 +116,53 @@ def _extract_qualifications(text: str) -> List[str]:
     return _clean_values(candidates)
 
 
+def _infer_name_and_role_with_llm(text: str, fallback_name: str, fallback_role: str) -> Tuple[str, str]:
+    if client is None or not text.strip():
+        return fallback_name, fallback_role
+    try:
+        system_prompt = (
+            "You extract profile details from CV text. "
+            "Return strict JSON with keys: name (string), role (string). "
+            "Use concise role titles like 'Product Manager', 'Frontend Engineer', 'Operations Lead'. "
+            "If uncertain, return empty string for that field."
+        )
+        user_prompt = f"CV text:\n{text[:12000]}"
+        response = client.chat.completions.create(
+            model=os.getenv("SIMULATION_MODEL", "gpt-4o-mini"),
+            temperature=0.1,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        raw = (response.choices[0].message.content or "").strip()
+        parsed = {}
+        if raw:
+            import json
+
+            parsed = json.loads(raw)
+        llm_name = str(parsed.get("name") or "").strip() if isinstance(parsed, dict) else ""
+        llm_role = str(parsed.get("role") or "").strip() if isinstance(parsed, dict) else ""
+        return llm_name or fallback_name, llm_role or fallback_role
+    except Exception:
+        return fallback_name, fallback_role
+
+
 def parse_cv_profile(file_name: str, text: str) -> Dict[str, object]:
     normalized_text = str(text or "").strip()
+    fallback_name = _extract_name(normalized_text, file_name)
+    fallback_role = _extract_role(normalized_text)
+    inferred_name, inferred_role = _infer_name_and_role_with_llm(
+        text=normalized_text,
+        fallback_name=fallback_name,
+        fallback_role=fallback_role,
+    )
     qualifications = _extract_qualifications(normalized_text)
     return {
         "source_file_name": file_name,
-        "name": _extract_name(normalized_text, file_name),
-        "role": _extract_role(normalized_text),
+        "name": inferred_name,
+        "role": inferred_role,
         "qualifications": qualifications,
         "qualification_notes": normalized_text[:20000],
     }

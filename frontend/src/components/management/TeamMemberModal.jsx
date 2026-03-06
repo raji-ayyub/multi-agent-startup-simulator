@@ -3,7 +3,7 @@ import ModalShell from "./ModalShell";
 import { parseManagementCv } from "../../services/managementService";
 
 const inputClass =
-  "w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-500";
+  "w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-blue-500";
 
 export default function TeamMemberModal({
   open,

@@ -131,3 +131,40 @@ html[data-theme="light"] .auth-screen .auth-social-btn {
   color: #0b1220 !important;
   border-color: #475569 !important;
 }
+
+html[data-theme="light"] .management-shell header,
+html[data-theme="light"] .management-shell article,
+html[data-theme="light"] .management-shell aside,
+html[data-theme="light"] .management-shell main {
+  background-color: #ffffff !important;
+  border-color: #dbe3f0 !important;
+}
+
+html[data-theme="light"] .management-shell .bg-slate-900\/40,
+html[data-theme="light"] .management-shell .bg-slate-900\/50,
+html[data-theme="light"] .management-shell .bg-slate-900\/70,
+html[data-theme="light"] .management-shell .bg-slate-950\/50,
+html[data-theme="light"] .management-shell .bg-slate-800,
+html[data-theme="light"] .management-shell .bg-\[\#0b1220\],
+html[data-theme="light"] .management-shell .bg-\[\#0d1525\],
+html[data-theme="light"] .management-shell .bg-\[\#101827\] {
+  background-color: #f8fafc !important;
+}
+
+html[data-theme="light"] .management-shell .text-slate-500 {
+  color: #64748b !important;
+}
+
+html[data-theme="light"] .management-shell .text-slate-400 {
+  color: #475569 !important;
+}
+
+html[data-theme="light"] .management-shell .text-slate-300 {
+  color: #334155 !important;
+}
+
+html[data-theme="light"] .management-shell .text-slate-200,
+html[data-theme="light"] .management-shell .text-slate-100,
+html[data-theme="light"] .management-shell .text-white {
+  color: #0f172a !important;
+}

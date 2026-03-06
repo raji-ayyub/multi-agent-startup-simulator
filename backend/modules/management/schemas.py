@@ -99,3 +99,33 @@ class ManagementCvParseResponse(BaseModel):
     role: str
     qualifications: List[str]
     qualification_notes: str
+
+
+class ManagementMemoryResponse(BaseModel):
+    memory_id: str
+    workspace_id: str
+    memory_type: str
+    title: str
+    payload: dict
+    created_at: datetime
+    updated_at: datetime
+
+
+class ManagementMonitorItemResponse(BaseModel):
+    item_id: str
+    workspace_id: str
+    plan_id: str
+    title: str
+    owner: str
+    priority: str
+    due_date: datetime
+    status: str
+    progress_note: str
+    signal_score: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class ManagementMonitorUpdate(BaseModel):
+    status: Optional[str] = Field(default=None, max_length=40)
+    progress_note: Optional[str] = Field(default=None, max_length=5000)
