@@ -37,6 +37,19 @@ export async function runSimulation(brief) {
   }
 }
 
+export async function intakeSimulationTurn(payload) {
+  try {
+    const { data } = await api.post("/api/v1/simulations/intake/turn", {
+      draft: payload?.draft || {},
+      user_message: payload?.userMessage || "",
+      history: Array.isArray(payload?.history) ? payload.history : [],
+    });
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Intake assistant request failed."));
+  }
+}
+
 export async function listSimulations() {
   try {
     const email = getCurrentUserEmail();
@@ -55,5 +68,23 @@ export async function getSimulation(simulationId) {
     return data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to load simulation details."));
+  }
+}
+
+export async function rerunSimulation(simulationId, payload) {
+  try {
+    const { data } = await api.post(`/api/v1/simulations/${simulationId}/rerun`, payload || {});
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to rerun simulation."));
+  }
+}
+
+export async function deleteSimulation(simulationId) {
+  try {
+    const { data } = await api.delete(`/api/v1/simulations/${simulationId}`);
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to delete simulation."));
   }
 }
