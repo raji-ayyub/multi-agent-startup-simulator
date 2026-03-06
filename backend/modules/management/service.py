@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 import openai
 
-from models import ManagementWorkspace
+from models import ManagementPlanRun, ManagementWorkspace
 from .schemas import PlannedActivity
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -59,6 +59,18 @@ def _workspace_to_response_payload(workspace: ManagementWorkspace) -> Dict[str, 
 
 def serialize_workspace(workspace: ManagementWorkspace) -> Dict[str, Any]:
     return _workspace_to_response_payload(workspace)
+
+
+def serialize_plan_run(plan_run: ManagementPlanRun) -> Dict[str, Any]:
+    activities = plan_run.activities if isinstance(plan_run.activities, list) else []
+    return {
+        "plan_id": plan_run.id,
+        "workspace_id": plan_run.workspace_id,
+        "objective": plan_run.objective or "",
+        "plan_summary": plan_run.plan_summary or "",
+        "activities": activities,
+        "created_at": plan_run.created_at,
+    }
 
 
 def build_workspace_prompt_context(workspace: ManagementWorkspace) -> str:

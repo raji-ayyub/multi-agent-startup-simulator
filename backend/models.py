@@ -80,3 +80,19 @@ class ManagementTeamMember(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     workspace = relationship("ManagementWorkspace", back_populates="team_members")
+
+
+class ManagementPlanRun(Base):
+    __tablename__ = "management_plan_runs"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    workspace_id = Column(
+        String(36),
+        ForeignKey("management_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    objective = Column(Text, nullable=False)
+    plan_summary = Column(Text, nullable=False, default="")
+    activities = Column(JSON, nullable=False, default=list)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

@@ -1,13 +1,14 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import ManagementTeamMember, ManagementWorkspace
+from models import ManagementPlanRun, ManagementTeamMember, ManagementWorkspace
 from .schemas import (
     ManagementActivityPlanRequest,
     ManagementActivityPlanResponse,
+    ManagementCvParseResponse,
     ManagementTeamMemberCreate,
     ManagementTeamMemberResponse,
     ManagementTeamMemberUpdate,
@@ -15,7 +16,8 @@ from .schemas import (
     ManagementWorkspaceResponse,
     ManagementWorkspaceUpdate,
 )
-from .service import generate_management_plan, serialize_workspace
+from .cv_parser import extract_cv_text, parse_cv_profile
+from .service import generate_management_plan, serialize_plan_run, serialize_workspace
 
 management_router = APIRouter(prefix="/api/v1/management", tags=["management"])
 
@@ -27,6 +29,25 @@ def _clean_list(items):
         if value:
             values.append(value[:120])
     return values[:100]
+
+
+@management_router.post("/cv/parse", response_model=ManagementCvParseResponse)
+async def parse_management_cv(file: UploadFile = File(...)):
+    file_name = file.filename or "cv-upload"
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded CV file is empty.")
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="CV file exceeds 10MB limit.")
+
+    try:
+        text, _ = extract_cv_text(file_name, content)
+        profile = parse_cv_profile(file_name=file_name, text=text)
+        return ManagementCvParseResponse(**profile)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Unable to parse CV file.")
 
 
 @management_router.post("/workspaces", response_model=ManagementWorkspaceResponse)
@@ -244,9 +265,38 @@ def generate_workspace_plan(
         objective=payload.objective,
         time_horizon_weeks=payload.time_horizon_weeks,
     )
-    return ManagementActivityPlanResponse(
+    plan_run = ManagementPlanRun(
         workspace_id=row.id,
         objective=payload.objective,
         plan_summary=plan.get("plan_summary", ""),
         activities=plan.get("activities", []),
     )
+    db.add(plan_run)
+    row.updated_at = datetime.utcnow()
+    db.add(row)
+    db.commit()
+    db.refresh(plan_run)
+    return ManagementActivityPlanResponse(**serialize_plan_run(plan_run))
+
+
+@management_router.get(
+    "/workspaces/{workspace_id}/plans",
+    response_model=list[ManagementActivityPlanResponse],
+)
+def list_workspace_plans(
+    workspace_id: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    workspace = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Management workspace not found.")
+
+    rows = (
+        db.query(ManagementPlanRun)
+        .filter(ManagementPlanRun.workspace_id == workspace_id)
+        .order_by(ManagementPlanRun.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [ManagementActivityPlanResponse(**serialize_plan_run(item)) for item in rows]

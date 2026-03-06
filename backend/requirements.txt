@@ -28,3 +28,4 @@ langgraph
 langchain_text_splitters
 python-multipart
 numpy
+docx2txt

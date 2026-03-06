@@ -87,6 +87,7 @@ backend/
 - `PATCH /api/v1/management/workspaces/{workspace_id}/team/{member_id}`
 - `DELETE /api/v1/management/workspaces/{workspace_id}/team/{member_id}`
 - `POST /api/v1/management/workspaces/{workspace_id}/plan`
+- `GET /api/v1/management/workspaces/{workspace_id}/plans`
 
 ## What Is Still Left (Recommended Next)
 

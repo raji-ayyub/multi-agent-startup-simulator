@@ -85,7 +85,17 @@ class PlannedActivity(BaseModel):
 
 
 class ManagementActivityPlanResponse(BaseModel):
+    plan_id: str
     workspace_id: str
     objective: str
     plan_summary: str
     activities: List[PlannedActivity]
+    created_at: datetime
+
+
+class ManagementCvParseResponse(BaseModel):
+    source_file_name: str
+    name: str
+    role: str
+    qualifications: List[str]
+    qualification_notes: str
