@@ -40,6 +40,7 @@ const AGENTIC_LOGS = [
   { role: "CUSTOMER AGENT", message: "Simulating target persona responses..." },
   { role: "INVESTOR AGENT", message: "Scoring growth and runway..." },
 ];
+const FALLBACK_LOGS = AGENTIC_LOGS;
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -306,7 +307,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                 alt="Logo"
                 className="w-8 h-8 bg-black p-1 rounded-lg"
               />
-              <span className="font-medium text-slate-200">PentraAI <span className="mx-1 text-slate-600">/</span> {simulationStage ? "Simulation" : step.subtitle}</span>
+              <span className="font-medium text-slate-200">PentraAI <span className="mx-1 text-slate-600">/</span> {simulationStage ? "Simulation" : "Intake"}</span>
             
             </div>
             <button
