@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Archive, Building2, Pencil, Sparkles, Trash2, TrendingUp, UserPlus, Users2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useLocation } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import useManagementStore from "../../store/managementStore";
 import ActivityPlanModal from "../../components/management/ActivityPlanModal";
@@ -20,6 +22,7 @@ const defaultTeamDraft = {
 };
 
 export default function ManagementDashboard() {
+  const location = useLocation();
   const { user } = useAuthStore();
   const {
     workspaces,
@@ -38,6 +41,7 @@ export default function ManagementDashboard() {
     deleteTeamMember,
     latestPlan,
     planHistory,
+    agentEvents,
   } = useManagementStore();
 
   const [objective, setObjective] = useState("");
@@ -50,6 +54,11 @@ export default function ManagementDashboard() {
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState(null);
   const [teamDraft, setTeamDraft] = useState(defaultTeamDraft);
+  const activeTab = useMemo(() => {
+    if (location.pathname.startsWith("/management/planner")) return "PLANNER";
+    if (location.pathname.startsWith("/management/signals")) return "SIGNALS";
+    return "HOME";
+  }, [location.pathname]);
 
   useEffect(() => {
     if (user?.email) {
@@ -230,14 +239,17 @@ export default function ManagementDashboard() {
   };
 
   return (
-    <section className="h-full text-slate-100">
+    <section className="management-shell h-full text-slate-100">
       <div className="mx-auto flex max-w-[1280px] flex-col gap-5">
         <header className="rounded-2xl border border-slate-800 bg-[#0b1220] px-6 py-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Active Archive</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-blue-300">Active Archive</p>
           <h1 className="mt-2 text-4xl font-semibold text-white">Startup Management Vault</h1>
           <p className="mt-2 max-w-3xl text-sm text-slate-400">
             Build management workspaces and run agentic execution plans using company revenue, team size, and
             qualifications.
+          </p>
+          <p className="mt-3 inline-flex rounded-full border border-blue-500/40 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-300">
+            Active View: {activeTab}
           </p>
         </header>
 
@@ -254,7 +266,7 @@ export default function ManagementDashboard() {
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(true)}
-                    className="rounded-full bg-cyan-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-cyan-400"
+                    className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-500"
                   >
                     + New
                   </button>
@@ -281,7 +293,7 @@ export default function ManagementDashboard() {
                       onClick={() => selectWorkspace(workspace.workspace_id)}
                       className={`rounded-lg border px-3 py-2 text-left transition ${
                         activeWorkspace?.workspace_id === workspace.workspace_id
-                          ? "border-cyan-500/60 bg-cyan-500/10"
+                          ? "border-blue-500/60 bg-blue-500/10"
                           : "border-slate-700 bg-slate-900/40 hover:border-slate-500"
                       }`}
                     >
@@ -353,6 +365,7 @@ export default function ManagementDashboard() {
           </div>
         </div>
 
+        {activeTab !== "SIGNALS" ? (
         <section className="grid gap-5 lg:grid-cols-[1fr_0.34fr]">
           <article className="rounded-2xl border border-slate-800 bg-[#0b1220] p-5">
             <h3 className="mb-4 text-base font-semibold text-white">Current Tasks</h3>
@@ -381,7 +394,7 @@ export default function ManagementDashboard() {
                     >
                       {task.priority}
                     </p>
-                    <p className="text-xs text-cyan-300">Week {task.week_target}</p>
+                    <p className="text-xs text-blue-300">Week {task.week_target}</p>
                   </div>
                 ))}
               </div>
@@ -390,19 +403,21 @@ export default function ManagementDashboard() {
 
           <article className="rounded-2xl border border-slate-800 bg-[#0b1220] p-5">
             <h3 className="text-sm font-semibold text-slate-200">Growth Velocity</h3>
-            <p className="mt-3 text-4xl font-semibold text-cyan-300">{growthVelocity}%</p>
+            <p className="mt-3 text-4xl font-semibold text-blue-300">{growthVelocity}%</p>
             <p className="mt-1 text-xs text-slate-500">Current execution momentum signal.</p>
             <div className="mt-4 flex gap-1.5">
               {[0, 1, 2, 3, 4].map((index) => (
                 <div
                   key={index}
-                  className={`h-6 flex-1 rounded-sm ${index * 20 < growthVelocity ? "bg-cyan-500" : "bg-slate-700"}`}
+                  className={`h-6 flex-1 rounded-sm ${index * 20 < growthVelocity ? "bg-blue-500" : "bg-slate-700"}`}
                 />
               ))}
             </div>
           </article>
         </section>
+        ) : null}
 
+        {activeTab !== "PLANNER" ? (
         <section className="grid gap-5 lg:grid-cols-2">
           <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
             <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
@@ -420,7 +435,7 @@ export default function ManagementDashboard() {
                   <button
                     type="button"
                     onClick={openCreateTeamModal}
-                    className="inline-flex items-center gap-1 rounded-full bg-cyan-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-cyan-400"
+                    className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-500"
                   >
                     <UserPlus size={12} />
                     Add Member
@@ -490,8 +505,10 @@ export default function ManagementDashboard() {
             )}
           </article>
         </section>
+        ) : null}
 
-        <section>
+        {activeTab !== "HOME" ? (
+        <section className="grid gap-5 lg:grid-cols-2">
           <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
             <h4 className="mb-3 text-sm font-semibold text-slate-200">Execution Calendar</h4>
             {executionCalendar.length === 0 ? (
@@ -519,7 +536,43 @@ export default function ManagementDashboard() {
               </div>
             )}
           </article>
+          <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
+            <h4 className="mb-3 text-sm font-semibold text-slate-200">Agent Activity Stream</h4>
+            {agentEvents.length === 0 ? (
+              <p className="text-sm text-slate-500">No agent events yet. Trigger an action to start streaming.</p>
+            ) : (
+              <div className="space-y-2">
+                {agentEvents.slice(0, 12).map((event, index) => (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.24, delay: index * 0.02 }}
+                    className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <motion.span
+                        animate={event.status === "RUNNING" ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+                        transition={event.status === "RUNNING" ? { duration: 1.2, repeat: Infinity } : { duration: 0 }}
+                        className={`h-2 w-2 rounded-full ${
+                          event.status === "DONE"
+                            ? "bg-emerald-400"
+                            : event.status === "ERROR"
+                            ? "bg-rose-400"
+                            : "bg-blue-400"
+                        }`}
+                      />
+                      <p className="text-xs font-semibold text-slate-200">{event.phase}</p>
+                      <p className="text-[11px] text-slate-500">{new Date(event.timestamp).toLocaleTimeString()}</p>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">{event.message}</p>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </article>
         </section>
+        ) : null}
 
         {error ? <p className="text-sm text-rose-400">{error}</p> : null}
       </div>

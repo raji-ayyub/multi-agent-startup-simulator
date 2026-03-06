@@ -96,3 +96,47 @@ class ManagementPlanRun(Base):
     plan_summary = Column(Text, nullable=False, default="")
     activities = Column(JSON, nullable=False, default=list)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class ManagementAgentMemory(Base):
+    __tablename__ = "management_agent_memory"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    workspace_id = Column(
+        String(36),
+        ForeignKey("management_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    memory_type = Column(String(80), nullable=False, index=True)
+    title = Column(String(255), nullable=False, default="")
+    payload = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ManagementActivityMonitor(Base):
+    __tablename__ = "management_activity_monitor"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    workspace_id = Column(
+        String(36),
+        ForeignKey("management_workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    plan_id = Column(
+        String(36),
+        ForeignKey("management_plan_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    title = Column(String(255), nullable=False)
+    owner = Column(String(255), nullable=False, default="Unassigned")
+    priority = Column(String(20), nullable=False, default="MEDIUM")
+    due_date = Column(DateTime, nullable=False, index=True)
+    status = Column(String(40), nullable=False, default="PLANNED", index=True)
+    progress_note = Column(Text, nullable=False, default="")
+    signal_score = Column(Integer, nullable=False, default=50)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

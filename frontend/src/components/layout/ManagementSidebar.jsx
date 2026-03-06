@@ -1,12 +1,12 @@
 import { Bell, BriefcaseBusiness, ClipboardList, LineChart, Settings, UserCircle2 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import ModeSwitch from "./ModeSwitch";
 
 const menuItems = [
-  { title: "Management Home", icon: BriefcaseBusiness, path: "/management" },
-  { title: "Activity Planner", icon: ClipboardList, path: "/management" },
-  { title: "Execution Signals", icon: LineChart, path: "/management" },
+  { title: "Management Home", icon: BriefcaseBusiness, path: "/management", end: true },
+  { title: "Activity Planner", icon: ClipboardList, path: "/management/planner", end: true },
+  { title: "Execution Signals", icon: LineChart, path: "/management/signals", end: true },
 ];
 
 const systemItems = [
@@ -16,21 +16,22 @@ const systemItems = [
 
 export default function ManagementSidebar() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
 
   return (
-    <aside className="flex h-screen w-[248px] flex-col justify-between border-r border-slate-800 bg-[#070d14] px-4 py-5 text-slate-300">
+    <aside className="management-shell flex h-screen w-[248px] flex-col justify-between border-r border-slate-800 bg-[#070b11] px-4 py-5 text-slate-300">
       <div>
         <div className="px-2">
           <div className="flex items-center gap-2">
             <img src="/images/Icon.svg" alt="Logo" className="h-8 w-8 rounded-lg bg-black p-1" />
-            <h1 className="text-sm font-semibold tracking-wide text-cyan-300">Pentra Manage</h1>
+            <h1 className="text-sm font-semibold tracking-wide text-[#E2E78D]">Pentra Manage</h1>
           </div>
           <p className="mt-1 text-xs text-slate-500">Startup Management OS</p>
         </div>
 
         <nav className="mt-6 space-y-1.5">
           {menuItems.map((item) => (
-            <NavItem key={item.title} title={item.title} icon={item.icon} path={item.path} />
+            <NavItem key={item.title} title={item.title} icon={item.icon} path={item.path} end={item.end} />
           ))}
         </nav>
 
@@ -48,11 +49,12 @@ export default function ManagementSidebar() {
       </div>
 
       <div className="space-y-4">
-        <article className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-4 text-center">
-          <p className="text-xs font-semibold leading-tight text-cyan-200">AGENTIC EXECUTION BOARD</p>
+        <article className="rounded-2xl border border-slate-700 bg-gradient-to-b from-slate-100 to-slate-300 p-4 text-center text-slate-900">
+          <p className="text-xs font-semibold leading-tight">AGENTIC EXECUTION BOARD</p>
           <button
             type="button"
-            className="mt-3 rounded-full bg-cyan-500 px-4 py-1.5 text-[11px] font-semibold text-black transition hover:bg-cyan-400"
+            onClick={() => navigate("/management/planner")}
+            className="mt-3 rounded-full bg-slate-900 px-4 py-1.5 text-[11px] font-semibold text-white transition hover:bg-black"
           >
             OPEN PLANNER
           </button>
@@ -72,13 +74,14 @@ export default function ManagementSidebar() {
   );
 }
 
-function NavItem({ title, icon: Icon, path }) {
+function NavItem({ title, icon: Icon, path, end = false }) {
   return (
     <NavLink
       to={path}
+      end={end}
       className={({ isActive }) =>
         `mx-1.5 flex items-center gap-2.5 px-3 py-2 text-sm transition ${
-          isActive ? "border-l-4 border-cyan-500/70 text-cyan-300" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+          isActive ? "border-l-4 border-blue-500/70 text-blue-500" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
         }`
       }
     >
