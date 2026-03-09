@@ -23,9 +23,10 @@ pdfplumber
 supabase
 psycopg2
 openai
-langChain
-langGraph
+langchain
+langgraph
 langchain_text_splitters
 python-multipart
 numpy
 sendgrid>=6.9.1
+docx2txt

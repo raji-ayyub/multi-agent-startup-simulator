@@ -12,6 +12,14 @@ from modules.simulation.routes import simulation_router
 load_dotenv()
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Create database tables during app startup."""
+    create_tables()
+    print("✓ Database tables initialized")
+    yield
+
+
 def get_cors_origins():
     """Resolve CORS origins from env, with local-safe defaults."""
     env_origins = os.getenv("CORS_ORIGINS", "").strip()
@@ -52,6 +60,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+def startup_event():
+    """Create database tables on server startup."""
+    create_tables()
+    print("✓ Database tables initialized")
+
 
 # Include routes
 app.include_router(auth_router)
@@ -80,12 +94,12 @@ def health_check():
     }
 
 
-if __name__ == "__main__":
-    import uvicorn
+# if __name__ == "__main__":
+#     import uvicorn
 
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=os.getenv("PORT", 8000),
+        port=int(os.getenv("PORT", "8000")),
         reload=True,
     )

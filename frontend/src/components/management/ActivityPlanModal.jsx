@@ -2,7 +2,7 @@ import { ClipboardList } from "lucide-react";
 import ModalShell from "./ModalShell";
 
 const inputClass =
-  "w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-cyan-500";
+  "w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-blue-500";
 
 export default function ActivityPlanModal({
   open,
@@ -48,7 +48,7 @@ export default function ActivityPlanModal({
           className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
             isPlanning || !canRun || !objective.trim()
               ? "cursor-not-allowed bg-slate-700 text-slate-400"
-              : "bg-emerald-500 text-black hover:bg-emerald-400"
+              : "bg-blue-600 text-white hover:bg-blue-500"
           }`}
         >
           <ClipboardList size={14} />

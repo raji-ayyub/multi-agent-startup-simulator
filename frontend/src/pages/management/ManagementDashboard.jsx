@@ -1,15 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
-import { Archive, Building2, Sparkles, TrendingUp, Users2 } from "lucide-react";
+import { Archive, Building2, Pencil, Sparkles, Trash2, TrendingUp, UserPlus, Users2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useLocation } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import useManagementStore from "../../store/managementStore";
 import ActivityPlanModal from "../../components/management/ActivityPlanModal";
+import TeamMemberModal from "../../components/management/TeamMemberModal";
 import WorkspaceProfileModal from "../../components/management/WorkspaceProfileModal";
 import WorkspaceSetupModal from "../../components/management/WorkspaceSetupModal";
 
 const parseQualifications = (input) => String(input || "").split(",").map((item) => item.trim()).filter(Boolean);
+const defaultTeamDraft = {
+  name: "",
+  role: "",
+  cvFileName: "",
+  qualifications: [],
+  qualification_notes: "",
+  additional_notes: "",
+  cvError: "",
+};
 
 export default function ManagementDashboard() {
+  const location = useLocation();
   const { user } = useAuthStore();
   const {
     workspaces,
@@ -23,8 +36,12 @@ export default function ManagementDashboard() {
     selectWorkspace,
     updateActiveWorkspace,
     createPlan,
+    addTeamMember,
+    updateTeamMember,
+    deleteTeamMember,
     latestPlan,
     planHistory,
+    agentEvents,
   } = useManagementStore();
 
   const [objective, setObjective] = useState("");
@@ -34,6 +51,14 @@ export default function ManagementDashboard() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPlanModal, setShowPlanModal] = useState(false);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState(null);
+  const [teamDraft, setTeamDraft] = useState(defaultTeamDraft);
+  const activeTab = useMemo(() => {
+    if (location.pathname.startsWith("/management/planner")) return "PLANNER";
+    if (location.pathname.startsWith("/management/signals")) return "SIGNALS";
+    return "HOME";
+  }, [location.pathname]);
 
   useEffect(() => {
     if (user?.email) {
@@ -64,6 +89,26 @@ export default function ManagementDashboard() {
     const highPriority = latestPlan.activities.filter((item) => item.priority === "HIGH").length;
     return Math.min(100, highPriority * 28 + 12);
   }, [latestPlan]);
+
+  const executionCalendar = useMemo(() => {
+    const plans = Array.isArray(planHistory) ? planHistory : [];
+    const items = plans.slice(0, 8).flatMap((plan) => {
+      const baseDate = new Date(plan.created_at || Date.now());
+      const activities = Array.isArray(plan.activities) ? plan.activities : [];
+      return activities.map((activity, index) => {
+        const dueDate = new Date(baseDate);
+        dueDate.setDate(baseDate.getDate() + Math.max(0, (Number(activity.week_target || 1) - 1) * 7));
+        return {
+          id: `${plan.plan_id || "plan"}-${index}-${activity.title}`,
+          title: activity.title,
+          owner: activity.owner || "Unassigned",
+          dueDate,
+          priority: activity.priority || "MEDIUM",
+        };
+      });
+    });
+    return items.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime()).slice(0, 12);
+  }, [planHistory]);
 
   const handleCreateWorkspace = async (payload) => {
     if (!user?.email) return;
@@ -138,15 +183,73 @@ export default function ManagementDashboard() {
     setShowEditModal(true);
   };
 
+  const openCreateTeamModal = () => {
+    setEditingMemberId(null);
+    setTeamDraft(defaultTeamDraft);
+    setShowTeamModal(true);
+  };
+
+  const openEditTeamModal = (member) => {
+    setEditingMemberId(member.member_id);
+    setTeamDraft({
+      name: member.name || "",
+      role: member.role || "",
+      cvFileName: "",
+      qualifications: member.qualifications || [],
+      qualification_notes: member.qualification_notes || "",
+      additional_notes: "",
+      cvError: "",
+    });
+    setShowTeamModal(true);
+  };
+
+  const handleSaveTeamMember = async (event) => {
+    event.preventDefault();
+    const notes = [teamDraft.qualification_notes, teamDraft.additional_notes.trim()].filter(Boolean).join("\n\n");
+    const payload = {
+      name: teamDraft.name.trim(),
+      role: teamDraft.role.trim(),
+      qualifications: teamDraft.qualifications || [],
+      qualification_notes: notes.slice(0, 20000),
+    };
+    if (!payload.name) return;
+    try {
+      if (editingMemberId) {
+        await updateTeamMember(editingMemberId, payload);
+        toast.success("Team member updated.");
+      } else {
+        await addTeamMember(payload);
+        toast.success("Team member added.");
+      }
+      setShowTeamModal(false);
+      setEditingMemberId(null);
+      setTeamDraft(defaultTeamDraft);
+    } catch (error) {
+      toast.error(error?.message || "Unable to save team member.");
+    }
+  };
+
+  const handleDeleteTeamMember = async (memberId) => {
+    try {
+      await deleteTeamMember(memberId);
+      toast.success("Team member removed.");
+    } catch (error) {
+      toast.error(error?.message || "Unable to remove team member.");
+    }
+  };
+
   return (
-    <section className="h-full text-slate-100">
+    <section className="management-shell h-full text-slate-100">
       <div className="mx-auto flex max-w-[1280px] flex-col gap-5">
         <header className="rounded-2xl border border-slate-800 bg-[#0b1220] px-6 py-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Active Archive</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-blue-300">Active Archive</p>
           <h1 className="mt-2 text-4xl font-semibold text-white">Startup Management Vault</h1>
           <p className="mt-2 max-w-3xl text-sm text-slate-400">
             Build management workspaces and run agentic execution plans using company revenue, team size, and
             qualifications.
+          </p>
+          <p className="mt-3 inline-flex rounded-full border border-blue-500/40 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-300">
+            Active View: {activeTab}
           </p>
         </header>
 
@@ -163,7 +266,7 @@ export default function ManagementDashboard() {
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(true)}
-                    className="rounded-full bg-cyan-500 px-3 py-1 text-xs font-semibold text-black transition hover:bg-cyan-400"
+                    className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-500"
                   >
                     + New
                   </button>
@@ -190,7 +293,7 @@ export default function ManagementDashboard() {
                       onClick={() => selectWorkspace(workspace.workspace_id)}
                       className={`rounded-lg border px-3 py-2 text-left transition ${
                         activeWorkspace?.workspace_id === workspace.workspace_id
-                          ? "border-cyan-500/60 bg-cyan-500/10"
+                          ? "border-blue-500/60 bg-blue-500/10"
                           : "border-slate-700 bg-slate-900/40 hover:border-slate-500"
                       }`}
                     >
@@ -262,6 +365,7 @@ export default function ManagementDashboard() {
           </div>
         </div>
 
+        {activeTab !== "SIGNALS" ? (
         <section className="grid gap-5 lg:grid-cols-[1fr_0.34fr]">
           <article className="rounded-2xl border border-slate-800 bg-[#0b1220] p-5">
             <h3 className="mb-4 text-base font-semibold text-white">Current Tasks</h3>
@@ -290,7 +394,7 @@ export default function ManagementDashboard() {
                     >
                       {task.priority}
                     </p>
-                    <p className="text-xs text-cyan-300">Week {task.week_target}</p>
+                    <p className="text-xs text-blue-300">Week {task.week_target}</p>
                   </div>
                 ))}
               </div>
@@ -299,30 +403,87 @@ export default function ManagementDashboard() {
 
           <article className="rounded-2xl border border-slate-800 bg-[#0b1220] p-5">
             <h3 className="text-sm font-semibold text-slate-200">Growth Velocity</h3>
-            <p className="mt-3 text-4xl font-semibold text-cyan-300">{growthVelocity}%</p>
+            <p className="mt-3 text-4xl font-semibold text-blue-300">{growthVelocity}%</p>
             <p className="mt-1 text-xs text-slate-500">Current execution momentum signal.</p>
             <div className="mt-4 flex gap-1.5">
               {[0, 1, 2, 3, 4].map((index) => (
                 <div
                   key={index}
-                  className={`h-6 flex-1 rounded-sm ${index * 20 < growthVelocity ? "bg-cyan-500" : "bg-slate-700"}`}
+                  className={`h-6 flex-1 rounded-sm ${index * 20 < growthVelocity ? "bg-blue-500" : "bg-slate-700"}`}
                 />
               ))}
             </div>
           </article>
         </section>
+        ) : null}
 
+        {activeTab !== "PLANNER" ? (
         <section className="grid gap-5 lg:grid-cols-2">
           <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
             <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
               <Users2 size={15} />
               Team Capability Snapshot
             </h4>
-            <p className="text-sm text-slate-400">
-              {activeWorkspace?.qualifications?.length
-                ? activeWorkspace.qualifications.join(", ")
-                : "No qualifications added yet."}
-            </p>
+            {!activeWorkspace ? (
+              <p className="text-sm text-slate-500">Select a workspace to manage team members.</p>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-slate-400">
+                    {(activeWorkspace.team_members || []).length} member(s) with persisted roles and qualifications.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openCreateTeamModal}
+                    className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-500"
+                  >
+                    <UserPlus size={12} />
+                    Add Member
+                  </button>
+                </div>
+                {(activeWorkspace.team_members || []).length === 0 ? (
+                  <p className="text-sm text-slate-500">No team members added yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {(activeWorkspace.team_members || []).map((member) => (
+                      <article key={member.member_id} className="rounded-lg border border-slate-700 bg-slate-900/40 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-200">{member.name}</p>
+                            <p className="text-xs text-slate-400">{member.role || "Role pending"}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openEditTeamModal(member)}
+                              className="rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-slate-400"
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                <Pencil size={12} />
+                                Edit
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTeamMember(member.member_id)}
+                              className="rounded-md border border-rose-500/60 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10"
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                <Trash2 size={12} />
+                                Delete
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                        {member.qualifications?.length ? (
+                          <p className="mt-2 text-xs text-slate-400">{member.qualifications.join(", ")}</p>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </article>
 
           <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
@@ -335,15 +496,83 @@ export default function ManagementDashboard() {
             ) : (
               <div className="space-y-2">
                 {planHistory.slice(0, 6).map((item) => (
-                  <div key={item.id} className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2">
+                  <div key={item.plan_id} className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2">
                     <p className="text-sm font-semibold text-slate-200">{item.objective}</p>
-                    <p className="text-xs text-slate-500">{new Date(item.createdAt).toLocaleString()}</p>
+                    <p className="text-xs text-slate-500">{new Date(item.created_at).toLocaleString()}</p>
                   </div>
                 ))}
               </div>
             )}
           </article>
         </section>
+        ) : null}
+
+        {activeTab !== "HOME" ? (
+        <section className="grid gap-5 lg:grid-cols-2">
+          <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
+            <h4 className="mb-3 text-sm font-semibold text-slate-200">Execution Calendar</h4>
+            {executionCalendar.length === 0 ? (
+              <p className="text-sm text-slate-500">Generate a plan to populate the execution calendar.</p>
+            ) : (
+              <div className="grid gap-2 md:grid-cols-2">
+                {executionCalendar.map((item) => (
+                  <div key={item.id} className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2">
+                    <p className="text-sm font-semibold text-slate-200">{item.title}</p>
+                    <p className="text-xs text-slate-400">Owner: {item.owner}</p>
+                    <p className="text-xs text-slate-500">Due: {item.dueDate.toLocaleDateString()}</p>
+                    <p
+                      className={`mt-1 text-xs font-semibold ${
+                        item.priority === "HIGH"
+                          ? "text-rose-400"
+                          : item.priority === "MEDIUM"
+                          ? "text-amber-400"
+                          : "text-emerald-400"
+                      }`}
+                    >
+                      {item.priority}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </article>
+          <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
+            <h4 className="mb-3 text-sm font-semibold text-slate-200">Agent Activity Stream</h4>
+            {agentEvents.length === 0 ? (
+              <p className="text-sm text-slate-500">No agent events yet. Trigger an action to start streaming.</p>
+            ) : (
+              <div className="space-y-2">
+                {agentEvents.slice(0, 12).map((event, index) => (
+                  <motion.div
+                    key={event.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.24, delay: index * 0.02 }}
+                    className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <motion.span
+                        animate={event.status === "RUNNING" ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+                        transition={event.status === "RUNNING" ? { duration: 1.2, repeat: Infinity } : { duration: 0 }}
+                        className={`h-2 w-2 rounded-full ${
+                          event.status === "DONE"
+                            ? "bg-emerald-400"
+                            : event.status === "ERROR"
+                            ? "bg-rose-400"
+                            : "bg-blue-400"
+                        }`}
+                      />
+                      <p className="text-xs font-semibold text-slate-200">{event.phase}</p>
+                      <p className="text-[11px] text-slate-500">{new Date(event.timestamp).toLocaleTimeString()}</p>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">{event.message}</p>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </article>
+        </section>
+        ) : null}
 
         {error ? <p className="text-sm text-rose-400">{error}</p> : null}
       </div>
@@ -381,6 +610,22 @@ export default function ManagementDashboard() {
           onGenerate={handleGeneratePlan}
           isPlanning={isPlanning}
           canRun={Boolean(activeWorkspace)}
+        />
+      ) : null}
+
+      {showTeamModal ? (
+        <TeamMemberModal
+          open={showTeamModal}
+          onClose={() => {
+            setShowTeamModal(false);
+            setEditingMemberId(null);
+            setTeamDraft(defaultTeamDraft);
+          }}
+          title={editingMemberId ? "Edit Team Member" : "Add Team Member"}
+          draft={teamDraft}
+          setDraft={setTeamDraft}
+          onSubmit={handleSaveTeamMember}
+          isSaving={isSaving}
         />
       ) : null}
     </section>

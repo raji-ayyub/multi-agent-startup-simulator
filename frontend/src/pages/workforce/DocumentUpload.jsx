@@ -92,7 +92,7 @@ export default function DocumentUpload() {
         {loading ? (
           <span className="flex items-center gap-2">
             <TypingDots />
-            AI is analyzing…
+            AI is analyzing…...
           </span>
         ) : (
           "Analyze Document"
