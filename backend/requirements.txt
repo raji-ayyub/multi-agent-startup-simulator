@@ -28,3 +28,4 @@ langGraph
 langchain_text_splitters
 python-multipart
 numpy
+sendgrid>=6.9.1

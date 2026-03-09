@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import ManagementTeamMember, ManagementWorkspace
+from models import ManagementWorkspace
 from .schemas import (
     ManagementActivityPlanRequest,
     ManagementActivityPlanResponse,
@@ -46,19 +46,19 @@ def create_management_workspace(payload: ManagementWorkspaceCreate, db: Session 
     db.commit()
     db.refresh(workspace)
 
-    if payload.team_members:
-        for member in payload.team_members:
-            db.add(
-                ManagementTeamMember(
-                    workspace_id=workspace.id,
-                    name=member.name.strip(),
-                    role=(member.role or "").strip(),
-                    qualifications=_clean_list(member.qualifications),
-                    qualification_notes=(member.qualification_notes or "").strip()[:20000],
-                )
-            )
-        db.commit()
-        db.refresh(workspace)
+    # if payload.team_members:
+    #     for member in payload.team_members:
+    #         db.add(
+    #             ManagementTeamMember(
+    #                 workspace_id=workspace.id,
+    #                 name=member.name.strip(),
+    #                 role=(member.role or "").strip(),
+    #                 qualifications=_clean_list(member.qualifications),
+    #                 qualification_notes=(member.qualification_notes or "").strip()[:20000],
+    #             )
+    #         )
+    #     db.commit()
+    #     db.refresh(workspace)
 
     return serialize_workspace(workspace)
 
