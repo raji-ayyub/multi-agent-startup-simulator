@@ -34,6 +34,16 @@ def get_cors_origins():
         "http://127.0.0.1:5173",
     ]
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle application startup and shutdown events."""
+    # Startup
+    create_tables()
+    print("✓ Database tables initialized")
+    yield
+
+
 app = FastAPI(
     title="PetraAI - Multi-Agent AI Startup Strategy Simulator API",
     description="A generative AI–powered decision-support system for startup founders",
@@ -49,6 +59,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Include routes
 app.include_router(auth_router)
@@ -80,9 +91,9 @@ def health_check():
 # if __name__ == "__main__":
 #     import uvicorn
 
-#     uvicorn.run(
-#         "main:app",
-#         host="0.0.0.0",
-#         port= "8000",
-        
-#     )
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=os.getenv("PORT", 8000),
+        reload=True,
+    )
