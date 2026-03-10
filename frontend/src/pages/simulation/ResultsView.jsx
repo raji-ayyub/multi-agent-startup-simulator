@@ -58,14 +58,14 @@ export default function ResultsView() {
   );
 
   if (isLoadingHistory && !activeSimulation) {
-    return <div className="text-slate-400">Loading simulations...</div>;
+    return <div className="app-copy">Loading simulations...</div>;
   }
 
   if (!activeSimulation) {
     return (
       <div className="space-y-4">
-        <p className="text-slate-400">No simulations saved yet.</p>
-        <Link to="/dashboard" className="inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
+        <p className="app-copy">No simulations saved yet.</p>
+        <Link to="/dashboard" className="app-primary-btn inline-flex rounded-lg px-4 py-2 text-sm font-semibold">
           Start New Simulation
         </Link>
       </div>
@@ -126,8 +126,8 @@ export default function ResultsView() {
 
   return (
     <div className="grid gap-5 xl:grid-cols-[290px_1fr]">
-      <aside className="rounded-2xl border border-amber-200 bg-[#090a0d] p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-amber-200">Simulation History</h2>
+      <aside className="app-sim-history rounded-2xl border p-4">
+        <h2 className="app-sim-accent mb-3 text-sm font-semibold uppercase tracking-wider">Simulation History</h2>
         <div className="space-y-2">
           {recentSimulations.map((item) => (
             <article
@@ -143,14 +143,14 @@ export default function ResultsView() {
               tabIndex={0}
               className={`w-full rounded-lg border px-3 py-2 text-left transition ${
                 item.id === activeSimulation.simulation_id
-                  ? "border-amber-200 bg-amber-200/10"
-                  : "border-slate-800 bg-[#0f1117] hover:border-slate-600"
+                  ? "app-sim-accent-soft"
+                  : "app-card-alt hover:border-slate-600"
               }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-sm font-semibold text-white">{item.name}</p>
-                  <p className="text-xs text-slate-400">{new Date(item.createdAt).toLocaleString()}</p>
+                  <p className="app-heading text-sm font-semibold">{item.name}</p>
+                  <p className="app-copy text-xs">{new Date(item.createdAt).toLocaleString()}</p>
                 </div>
                 <button
                   type="button"
@@ -158,7 +158,7 @@ export default function ResultsView() {
                     event.stopPropagation();
                     handleDelete(item.id);
                   }}
-                  className="rounded p-1 text-slate-500 hover:bg-slate-800 hover:text-rose-400"
+                  className="app-ghost-btn rounded p-1"
                   title="Delete simulation"
                 >
                   <Trash2 size={13} />
@@ -169,34 +169,34 @@ export default function ResultsView() {
         </div>
         <Link
           to="/dashboard"
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-200 px-4 py-2.5 text-sm font-semibold text-black"
+          className="app-sim-accent-soft mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold"
         >
           <Rocket size={14} />
           New Simulation
         </Link>
       </aside>
 
-      <section className="space-y-4 rounded-2xl border border-amber-200 bg-[#0a0b10] p-5">
-        <header className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-800 pb-3">
+      <section className="app-card space-y-4 rounded-2xl border p-5">
+        <header className="app-modal-section flex flex-wrap items-end justify-between gap-3 border-b pb-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Active Simulation</p>
-            <h1 className="text-3xl font-semibold text-white">PROJECT: {activeSimulation.startup_name}</h1>
+            <p className="app-muted text-xs uppercase tracking-[0.2em]">Active Simulation</p>
+            <h1 className="app-heading text-3xl font-semibold">PROJECT: {activeSimulation.startup_name}</h1>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={openRerunModal}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:border-slate-500"
+              className="app-ghost-btn inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold"
             >
               <Pencil size={13} />
               Edit & Rerun
             </button>
-            <p className="text-sm text-slate-400">Elapsed Time {elapsed}</p>
+            <p className="app-copy text-sm">Elapsed Time {elapsed}</p>
           </div>
         </header>
 
-        <article className="rounded-xl border border-slate-800 bg-[#12141c] p-4">
-          <p className="mb-3 text-[11px] uppercase tracking-[0.18em] text-slate-500">Startup Idea Input Panel</p>
+        <article className="app-card-alt rounded-xl border p-4">
+          <p className="app-muted mb-3 text-[11px] uppercase tracking-[0.18em]">Startup Idea Input Panel</p>
           <div className="grid gap-3 md:grid-cols-3">
             <Panel title="Problem Statement" value={payload.problem_statement} />
             <Panel
@@ -211,17 +211,17 @@ export default function ResultsView() {
           {(activeSimulation.agents || []).map((agent) => {
             const Icon = AGENT_ICON[agent.perspective] || TrendingUp;
             return (
-              <article key={agent.perspective} className="rounded-xl border border-slate-800 bg-[#11131a] p-4">
+              <article key={agent.perspective} className="app-card-alt rounded-xl border p-4">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="rounded-md border border-slate-700 bg-slate-900 p-2 text-slate-300">
+                    <span className="app-card-subtle rounded-md border p-2 app-copy">
                       <Icon size={14} />
                     </span>
-                    <p className="text-sm font-semibold text-white uppercase">{agent.perspective}</p>
+                    <p className="app-heading text-sm font-semibold uppercase">{agent.perspective}</p>
                   </div>
-                  <p className="text-sm text-slate-300">Confidence {agent.confidence}%</p>
+                  <p className="app-copy text-sm">Confidence {agent.confidence}%</p>
                 </div>
-                <p className="text-sm text-slate-400">{agent.summary}</p>
+                <p className="app-copy text-sm">{agent.summary}</p>
                 <div className="mt-3 space-y-1">
                   {(agent.opportunities || []).slice(0, 2).map((op) => (
                     <p key={op} className="text-xs text-emerald-300">+ {op}</p>
@@ -232,55 +232,55 @@ export default function ResultsView() {
           })}
         </div>
 
-        <article className="rounded-xl border border-amber-200 bg-[linear-gradient(90deg, amber ,#11131a)] p-5">
+        <article className="app-sim-verdict rounded-xl border p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Strategic Verdict</p>
-              <p className="mt-1 inline-flex rounded bg-amber-200 px-2 py-1 text-[11px] font-semibold text-black">{confidenceLabel(score)}</p>
-              <h2 className="mt-2 text-5xl font-bold text-white">{score >= 65 ? "PROCEED TO SEED" : "ITERATE BEFORE SCALE"}</h2>
+              <p className="app-copy text-xs uppercase tracking-[0.2em]">Strategic Verdict</p>
+              <p className="app-sim-accent-soft mt-1 inline-flex rounded border px-2 py-1 text-[11px] font-semibold">{confidenceLabel(score)}</p>
+              <h2 className="app-heading mt-2 text-5xl font-bold">{score >= 65 ? "PROCEED TO SEED" : "ITERATE BEFORE SCALE"}</h2>
             </div>
-            <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-amber-200 px-5 py-3 text-sm font-semibold text-black">
+            <button type="button" className="app-sim-accent-soft inline-flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold">
               <Download size={16} />
               Download Full Strategy Deck
             </button>
           </div>
-          <p className="mt-3 text-sm text-slate-300">{activeSimulation.synthesis}</p>
+          <p className="app-copy mt-3 text-sm">{activeSimulation.synthesis}</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div>
-              <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-amber-200">Core Strengths</p>
+              <p className="app-sim-accent mb-2 text-sm font-semibold uppercase tracking-wider">Core Strengths</p>
               <div className="space-y-1.5">
                 {strengths.map((item) => (
-                  <p key={item} className="text-sm text-slate-200">- {item}</p>
+                  <p key={item} className="app-heading text-sm">- {item}</p>
                 ))}
               </div>
             </div>
             <div>
-              <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-red-400">Critical Risks</p>
+              <p className="app-status-danger mb-2 inline-flex rounded-full px-2 py-1 text-sm font-semibold uppercase tracking-wider">Critical Risks</p>
               <div className="space-y-1.5">
                 {risks.map((item) => (
-                  <p key={item} className="text-sm text-slate-200">- {item}</p>
+                  <p key={item} className="app-heading text-sm">- {item}</p>
                 ))}
               </div>
             </div>
           </div>
         </article>
 
-        {simulationError ? <p className="text-sm text-red-400">{simulationError}</p> : null}
+        {simulationError ? <p className="app-status-danger rounded-lg px-3 py-2 text-sm">{simulationError}</p> : null}
       </section>
 
       {showRerunModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowRerunModal(false)} />
-          <section className="relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-[#0b1220]">
-            <header className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+          <div className="modal-backdrop absolute inset-0 backdrop-blur-sm" onClick={() => setShowRerunModal(false)} />
+          <section className="theme-modal relative z-10 flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border">
+            <header className="app-modal-section flex items-center justify-between border-b px-5 py-4">
               <div>
-                <h3 className="text-lg font-semibold text-white">Revisit Simulation</h3>
-                <p className="text-xs text-slate-400">Update fields and rerun, or create a new version.</p>
+                <h3 className="app-heading text-lg font-semibold">Revisit Simulation</h3>
+                <p className="app-copy text-xs">Update fields and rerun, or create a new version.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowRerunModal(false)}
-                className="rounded-full border border-slate-700 p-1.5 text-slate-400 hover:text-slate-200"
+                className="app-ghost-btn rounded-full border p-1.5"
               >
                 <X size={14} />
               </button>
@@ -288,40 +288,40 @@ export default function ResultsView() {
             <div className="overflow-y-auto px-5 py-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="Startup Name">
-                  <input value={rerunDraft.startup_name || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, startup_name: e.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-300" />
+                  <input value={rerunDraft.startup_name || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, startup_name: e.target.value }))} className="theme-input w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-amber-300" />
                 </Field>
                 <Field label="Target Audience">
-                  <input value={rerunDraft.target_audience || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, target_audience: e.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-300" />
+                  <input value={rerunDraft.target_audience || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, target_audience: e.target.value }))} className="theme-input w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-amber-300" />
                 </Field>
                 <Field label="Target Segment">
-                  <input value={rerunDraft.primary_target_segment || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, primary_target_segment: e.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-300" />
+                  <input value={rerunDraft.primary_target_segment || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, primary_target_segment: e.target.value }))} className="theme-input w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-amber-300" />
                 </Field>
                 <Field label="Geography">
-                  <input value={rerunDraft.geography || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, geography: e.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-300" />
+                  <input value={rerunDraft.geography || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, geography: e.target.value }))} className="theme-input w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-amber-300" />
                 </Field>
                 <Field label="Monthly Burn">
-                  <input value={rerunDraft.monthly_burn || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, monthly_burn: e.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-300" />
+                  <input value={rerunDraft.monthly_burn || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, monthly_burn: e.target.value }))} className="theme-input w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-amber-300" />
                 </Field>
                 <Field label="Current Cash">
-                  <input value={rerunDraft.current_cash_in_hand || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, current_cash_in_hand: e.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-300" />
+                  <input value={rerunDraft.current_cash_in_hand || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, current_cash_in_hand: e.target.value }))} className="theme-input w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-amber-300" />
                 </Field>
                 <Field label="Marketing Strategy" className="md:col-span-2">
-                  <textarea rows={2} value={rerunDraft.marketing_strategy || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, marketing_strategy: e.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-300" />
+                  <textarea rows={2} value={rerunDraft.marketing_strategy || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, marketing_strategy: e.target.value }))} className="theme-input w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-amber-300" />
                 </Field>
                 <Field label="Problem Statement" className="md:col-span-2">
-                  <textarea rows={3} value={rerunDraft.problem_statement || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, problem_statement: e.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-300" />
+                  <textarea rows={3} value={rerunDraft.problem_statement || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, problem_statement: e.target.value }))} className="theme-input w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-amber-300" />
                 </Field>
                 <Field label="Customer Pain Points" className="md:col-span-2">
-                  <textarea rows={3} value={rerunDraft.customer_behavior_pain_points || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, customer_behavior_pain_points: e.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-300" />
+                  <textarea rows={3} value={rerunDraft.customer_behavior_pain_points || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, customer_behavior_pain_points: e.target.value }))} className="theme-input w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-amber-300" />
                 </Field>
               </div>
             </div>
-            <footer className="flex items-center justify-between border-t border-slate-800 px-5 py-4">
+            <footer className="app-modal-section flex items-center justify-between border-t px-5 py-4">
               <button
                 type="button"
                 onClick={() => runRerun(false)}
                 disabled={isRunning}
-                className={`rounded-lg px-4 py-2 text-sm font-semibold ${isRunning ? "bg-slate-700 text-slate-500" : "bg-blue-600 text-white hover:bg-blue-500"}`}
+                className="app-primary-btn rounded-lg px-4 py-2 text-sm font-semibold"
               >
                 {isRunning ? "Running..." : "Rerun Simulation"}
               </button>
@@ -329,7 +329,7 @@ export default function ResultsView() {
                 type="button"
                 onClick={() => runRerun(true)}
                 disabled={isRunning}
-                className={`rounded-lg px-4 py-2 text-sm font-semibold ${isRunning ? "bg-slate-700 text-slate-500" : "bg-emerald-500 text-black hover:bg-emerald-400"}`}
+                className="app-success-btn rounded-lg px-4 py-2 text-sm font-semibold"
               >
                 {isRunning ? "Running..." : "Run as New Version (_v2)"}
               </button>
@@ -343,9 +343,9 @@ export default function ResultsView() {
 
 function Panel({ title, value }) {
   return (
-    <article className="rounded-lg border border-slate-800 bg-[#0f1118] p-3 max-h-[20rem] overflow-auto">
-      <p className="mb-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">{title}</p>
-      <p className="text-sm text-slate-200">{value || "Not provided"}</p>
+    <article className="app-card-alt max-h-[20rem] overflow-auto rounded-lg border p-3">
+      <p className="app-muted mb-1 text-[11px] uppercase tracking-[0.16em]">{title}</p>
+      <p className="app-copy text-sm">{value || "Not provided"}</p>
     </article>
   );
 }
@@ -353,7 +353,7 @@ function Panel({ title, value }) {
 function Field({ label, children, className = "" }) {
   return (
     <label className={className}>
-      <p className="mb-1 text-xs text-slate-400">{label}</p>
+      <p className="app-copy mb-1 text-xs">{label}</p>
       {children}
     </label>
   );

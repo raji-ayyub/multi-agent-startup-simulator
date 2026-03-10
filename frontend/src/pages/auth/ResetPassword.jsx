@@ -44,31 +44,31 @@ export default function ResetPassword() {
 
   return (
     <AuthLayout>
-      <div className="w-full max-w-sm ">
+      <div className="auth-screen w-full max-w-sm">
         <div className="flex justify-center mb-5">
           <img src="/images/reset.svg" alt="Reset" className="h-10 w-auto" />
         </div>
 
-        <h2 className="text-2xl font-bold mb-2 text-center">Reset Password</h2>
-        <p className="text-slate-400 mb-7 text-center text-xs">
+        <h2 className="auth-deep-title mb-2 text-center text-2xl font-bold">Reset Password</h2>
+        <p className="auth-deep-subtitle mb-7 text-center text-xs">
           Enter your new password to regain account access.
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl border border-white/10 bg-[#0a0f1a]/92 p-6 shadow-2xl shadow-black/60 sm:p-8">
+        <form onSubmit={handleSubmit} className="auth-form-panel space-y-5 rounded-2xl border p-6 sm:p-8">
           <div className="relative">
-            <label className="block text-xs mb-2 text-slate-300">New Password</label>
+            <label className="app-copy mb-2 block text-xs">New Password</label>
             <input
               type={showPassword ? "text" : "password"}
               name="password"
               value={formData.password}
               onChange={handleChange}
               placeholder="Minimum 8 characters"
-              className="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-2.5 pr-10 focus:outline-none focus:ring-1 focus:ring-[#B8C45A] transition text-sm"
+              className="auth-input w-full rounded-lg border px-3 py-2.5 pr-10 text-sm transition focus:outline-none focus:ring-1 focus:ring-[#B8C45A]"
               required
             />
             <button
               type="button"
-              className="absolute right-3 top-8.5 text-slate-400"
+              className="auth-icon-btn absolute right-3 top-8.5"
               onClick={() => setShowPassword(!showPassword)}
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -76,19 +76,19 @@ export default function ResetPassword() {
           </div>
 
           <div className="relative">
-            <label className="block text-xs mb-2 text-slate-300">Confirm Password</label>
+            <label className="app-copy mb-2 block text-xs">Confirm Password</label>
             <input
               type={showConfirm ? "text" : "password"}
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
               placeholder="Re-enter new password"
-              className="w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-2.5 pr-10 focus:outline-none focus:ring-1 focus:ring-[#B8C45A] transition text-sm"
+              className="auth-input w-full rounded-lg border px-3 py-2.5 pr-10 text-sm transition focus:outline-none focus:ring-1 focus:ring-[#B8C45A]"
               required
             />
             <button
               type="button"
-              className="absolute right-3 top-8.5 text-slate-400"
+              className="auth-icon-btn absolute right-3 top-8.5"
               onClick={() => setShowConfirm(!showConfirm)}
             >
               {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -102,14 +102,14 @@ export default function ResetPassword() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-[#CED87C] text-black font-semibold py-2.5 rounded-lg hover:opacity-90 transition text-sm"
+            className="auth-submit-btn w-full rounded-lg py-2.5 text-sm font-semibold transition"
           >
             {isLoading ? "Resetting..." : "Reset Password"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-slate-400">
-          <Link to="/login" className="text-white hover:underline">
+        <p className="auth-deep-subtitle mt-6 text-center text-xs">
+          <Link to="/login" className="auth-link hover:underline">
             Back to Login
           </Link>
         </p>

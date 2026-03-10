@@ -70,23 +70,24 @@ export default function DocumentUpload() {
   };
 
   return (
-    <div className="p-10 max-w-xl mx-auto">
-      <h2 className="text-2xl font-bold mb-6">Upload Employee Document</h2>
+    <div className="app-view mx-auto max-w-xl p-10">
+      <div className="app-card space-y-6 rounded-2xl border p-8">
+      <h2 className="app-heading mb-6 text-2xl font-bold">Upload Employee Document</h2>
 
       <input
         type="file"
         accept=".pdf,.doc,.docx,.txt"
         onChange={handleFileChange}
-        className="mb-4"
+        className="theme-input w-full rounded-xl border px-4 py-3"
         disabled={loading}
       />
 
-      {file && <p className="text-green-600 mb-4">Selected: {file.name}</p>}
-      {error && <p className="text-red-600 mb-4">{error}</p>}
+      {file && <p className="app-status-success rounded-lg px-3 py-2 text-sm">Selected: {file.name}</p>}
+      {error && <p className="app-status-danger rounded-lg px-3 py-2 text-sm">{error}</p>}
 
       <button
         onClick={handleAnalyze}
-        className="bg-blue-600 text-white px-6 py-2 rounded flex items-center justify-center"
+        className="app-primary-btn flex items-center justify-center rounded px-6 py-2"
         disabled={loading || !file}
       >
         {loading ? (
@@ -101,10 +102,11 @@ export default function DocumentUpload() {
 
       {/* AI Message Preview */}
       {aiMessage && (
-        <div className="mt-6 p-4 bg-slate-800 rounded text-slate-200">
+        <div className="app-card-subtle mt-6 rounded border p-4 app-copy">
           {aiMessage}
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -26,14 +26,14 @@ export default function ForgotPassword() {
 
         <div className="text-center mb-7">
           <h2 className="auth-deep-title text-2xl font-bold mb-2">Forgot Password</h2>
-          <p className="auth-deep-subtitle text-slate-400 text-xs leading-relaxed">
+          <p className="auth-deep-subtitle text-xs leading-relaxed">
             Enter your email and we will issue a password reset token.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="auth-form-panel space-y-5 rounded-2xl border border-white/10 bg-[#0a0f1a]/92 p-6 shadow-2xl shadow-black/60 sm:p-8">
+        <form onSubmit={handleSubmit} className="auth-form-panel space-y-5 rounded-2xl border p-6 sm:p-8">
           <div>
-            <label className="block text-xs mb-2 text-slate-300">Email Address</label>
+            <label className="app-copy mb-2 block text-xs">Email Address</label>
             <div className="relative">
               <img
                 src="/images/Container.svg"
@@ -46,27 +46,27 @@ export default function ForgotPassword() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@company.com"
-                className="auth-input w-full bg-[#0f172a] border border-slate-700 rounded-lg pl-9 pr-4 py-2.5 focus:outline-none focus:ring-1 focus:ring-[#B8C45A] transition text-sm"
+                className="auth-input w-full rounded-lg border py-2.5 pl-9 pr-4 text-sm transition focus:outline-none focus:ring-1 focus:ring-[#B8C45A]"
                 required
               />
             </div>
           </div>
 
-          {message && <p className="text-xs text-[#CED87C]">{message}</p>}
+          {message && <p className="app-status-success rounded-lg px-3 py-2 text-xs">{message}</p>}
           {error && <p className="text-xs text-red-400">{error}</p>}
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-[#CED87C] text-black font-semibold py-2.5 rounded-lg hover:opacity-90 transition text-sm"
+            className="auth-submit-btn w-full rounded-lg py-2.5 text-sm font-semibold transition"
           >
             {isLoading ? "Sending reset link..." : "Send reset link"}
           </button>
         </form>
 
-        <div className="mt-6 text-center text-xs text-slate-400">
+        <div className="auth-deep-subtitle mt-6 text-center text-xs">
           Remember your password?{" "}
-          <Link to="/login" className="text-white hover:underline">
+          <Link to="/login" className="auth-link hover:underline">
             Back to login
           </Link>
         </div>

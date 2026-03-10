@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, logger, status, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import JSONResponse
 
+# new import for sending email via SendGrid
+from email_utils import send_password_reset_email
+
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
@@ -156,14 +159,14 @@ def get_profile(email: str = None, db: Session = Depends(get_db)):
 
 
 @router.post("/forgot-password", response_model=PasswordResetResponse)
-def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db)):
+def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db), background_tasks: BackgroundTasks = None):
     """
-    Request a password reset. Generates a reset token.
-
-    In production, this token would be sent via email to the user.
-    For now, the token is returned in the response for testing purposes.
+    Request a password reset. Generates a reset token and queues an email.
 
     - **email**: User's email address
+
+    The token itself is **not** returned in the response; instead we send
+    a link to the frontend via SendGrid.  
     """
     user = db.query(User).filter(User.email == request.email).first()
 
@@ -177,10 +180,15 @@ def forgot_password(request: PasswordResetRequest, db: Session = Depends(get_db)
     try:
         reset_token = create_password_reset_token(request.email, db)
 
-        # In production, send this token via email
-        # For testing: return the token so it can be used
+        # schedule email to send asynchronously
+        if background_tasks is not None:
+            background_tasks.add_task(send_password_reset_email, request.email, reset_token)
+        else:
+            # fallback: send synchronously
+            send_password_reset_email(request.email, reset_token)
+
         return {
-            "message": "Password reset token generated. Check your email for reset link.",
+            "message": "Password reset sent. Check your email for reset link.",
             "email": request.email,
         }
 

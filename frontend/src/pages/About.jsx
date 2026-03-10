@@ -25,22 +25,22 @@ export default function About() {
   const ctaHref = isAuthenticated ? "/dashboard" : "/signup";
 
   return (
-    <div className="min-h-screen bg-[#f4f7fc] text-slate-900">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <div className="marketing-page min-h-screen">
+      <header className="marketing-header sticky top-0 z-20 border-b backdrop-blur">
         <div className="mx-auto flex max-w-[1100px] items-center justify-between px-5 py-4">
           <Link to="/" className="flex items-center gap-2 text-sm font-semibold">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-900 text-white">
+            <div className="landing-logo-badge flex h-7 w-7 items-center justify-center rounded-md text-white">
               <Sparkles size={14} />
             </div>
             PentraAI
           </Link>
-          <nav className="hidden items-center gap-7 text-sm text-slate-600 md:flex">
-            <Link to="/#product" className="hover:text-slate-900">Product</Link>
-            <Link to="/about" className="font-semibold text-slate-900">About</Link>
-            <Link to="/#method" className="hover:text-slate-900">Methodology</Link>
-            <Link to="/#pricing" className="hover:text-slate-900">Pricing</Link>
+          <nav className="hidden items-center gap-7 text-sm md:flex">
+            <Link to="/#product" className="landing-nav-link">Product</Link>
+            <Link to="/about" className="landing-nav-link landing-heading font-semibold">About</Link>
+            <Link to="/#method" className="landing-nav-link">Methodology</Link>
+            <Link to="/#pricing" className="landing-nav-link">Pricing</Link>
           </nav>
-          <Link to={ctaHref} className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+          <Link to={ctaHref} className="app-primary-btn rounded-full px-4 py-2 text-xs font-semibold">
             Sign Up
           </Link>
         </div>
@@ -48,18 +48,18 @@ export default function About() {
 
       <main className="mx-auto max-w-[1100px] px-5 py-14">
         <section>
-          <p className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">
+          <p className="app-status-warning inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]">
             The Mission
           </p>
-          <h1 className="mt-5 max-w-3xl text-5xl font-semibold leading-tight">
+          <h1 className="app-heading mt-5 max-w-3xl text-5xl font-semibold leading-tight">
             Bridging the gap between
-            <span className="text-blue-600"> intuition</span> and <span className="underline decoration-slate-800">execution</span>.
+            <span className="app-marketing-accent"> intuition</span> and <span className="underline decoration-slate-400">execution</span>.
           </h1>
-          <p className="mt-6 max-w-3xl text-xl leading-relaxed text-slate-600">
+          <p className="app-copy mt-6 max-w-3xl text-xl leading-relaxed">
             PentraAI was built for founders. We transform high-level vision into clinical, data-driven simulations,
             allowing entrepreneurs to stress-test their strategies before they ever hit the market.
           </p>
-          <div className="mt-10 rounded-2xl border border-slate-200 bg-[linear-gradient(120deg,#edf3ff,#e8eef7)] p-10">
+          <div className="marketing-band mt-10 rounded-2xl border p-10">
             <div className="flex items-center justify-center gap-3">
               {[1, 2, 3, 4, 5, 6].map((item) => (
                 <div key={item} className="h-12 w-12 rounded-lg bg-slate-400/35" />
@@ -69,29 +69,29 @@ export default function About() {
         </section>
 
         <section className="mt-16">
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-700">The Methodology</p>
+          <p className="app-marketing-accent text-xs font-semibold uppercase tracking-[0.25em]">The Methodology</p>
           <div className="mt-7 grid gap-6 md:grid-cols-3">
             {methodology.map((item) => (
-              <article key={item.title} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="mb-4 inline-flex rounded-full bg-slate-100 p-3 text-slate-700">
+              <article key={item.title} className="marketing-card rounded-2xl border p-6">
+                <div className="app-card-subtle app-copy mb-4 inline-flex rounded-full border p-3">
                   <item.icon size={16} />
                 </div>
-                <h3 className="text-2xl font-semibold">{item.title}</h3>
-                <p className="mt-3 text-base leading-relaxed text-slate-600">{item.body}</p>
+                <h3 className="app-heading text-2xl font-semibold">{item.title}</h3>
+                <p className="app-copy mt-3 text-base leading-relaxed">{item.body}</p>
               </article>
             ))}
           </div>
         </section>
 
-        <section className="mt-16 rounded-3xl border border-slate-800 bg-[#081327] p-8 text-white">
+        <section className="marketing-band mt-16 rounded-3xl border p-8">
           <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr]">
             <div>
-              <h2 className="text-4xl font-semibold">Built on Intelligence</h2>
-              <p className="mt-4 text-lg leading-relaxed text-slate-300">
+              <h2 className="app-heading text-4xl font-semibold">Built on Intelligence</h2>
+              <p className="app-copy mt-4 text-lg leading-relaxed">
                 We blend Large Language Models with retrieval-augmented generation so decisions are grounded in evidence,
                 not guesswork.
               </p>
-              <p className="mt-4 text-lg leading-relaxed text-slate-300">
+              <p className="app-copy mt-4 text-lg leading-relaxed">
                 Our orchestration layer synthesizes conflicting stakeholder priorities into one clear strategic output.
               </p>
             </div>
@@ -105,16 +105,16 @@ export default function About() {
 
         <section className="mt-16 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-blue-700">The Vision</p>
-            <blockquote className="mt-4 text-4xl font-medium leading-tight text-slate-800">
+            <p className="app-marketing-accent text-xs font-semibold uppercase tracking-[0.25em]">The Vision</p>
+            <blockquote className="app-heading mt-4 text-4xl font-medium leading-tight">
               "Our commitment is to startup growth. By providing institutional-grade intelligence to early-stage founders,
               we can significantly increase the success rate of new ventures worldwide."
             </blockquote>
             <div className="mt-6 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-slate-300" />
+              <div className="app-card-subtle h-10 w-10 rounded-full border" />
               <div>
-                <p className="font-semibold">Raji Ayyub</p>
-                <p className="text-sm text-slate-600">TeamLead</p>
+                <p className="app-heading font-semibold">Raji Ayyub</p>
+                <p className="app-copy text-sm">TeamLead</p>
               </div>
             </div>
           </div>
@@ -124,26 +124,26 @@ export default function About() {
           </div>
         </section>
 
-        <section className="mt-16 border-t border-slate-200 pt-14 text-center">
-          <h2 className="text-5xl font-semibold">Ready to test your strategy?</h2>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
+        <section className="app-modal-section mt-16 border-t pt-14 text-center">
+          <h2 className="app-heading text-5xl font-semibold">Ready to test your strategy?</h2>
+          <p className="app-copy mx-auto mt-4 max-w-2xl text-lg">
             Join founders using PentraAI to build more resilient, data-driven businesses.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link to={ctaHref} className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-500">
+            <Link to={ctaHref} className="app-primary-btn rounded-xl px-6 py-3 text-sm font-semibold">
               Experience the Future of Strategy
             </Link>
-            <Link to="/login" className="rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-100">
+            <Link to="/login" className="app-ghost-btn rounded-xl border px-6 py-3 text-sm font-semibold">
               View Sample Report
             </Link>
           </div>
-          <p className="mt-4 text-sm text-slate-500">No credit card required for trial simulation.</p>
+          <p className="app-muted mt-4 text-sm">No credit card required for trial simulation.</p>
         </section>
       </main>
 
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-[1100px] flex-wrap items-center justify-between gap-4 px-5 py-6 text-sm text-slate-600">
-          <p className="font-semibold text-slate-900">PentraAI</p>
+      <footer className="marketing-header border-t">
+        <div className="app-copy mx-auto flex max-w-[1100px] flex-wrap items-center justify-between gap-4 px-5 py-6 text-sm">
+          <p className="app-heading font-semibold">PentraAI</p>
           <div className="flex items-center gap-5">
             <p>Privacy Policy</p>
             <p>Terms of Service</p>
@@ -158,18 +158,18 @@ export default function About() {
 
 function Panel({ title, subtitle, full = false }) {
   return (
-    <div className={`rounded-xl border border-slate-700/80 bg-slate-900/50 p-5 ${full ? "md:col-span-2" : ""}`}>
-      <p className="text-3xl font-semibold text-amber-300">{title}</p>
-      <p className="mt-1 text-sm uppercase tracking-wider text-slate-300">{subtitle}</p>
+    <div className={`app-card-subtle rounded-xl border p-5 ${full ? "md:col-span-2" : ""}`}>
+      <p className="app-sim-accent text-3xl font-semibold">{title}</p>
+      <p className="app-copy mt-1 text-sm uppercase tracking-wider">{subtitle}</p>
     </div>
   );
 }
 
 function InfoCard({ title, body }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-6">
-      <h3 className="text-xl font-semibold">{title}</h3>
-      <p className="mt-2 text-base text-slate-600">{body}</p>
+    <article className="marketing-card rounded-2xl border p-6">
+      <h3 className="app-heading text-xl font-semibold">{title}</h3>
+      <p className="app-copy mt-2 text-base">{body}</p>
     </article>
   );
 }

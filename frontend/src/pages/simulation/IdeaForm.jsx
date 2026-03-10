@@ -1,111 +1,10 @@
-// import { useNavigate } from "react-router-dom";
-// import { motion } from "framer-motion";
-// import useSimulationStore from "../../store/simulationStore";
-
-// export default function IdeaForm() {
-//   const navigate = useNavigate();
-//   const { startupIdea, updateField, startSimulation } = useSimulationStore();
-
-//   const handleSubmit = (e) => {
-//     e.preventDefault();
-//     startSimulation();
-//     navigate("/simulation/run");
-//   };
-
-//   return (
-//     <div className="max-w-4xl mx-auto space-y-8">
-//       <div>
-//         <h1 className="text-3xl font-bold">New Startup Simulation</h1>
-//         <p className="text-slate-400 mt-2">
-//           Define your startup strategy to begin analysis
-//         </p>
-//       </div>
-
-//       <motion.form
-//         onSubmit={handleSubmit}
-//         initial={{ opacity: 0, y: 15 }}
-//         animate={{ opacity: 1, y: 0 }}
-//         className="bg-slate-900 border border-slate-800 rounded-2xl p-8 space-y-6"
-//       >
-//         <InputField
-//           label="Startup Name"
-//           value={startupIdea.name}
-//           onChange={(val) => updateField("name", val)}
-//         />
-
-//         <TextAreaField
-//           label="Problem Statement"
-//           value={startupIdea.problem}
-//           onChange={(val) => updateField("problem", val)}
-//         />
-
-//         <TextAreaField
-//           label="Target Market"
-//           value={startupIdea.targetMarket}
-//           onChange={(val) => updateField("targetMarket", val)}
-//         />
-
-//         <InputField
-//           label="Revenue Model"
-//           value={startupIdea.revenueModel}
-//           onChange={(val) => updateField("revenueModel", val)}
-//         />
-
-//         <TextAreaField
-//           label="Competitive Advantage"
-//           value={startupIdea.competitiveAdvantage}
-//           onChange={(val) => updateField("competitiveAdvantage", val)}
-//         />
-
-//         <button
-//           type="submit"
-//           className="w-full bg-indigo-600 hover:bg-indigo-500 transition py-3 rounded-xl font-semibold"
-//         >
-//           Run Multi-Agent Simulation
-//         </button>
-//       </motion.form>
-//     </div>
-//   );
-// }
-
-// function InputField({ label, value, onChange }) {
-//   return (
-//     <div>
-//       <label className="block text-sm text-slate-400 mb-2">{label}</label>
-//       <input
-//         value={value}
-//         onChange={(e) => onChange(e.target.value)}
-//         className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500"
-//       />
-//     </div>
-//   );
-// }
-
-// function TextAreaField({ label, value, onChange }) {
-//   return (
-//     <div>
-//       <label className="block text-sm text-slate-400 mb-2">{label}</label>
-//       <textarea
-//         rows={4}
-//         value={value}
-//         onChange={(e) => onChange(e.target.value)}
-//         className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500"
-//       />
-//     </div>
-//   );
-// }
-
-
-
-
-import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import useSimulationStore from "../../store/simulationStore";
 
 export default function IdeaForm() {
   const navigate = useNavigate();
-
   const {
     startupIdea,
     updateField,
@@ -116,8 +15,8 @@ export default function IdeaForm() {
     removeAdditionalField,
   } = useSimulationStore();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
 
     if (!startupIdea.name || !startupIdea.problem) {
       toast.error("Startup Name and Problem Statement are required.");
@@ -129,68 +28,60 @@ export default function IdeaForm() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto py-10 px-4 space-y-10">
-      {/* Header */}
+    <div className="app-view mx-auto max-w-5xl space-y-10 px-4 py-10">
       <div>
-        <h1 className="text-3xl font-bold text-white">
-          🚀 New Startup Simulation
-        </h1>
-        <p className="text-slate-400 mt-2">
+        <h1 className="app-heading text-3xl font-bold">New Startup Simulation</h1>
+        <p className="app-copy mt-2">
           Define your startup strategy to begin multi-agent analysis.
         </p>
       </div>
 
-      {/* Form */}
       <motion.form
         onSubmit={handleSubmit}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="bg-slate-900 border border-slate-800 rounded-2xl p-10 space-y-8 shadow-xl"
+        className="app-card space-y-8 rounded-2xl border p-10 shadow-xl"
       >
         <InputField
           label="Startup Name"
           required
           value={startupIdea.name}
-          onChange={(val) => updateField("name", val)}
+          onChange={(value) => updateField("name", value)}
         />
 
         <TextAreaField
           label="Problem Statement"
           required
           value={startupIdea.problem}
-          onChange={(val) => updateField("problem", val)}
+          onChange={(value) => updateField("problem", value)}
         />
 
         <TextAreaField
           label="Target Market"
           value={startupIdea.targetMarket}
-          onChange={(val) => updateField("targetMarket", val)}
+          onChange={(value) => updateField("targetMarket", value)}
         />
 
         <InputField
           label="Revenue Model"
           value={startupIdea.revenueModel}
-          onChange={(val) => updateField("revenueModel", val)}
+          onChange={(value) => updateField("revenueModel", value)}
         />
 
         <TextAreaField
           label="Competitive Advantage"
           value={startupIdea.competitiveAdvantage}
-          onChange={(val) => updateField("competitiveAdvantage", val)}
+          onChange={(value) => updateField("competitiveAdvantage", value)}
         />
 
-        {/* ---------- Additional Dynamic Fields ---------- */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">
-              🧩 Additional Details (Optional)
-            </h3>
-
+            <h3 className="app-heading text-lg font-semibold">Additional Details (Optional)</h3>
             <button
               type="button"
               onClick={addAdditionalField}
-              className="text-sm bg-slate-800 hover:bg-slate-700 px-3 py-1 rounded-lg transition"
+              className="app-ghost-btn rounded-lg border px-3 py-1 text-sm transition"
             >
               + Add Field
             </button>
@@ -198,72 +89,58 @@ export default function IdeaForm() {
 
           {startupIdea.additionalInfo?.map((item, index) => (
             <div
-              key={index}
-              className="grid grid-cols-2 gap-4 items-center bg-slate-800 p-4 rounded-xl border border-slate-700"
+              key={`${item.label}-${index}`}
+              className="app-card-subtle grid grid-cols-1 items-center gap-4 rounded-xl border p-4 md:grid-cols-2"
             >
               <input
                 placeholder="Label (e.g., Timeline)"
                 value={item.label}
-                onChange={(e) =>
-                  updateAdditionalField(index, "label", e.target.value)
-                }
-                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500"
+                onChange={(event) => updateAdditionalField(index, "label", event.target.value)}
+                className="theme-input rounded-lg border px-3 py-2 focus:outline-none focus:border-indigo-500"
               />
 
               <div className="flex gap-2">
                 <input
                   placeholder="Value"
                   value={item.value}
-                  onChange={(e) =>
-                    updateAdditionalField(index, "value", e.target.value)
-                  }
-                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500"
+                  onChange={(event) => updateAdditionalField(index, "value", event.target.value)}
+                  className="theme-input flex-1 rounded-lg border px-3 py-2 focus:outline-none focus:border-indigo-500"
                 />
 
                 <button
                   type="button"
                   onClick={() => removeAdditionalField(index)}
-                  className="text-red-500 hover:text-red-400 font-bold"
+                  className="app-danger-btn rounded-lg px-3 py-2 text-sm font-semibold transition"
                 >
-                  ✕
+                  Remove
                 </button>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Submit Button */}
         <button
           type="submit"
           disabled={isRunning}
-          className={`w-full py-3 rounded-xl font-semibold transition-all ${
-            isRunning
-              ? "bg-slate-700 cursor-not-allowed"
-              : "bg-indigo-600 hover:bg-indigo-500"
-          }`}
+          className="app-primary-btn w-full rounded-xl py-3 font-semibold transition-all"
         >
-          {isRunning
-            ? "Initializing Agents..."
-            : "Run Multi-Agent Simulation"}
+          {isRunning ? "Initializing Agents..." : "Run Multi-Agent Simulation"}
         </button>
       </motion.form>
     </div>
   );
 }
 
-/* ---------------- Reusable Components ---------------- */
-
 function InputField({ label, value, onChange, required }) {
   return (
     <div>
-      <label className="block text-sm text-slate-400 mb-2">
-        {label} {required && <span className="text-red-500">*</span>}
+      <label className="app-copy mb-2 block text-sm">
+        {label} {required ? <span className="text-red-500">*</span> : null}
       </label>
       <input
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 
-        focus:outline-none focus:border-indigo-500 transition"
+        onChange={(event) => onChange(event.target.value)}
+        className="theme-input w-full rounded-xl border px-4 py-3 transition focus:outline-none focus:border-indigo-500"
       />
     </div>
   );
@@ -272,17 +149,15 @@ function InputField({ label, value, onChange, required }) {
 function TextAreaField({ label, value, onChange, required }) {
   return (
     <div>
-      <label className="block text-sm text-slate-400 mb-2">
-        {label} {required && <span className="text-red-500">*</span>}
+      <label className="app-copy mb-2 block text-sm">
+        {label} {required ? <span className="text-red-500">*</span> : null}
       </label>
       <textarea
         rows={4}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 
-        focus:outline-none focus:border-indigo-500 transition resize-none"
+        onChange={(event) => onChange(event.target.value)}
+        className="theme-input w-full resize-none rounded-xl border px-4 py-3 transition focus:outline-none focus:border-indigo-500"
       />
     </div>
   );
 }
-

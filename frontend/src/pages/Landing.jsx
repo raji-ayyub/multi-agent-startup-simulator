@@ -55,34 +55,30 @@ export default function Landing() {
   const secondaryHref = isAuthenticated ? "/simulation" : "/login";
 
   return (
-    <div className="min-h-screen bg-[#05080f] text-slate-100">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(36,86,198,0.23),transparent_35%),radial-gradient(circle_at_80%_8%,rgba(14,165,233,0.14),transparent_30%)]" />
+    <div className="landing-page marketing-page min-h-screen bg-[#05080f] text-slate-100">
+      <div className="landing-ambient pointer-events-none fixed inset-0" />
 
-      <header className="sticky top-0 z-20 border-b border-slate-800/70 bg-[#060a12]/90 backdrop-blur-xl">
+      <header className="landing-header sticky top-0 z-20 border-b backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1160px] items-center justify-between px-5 py-4">
           <Link to="/" className="flex items-center gap-2">
-            <img
-              src="/images/Icon.svg"
-              alt="Logo"
-              className="w-8 h-8 bg-black p-1 rounded-lg"
-            />
-            <h1 className="text-sm font-semibold tracking-wide text-[#E2E78D]">PentraAI</h1>
+            <img src="/images/Icon.svg" alt="Logo" className="landing-logo-badge h-8 w-8 rounded-lg p-1" />
+            <h1 className="landing-brand text-sm font-semibold tracking-wide">PentraAI</h1>
           </Link>
 
-          <nav className="hidden items-center gap-7 text-sm text-slate-400 md:flex">
-            <a href="/#product" className="transition hover:text-slate-100">Product</a>
-            <Link to="/about" className="transition hover:text-slate-100">About</Link>
-            <a href="/#method" className="transition hover:text-slate-100">Methodology</a>
-            <a href="/#pricing" className="transition hover:text-slate-100">Pricing</a>
+          <nav className="hidden items-center gap-7 text-sm md:flex">
+            <a href="/#product" className="landing-nav-link transition">Product</a>
+            <Link to="/about" className="landing-nav-link transition">About</Link>
+            <a href="/#method" className="landing-nav-link transition">Methodology</a>
+            <a href="/#pricing" className="landing-nav-link transition">Pricing</a>
           </nav>
 
           <div className="flex items-center gap-2">
             {!isAuthenticated ? (
-              <Link to="/login" className="rounded-full border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-500">
+              <Link to="/login" className="landing-ghost-btn rounded-full border px-4 py-2 text-xs font-semibold transition">
                 Sign In
               </Link>
             ) : null}
-            <Link to={primaryHref} className="rounded-full bg-blue-500 px-4 py-2 text-xs font-semibold text-black transition hover:bg-cyan-400">
+            <Link to={primaryHref} className="landing-primary-btn rounded-full px-4 py-2 text-xs font-semibold transition">
               Start Simulation
             </Link>
           </div>
@@ -92,67 +88,67 @@ export default function Landing() {
       <main className="relative z-10">
         <section className="mx-auto grid max-w-[1160px] gap-8 px-5 pb-16 pt-16 lg:grid-cols-[1.1fr_1fr]">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-blue-300">
+            <p className="landing-badge inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.18em]">
               <CircleDot size={12} />
               Multi-Agent Engine v2.4 Live
             </p>
-            <h1 className="mt-5 text-5xl font-semibold leading-[0.95] text-white sm:text-6xl">
+            <h1 className="landing-heading mt-5 text-5xl font-semibold leading-[0.95] sm:text-6xl">
               Simulate Your Strategy.
-              <span className="mt-1 block bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">
+              <span className="landing-highlight mt-1 block bg-clip-text text-transparent">
                 Before You Spend a Dollar.
               </span>
             </h1>
-            <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-400">
+            <p className="landing-copy mt-5 max-w-xl text-base leading-relaxed">
               PentraAI runs your startup idea through Market, Customer, and Investor agents to expose blind spots
               before you commit significant resources.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to={primaryHref} className="inline-flex items-center gap-2 rounded-xl bg-blue-500 px-5 py-3 text-sm font-semibold text-black transition hover:bg-cyan-400">
+              <Link to={primaryHref} className="landing-primary-btn inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition">
                 Launch Your First Simulation
                 <ArrowRight size={15} />
               </Link>
-              <Link to={secondaryHref} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/50 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-slate-500">
+              <Link to={secondaryHref} className="landing-secondary-btn inline-flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold transition">
                 {isAuthenticated ? "Open Workspace" : "Watch Methodology"}
                 <ChevronRight size={15} />
               </Link>
             </div>
 
-            <p className="mt-5 text-xs text-slate-500">Trusted by early-stage teams, operators,and venture studios.</p>
+            <p className="landing-muted mt-5 text-xs">Trusted by early-stage teams, operators, and venture studios.</p>
           </div>
 
-          <div className="rounded-2xl border border-slate-700 bg-gradient-to-br from-slate-900 via-[#081322] to-[#0f1c30] p-4 shadow-[0_20px_40px_rgba(0,0,0,0.45)]">
-            <div className="rounded-xl border border-slate-700 bg-black/30 p-5">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Simulation Environment | Strategic Analysis</p>
-              <div className="mt-6 h-64 rounded-xl border border-cyan-500/20 bg-[radial-gradient(circle_at_50%_35%,rgba(45,212,191,0.24),transparent_58%),linear-gradient(to_bottom,rgba(15,23,42,0.35),rgba(2,6,23,0.85))] p-4">
+          <div className="landing-hero-card rounded-2xl border p-4">
+            <div className="landing-hero-inner rounded-xl border p-5">
+              <p className="landing-kicker text-[10px] uppercase tracking-[0.2em]">Simulation Environment | Strategic Analysis</p>
+              <div className="landing-chart-panel mt-6 h-64 rounded-xl border p-4">
                 <div className="flex h-full items-end justify-between">
-                  <div className="space-y-2 text-xs text-slate-300">
-                    <p className="text-cyan-300">Probability of Success</p>
-                    <p className="text-2xl font-semibold text-white">84.2%</p>
-                    <p className="text-slate-500">Live from simulated market conditions.</p>
+                  <div className="space-y-2 text-xs">
+                    <p className="landing-accent-text">Probability of Success</p>
+                    <p className="landing-heading text-2xl font-semibold">84.2%</p>
+                    <p className="landing-muted">Live from simulated market conditions.</p>
                   </div>
-                  <LineChart size={96} className="text-cyan-200/80" />
+                  <LineChart size={96} className="landing-graph" />
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section id="product" className="border-y border-slate-800 bg-black py-16">
+        <section id="product" className="landing-band border-y py-16">
           <div className="mx-auto max-w-[1160px] px-5">
-            <h2 className="text-center text-4xl font-semibold text-white">Executive-Grade Intelligence</h2>
-            <p className="mx-auto mt-3 max-w-2xl text-center text-slate-400">
+            <h2 className="landing-heading text-center text-4xl font-semibold">Executive-Grade Intelligence</h2>
+            <p className="landing-copy mx-auto mt-3 max-w-2xl text-center">
               Orchestrated AI reasoning with startup-specific context, built for decisions that move capital and time.
             </p>
 
             <div className="mt-10 grid gap-4 md:grid-cols-3">
               {capabilityCards.map((card) => (
-                <article key={card.title} className="rounded-2xl border border-slate-700 bg-slate-900/40 p-5">
-                  <div className="mb-4 inline-flex rounded-lg border border-blue-500/30 bg-blue-500/10 p-2 text-blue-300">
+                <article key={card.title} className="landing-feature-card rounded-2xl border p-5">
+                  <div className="landing-icon-chip mb-4 inline-flex rounded-lg border p-2">
                     <card.icon size={16} />
                   </div>
-                  <h3 className="text-lg font-semibold text-white">{card.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-400">{card.body}</p>
+                  <h3 className="landing-heading text-lg font-semibold">{card.title}</h3>
+                  <p className="landing-copy mt-2 text-sm leading-relaxed">{card.body}</p>
                 </article>
               ))}
             </div>
@@ -161,19 +157,19 @@ export default function Landing() {
 
         <section id="method" className="mx-auto grid max-w-[1160px] gap-10 px-5 py-16 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <h2 className="text-4xl font-semibold leading-tight text-white">
+            <h2 className="landing-heading text-4xl font-semibold leading-tight">
               The 4-Pillar Strategic
-              <span className="block bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">Stress-Test</span>
+              <span className="landing-highlight block bg-clip-text text-transparent">Stress-Test</span>
             </h2>
             <div className="mt-7 space-y-5">
               {pillars.map((pillar, index) => (
                 <article key={pillar.title} className="flex gap-3">
-                  <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-blue-500/50 text-xs text-blue-300">
+                  <div className="landing-step-badge mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs">
                     {index + 1}
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold text-slate-100">{pillar.title}</h3>
-                    <p className="mt-1 text-sm text-slate-400">{pillar.body}</p>
+                    <h3 className="landing-heading text-base font-semibold">{pillar.title}</h3>
+                    <p className="landing-copy mt-1 text-sm">{pillar.body}</p>
                   </div>
                 </article>
               ))}
@@ -181,13 +177,13 @@ export default function Landing() {
           </div>
 
           <div className="flex items-center justify-center">
-            <div className="w-full max-w-sm rounded-3xl border border-slate-700 bg-slate-900/40 p-7 text-center shadow-[0_20px_40px_rgba(0,0,0,0.45)]">
-              <div className="mx-auto mb-4 inline-flex rounded-full border border-cyan-400/40 bg-cyan-400/10 p-3 text-cyan-300">
+            <div className="landing-side-card w-full max-w-sm rounded-3xl border p-7 text-center">
+              <div className="landing-icon-chip mx-auto mb-4 inline-flex rounded-full border p-3">
                 <ShieldCheck size={18} />
               </div>
-              <h3 className="text-2xl font-semibold text-white">Agent Swarm Active</h3>
-              <p className="mt-2 text-sm text-slate-400">Ready to analyze millions of strategic data points in context.</p>
-              <Link to={primaryHref} className="mt-6 inline-flex rounded-xl bg-blue-500 px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-cyan-400">
+              <h3 className="landing-heading text-2xl font-semibold">Agent Swarm Active</h3>
+              <p className="landing-copy mt-2 text-sm">Ready to analyze millions of strategic data points in context.</p>
+              <Link to={primaryHref} className="landing-primary-btn mt-6 inline-flex rounded-xl px-5 py-2.5 text-sm font-semibold transition">
                 Initialize Model
               </Link>
             </div>
@@ -195,10 +191,10 @@ export default function Landing() {
         </section>
 
         <section id="cases" className="mx-auto max-w-[1160px] px-5 pb-16">
-          <div className="rounded-3xl border border-blue-500/30 bg-gradient-to-r from-[#0e2d63] via-[#133a79] to-[#0a2d58] p-8 sm:p-10">
+          <div className="landing-cta-panel rounded-3xl border p-8 sm:p-10">
             <h2 className="text-4xl font-semibold leading-tight text-white">Stop Guessing. Start Simulating.</h2>
-            <p className="mt-4 max-w-2xl text-slate-200/85">
-              PentraAI helps founders move from intuition to evidence-backed execution.Launch your first strategy run today.
+            <p className="mt-4 max-w-2xl text-white/80">
+              PentraAI helps founders move from intuition to evidence-backed execution. Launch your first strategy run today.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link to={primaryHref} className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-200">
@@ -212,22 +208,22 @@ export default function Landing() {
         </section>
       </main>
 
-      <footer id="pricing" className="relative z-10 border-t border-slate-800 bg-black">
+      <footer id="pricing" className="landing-footer relative z-10 border-t">
         <div className="mx-auto grid max-w-[1160px] gap-10 px-5 py-12 md:grid-cols-4">
           <div>
-            <p className="text-base font-semibold text-white">PentraAI</p>
-            <p className="mt-3 text-sm text-slate-500">
-              Strategic simulation infrastructure for founders, operators,and venture teams.
+            <p className="landing-heading text-base font-semibold">PentraAI</p>
+            <p className="landing-muted mt-3 text-sm">
+              Strategic simulation infrastructure for founders, operators, and venture teams.
             </p>
           </div>
           <FooterCol title="Product" links={["Market Analysis", "Risk Modeling", "Pricing Engine", "API Reference"]} />
           <FooterCol title="Company" links={["About Us", "Methodology", "Careers", "Privacy Policy"]} />
           <div>
-            <p className="text-sm font-semibold text-white">Stay Informed</p>
-            <div className="mt-3 flex rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-500">
+            <p className="landing-heading text-sm font-semibold">Stay Informed</p>
+            <div className="landing-input-shell mt-3 flex rounded-lg border px-3 py-2 text-sm">
               work@company.com
             </div>
-            <button type="button" className="mt-3 w-full rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-cyan-400">
+            <button type="button" className="landing-primary-btn mt-3 w-full rounded-lg px-4 py-2 text-sm font-semibold transition">
               Subscribe
             </button>
           </div>
@@ -240,8 +236,8 @@ export default function Landing() {
 function FooterCol({ title, links }) {
   return (
     <div>
-      <p className="text-sm font-semibold text-white">{title}</p>
-      <div className="mt-3 space-y-2 text-sm text-slate-500">
+      <p className="landing-heading text-sm font-semibold">{title}</p>
+      <div className="landing-muted mt-3 space-y-2 text-sm">
         {links.map((link) => (
           <p key={link}>{link}</p>
         ))}

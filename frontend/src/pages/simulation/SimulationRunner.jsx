@@ -43,18 +43,18 @@ export default function SimulationRunner() {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
+    <div className="app-view flex h-full flex-col items-center justify-center space-y-6 text-center">
       <motion.div
         animate={{ rotate: 360 }}
         transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
         className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full"
       />
 
-      <h2 className="text-xl font-semibold">
+      <h2 className="app-heading text-xl font-semibold">
         Multi-Agent Simulation Running...
       </h2>
 
-      <p className="text-slate-400">
+      <p className="app-copy">
         Market, Customer, and Investor agents are analyzing your strategy.
       </p>
     </div>

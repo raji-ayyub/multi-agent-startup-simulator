@@ -12,7 +12,7 @@ export default function WorkforceDashboard() {
   const analysis = useWorkforceStore((s) => s.analysis);
 
   if (!analysis)
-    return <div className="p-8">No analysis data available.</div>;
+    return <div className="app-view p-8">No analysis data available.</div>;
 
   const chartData = [
     { name: "Skill Score", value: analysis.skill_score },
@@ -21,8 +21,9 @@ export default function WorkforceDashboard() {
   ];
 
   return (
-    <div className="p-8">
-      <h2 className="text-2xl font-bold mb-6">
+    <div className="app-view p-8">
+      <div className="app-card rounded-2xl border p-6">
+      <h2 className="app-heading mb-6 text-2xl font-bold">
         Workforce Intelligence Dashboard
       </h2>
 
@@ -35,18 +36,19 @@ export default function WorkforceDashboard() {
       </BarChart>
 
       <div className="mt-8">
-        <h3 className="font-bold">Employee:</h3>
-        <p>{analysis.employee_name}</p>
+        <h3 className="app-heading font-bold">Employee:</h3>
+        <p className="app-copy">{analysis.employee_name}</p>
 
-        <h3 className="font-bold mt-4">Recommended Role:</h3>
-        <p>{analysis.recommended_role}</p>
+        <h3 className="app-heading mt-4 font-bold">Recommended Role:</h3>
+        <p className="app-copy">{analysis.recommended_role}</p>
 
-        <h3 className="font-bold mt-4">Training Recommendations:</h3>
+        <h3 className="app-heading mt-4 font-bold">Training Recommendations:</h3>
         <ul className="list-disc ml-5">
           {analysis.training_recommendations.map((item, i) => (
-            <li key={i}>{item}</li>
+            <li key={i} className="app-copy">{item}</li>
           ))}
         </ul>
+      </div>
       </div>
     </div>
   );

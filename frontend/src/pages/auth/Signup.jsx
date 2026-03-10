@@ -71,52 +71,52 @@ export default function Signup() {
   return (
     <AuthLayout>
       <div className="auth-screen auth-form-panel w-full max-w-sm p-6 sm:p-8">
-          <div className="text-center mb-8">
+          <div className="mb-8 text-center">
             <h2 className="auth-deep-title text-2xl font-bold mb-2">Create Account</h2>
-            <p className="auth-deep-subtitle text-slate-400 text-xs">
+            <p className="auth-deep-subtitle text-xs">
               Join the next generation AI movement enterprise.
             </p>
           </div>
 
-          <div className="flex flex-col space-y-2 mb-4">
-            <button className="auth-social-btn flex items-center justify-center bg-transparent text-white border border-slate-800 py-2 rounded-lg hover:opacity-90 transition text-sm">
+          <div className="mb-4 flex flex-col space-y-2">
+            <button className="auth-social-btn flex items-center justify-center rounded-lg border py-2 text-sm transition hover:opacity-90">
               <img src="/images/google.svg" alt="Google Logo" className="w-4 h-4 mr-2" />
               Sign up with Google
             </button>
 
-            <button className="auth-social-btn flex items-center justify-center bg-transparent text-white border border-slate-800 py-2 rounded-lg hover:opacity-90 transition text-sm">
+            <button className="auth-social-btn flex items-center justify-center rounded-lg border py-2 text-sm transition hover:opacity-90">
               <img src="/images/Key.svg" alt="SSO Logo" className="w-4 h-4 mr-2" />
               Single Sign-On (SSO)
             </button>
           </div>
 
           <div className="flex items-center mb-5">
-            <div className="flex-1 h-px bg-slate-800" />
-            <span className="px-3 text-[10px] text-slate-500 tracking-[0.18em]">OR CONTINUE WITH EMAIL</span>
-            <div className="flex-1 h-px bg-slate-800" />
+            <div className="auth-divider h-px flex-1" />
+            <span className="app-muted px-3 text-[10px] tracking-[0.18em]">OR CONTINUE WITH EMAIL</span>
+            <div className="auth-divider h-px flex-1" />
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-xs mb-2 text-slate-300">Full Name</label>
+              <label className="app-copy mb-2 block text-xs">Full Name</label>
               <input
                 type="text"
                 name="fullName"
                 value={formData.fullName}
                 onChange={handleChange}
-                className="auth-input w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-2.5 focus:ring-1 focus:ring-[#B8C45A] outline-none text-sm"
+                className="auth-input w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#B8C45A]"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs mb-2 text-slate-300">Work Email</label>
+              <label className="app-copy mb-2 block text-xs">Work Email</label>
               <input
                 type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className={`auth-input w-full bg-[#0f172a] border rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-600 outline-none ${
+                className={`auth-input w-full rounded-lg border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-600 ${
                   emailValid ? "border-slate-700" : "border-red-500"
                 }`}
                 required
@@ -129,26 +129,26 @@ export default function Signup() {
             </div>
 
             <div className="relative">
-              <label className="block text-xs mb-2 text-slate-300">Password</label>
+              <label className="app-copy mb-2 block text-xs">Password</label>
               <input
                 type={showPassword ? "text" : "password"}
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Minimum 8 characters"
-                className="auth-input w-full bg-[#0f172a] border border-slate-700 rounded-lg px-3 py-2.5 pr-10 focus:ring-1 focus:ring-[#B8C45A] outline-none text-sm"
+                className="auth-input w-full rounded-lg border px-3 py-2.5 pr-10 text-sm outline-none focus:ring-1 focus:ring-[#B8C45A]"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-8.5 text-gray-400"
+                className="auth-icon-btn absolute right-3 top-8.5"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
 
               {passwordStrength && (
-                <div className="mt-2 h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div className="auth-meter mt-2 h-2 overflow-hidden rounded-full">
                   <div
                     className={`h-full ${strengthColor[passwordStrength]} transition-all`}
                     style={{
@@ -162,7 +162,7 @@ export default function Signup() {
                   />
                 </div>
               )}
-              <p className="mt-2 text-[11px] text-slate-400">
+              <p className="auth-deep-subtitle mt-2 text-[11px]">
                 Use at least 8 characters. Add numbers or symbols for stronger security.
               </p>
             </div>
@@ -174,15 +174,15 @@ export default function Signup() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[#CED87C] text-black font-semibold py-2.5 rounded-lg hover:opacity-90 transition text-sm"
+              className="auth-submit-btn w-full rounded-lg py-2.5 text-sm font-semibold transition"
             >
               {isLoading ? "Creating..." : "Create Account"}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-slate-400">
+          <div className="auth-deep-subtitle mt-6 text-center text-xs">
             Already registered?{" "}
-            <Link to="/login" className="text-yellow-200 hover:underline">
+            <Link to="/login" className="auth-link hover:underline">
               Log in
             </Link>
           </div>
