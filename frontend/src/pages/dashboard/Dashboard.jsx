@@ -43,13 +43,13 @@ export default function Dashboard() {
   }, [fetchSimulations]);
 
   return (
-    <section className="h-full text-slate-100">
+    <section className="app-view h-full">
       <div className="mx-auto flex max-w-[1220px] flex-col gap-5">
-        <header className="rounded-xl border border-slate-800 bg-[#0d121a] px-5 py-4">
+        <header className="app-card rounded-xl border px-5 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h1 className="text-[32px] font-semibold leading-tight text-white">Hello {firstName}</h1>
-              <p className="mt-1 text-sm text-slate-400">Welcome to PentraAI</p>
+              <h1 className="app-heading text-[32px] font-semibold leading-tight">Hello {firstName}</h1>
+              <p className="app-copy mt-1 text-sm">Welcome to PentraAI</p>
             </div>
             <div className="flex items-center gap-2">
               <IconButton label="Search">
@@ -58,26 +58,26 @@ export default function Dashboard() {
               <IconButton label="Notifications">
                 <Bell size={15} />
               </IconButton>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-[11px] font-semibold text-slate-200">
+              <div className="app-avatar-shell flex h-8 w-8 items-center justify-center rounded-full border text-[11px] font-semibold">
                 {initials(user?.fullName || user?.name)}
               </div>
             </div>
           </div>
         </header>
 
-        <article className="rounded-2xl border border-slate-800 bg-[radial-gradient(circle_at_top,_rgba(54,84,138,0.28),_rgba(12,15,21,0.98)_64%)] p-8 text-center shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-700/40 text-slate-200">
+        <article className="app-banner rounded-2xl border p-8 text-center">
+          <div className="app-icon-chip mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border">
             <Rocket size={19} />
           </div>
-          <h2 className="text-xl font-semibold text-white">Ready to simulate your first startup idea?</h2>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-slate-400">
+          <h2 className="app-heading text-xl font-semibold">Ready to simulate your first startup idea?</h2>
+          <p className="app-copy mx-auto mt-3 max-w-2xl text-sm leading-relaxed">
             Start your first analysis to unlock deep market visibility scores, investor confidence ratings, and
             customer demand insights.
           </p>
           <button
             type="button"
             onClick={handleOpenModal}
-            className="mt-6 inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500"
+            className="app-primary-btn mt-6 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition"
           >
             <PlayCircle size={15} />
             Start New Simulation
@@ -88,49 +88,49 @@ export default function Dashboard() {
           {metrics.map((metric) => (
             <article
               key={metric.key}
-              className="rounded-xl border border-slate-800 bg-[#0f141d] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
+              className="app-card-alt rounded-xl border px-4 py-4"
             >
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-[11px] uppercase tracking-[0.15em] text-slate-500">{metric.title}</h3>
-                <span className="text-sm text-slate-300">{metric.value == null ? "--" : `${metric.value}%`}</span>
+                <h3 className="app-muted text-[11px] uppercase tracking-[0.15em]">{metric.title}</h3>
+                <span className="app-copy text-sm">{metric.value == null ? "--" : `${metric.value}%`}</span>
               </div>
-              <div className="h-2 rounded-full bg-slate-800">
+              <div className="app-card-subtle h-2 rounded-full border">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${scoreTone(metric.value)}`}
                   style={{ width: metric.value == null ? "0%" : `${metric.value}%` }}
                 />
               </div>
-              <p className="mt-3 text-xs text-slate-500">
+              <p className="app-muted mt-3 text-xs">
                 {metric.value == null ? "Waiting for simulation data..." : "Updated from latest simulation run."}
               </p>
             </article>
           ))}
         </section>
 
-        <section className="rounded-xl border border-slate-800 bg-[#0d121a] p-4 md:p-5">
+        <section className="app-card rounded-xl border p-4 md:p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-200">Recent Simulations</h3>
-            <span className="text-xs text-slate-500">View All</span>
+            <h3 className="app-heading text-sm font-semibold">Recent Simulations</h3>
+            <span className="app-muted text-xs">View All</span>
           </div>
 
           {recentSimulations.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/35 px-4 py-12 text-center">
-              <p className="text-sm text-slate-500">No simulations found. Launch your first simulation to see results here.</p>
+            <div className="app-card-subtle rounded-xl border border-dashed px-4 py-12 text-center">
+              <p className="app-muted text-sm">No simulations found. Launch your first simulation to see results here.</p>
             </div>
           ) : (
             <div className="grid gap-3">
               {recentSimulations.slice(0, 4).map((item) => (
                 <article
                   key={item.id}
-                  className="grid gap-3 rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-3 md:grid-cols-[1fr_auto_auto]"
+                  className="app-card-subtle grid gap-3 rounded-lg border px-4 py-3 md:grid-cols-[1fr_auto_auto]"
                 >
                   <div>
-                    <p className="text-sm font-medium text-slate-200">{item.name}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="app-heading text-sm font-medium">{item.name}</p>
+                    <p className="app-muted text-xs">
                       {new Date(item.createdAt).toLocaleString()} | {item.status}
                     </p>
                   </div>
-                  <p className="text-sm text-slate-400">Score</p>
+                  <p className="app-copy text-sm">Score</p>
                   <p className="text-sm font-semibold text-blue-300">{item.score}</p>
                 </article>
               ))}
@@ -138,7 +138,7 @@ export default function Dashboard() {
           )}
         </section>
 
-        <footer className="rounded-xl border border-slate-800 bg-[#0d121a] px-4 py-3 text-xs text-slate-500">
+        <footer className="app-card app-muted rounded-xl border px-4 py-3 text-xs">
           {overallScore == null
             ? "Run a simulation to generate an overall confidence score."
             : `Latest overall score: ${overallScore}/100`}
@@ -155,7 +155,7 @@ function IconButton({ label, children }) {
     <button
       type="button"
       aria-label={label}
-      className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-800 text-slate-300 transition hover:border-slate-500 hover:text-slate-100"
+      className="app-ghost-btn flex h-8 w-8 items-center justify-center rounded-full border transition"
     >
       {children}
     </button>

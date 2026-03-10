@@ -2,7 +2,7 @@ import { Save } from "lucide-react";
 import ModalShell from "./ModalShell";
 
 const inputClass =
-  "w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-blue-500";
+  "theme-input w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-blue-500";
 
 export default function WorkspaceProfileModal({
   open,
@@ -43,9 +43,7 @@ export default function WorkspaceProfileModal({
         <button
           type="submit"
           disabled={isSaving}
-          className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
-            isSaving ? "cursor-not-allowed bg-slate-700 text-slate-400" : "bg-blue-600 text-white hover:bg-blue-500"
-          }`}
+          className="app-primary-btn inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition"
         >
           <Save size={14} />
           {isSaving ? "Saving..." : "Save Changes"}
@@ -58,7 +56,7 @@ export default function WorkspaceProfileModal({
 function Field({ label, children }) {
   return (
     <label>
-      <span className="mb-1 block text-xs text-slate-400">{label}</span>
+      <span className="app-copy mb-1 block text-xs">{label}</span>
       {children}
     </label>
   );

@@ -12,7 +12,7 @@ const stepItems = [
 ];
 
 const inputClass =
-  "w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-blue-500";
+  "theme-input w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-blue-500";
 
 const defaultTeamMember = () => ({
   id: nextId(),
@@ -139,18 +139,18 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
       maxWidth="max-w-4xl"
     >
         <div className="mb-5">
-        <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
+        <div className="app-muted mb-2 flex items-center justify-between text-xs">
           <span>Step {step} of 3</span>
           <span>{filledPercent}% Complete</span>
         </div>
-        <div className="h-1.5 rounded-full bg-slate-800">
+        <div className="app-progress-track h-1.5 rounded-full">
           <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${(step / 3) * 100}%` }} />
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2">
           {stepItems.map((item) => (
             <p
               key={item.key}
-              className={`text-xs ${step === item.key ? "text-blue-300" : "text-slate-500"}`}
+              className={`app-progress-step text-xs ${step === item.key ? "is-active" : ""}`}
             >
               {item.key}. {item.label}
             </p>
@@ -160,8 +160,8 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
 
       {step === 1 ? (
         <div className="space-y-4">
-          <h4 className="text-2xl font-semibold text-white">Initialize Workspace</h4>
-          <p className="text-sm text-slate-400">Only the essentials. You can edit the rest later.</p>
+          <h4 className="app-heading text-2xl font-semibold">Initialize Workspace</h4>
+          <p className="app-copy text-sm">Only the essentials. You can edit the rest later.</p>
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Company Name">
               <input
@@ -194,7 +194,7 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
               <input type="number" value={employeeCount} onChange={(event) => setEmployeeCount(event.target.value)} className={inputClass} />
             </Field>
           </div>
-          <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-200">
+          <div className="app-status-info rounded-xl border px-3 py-2 text-xs">
             <Info size={12} className="mr-2 inline-block" />
             These basics are enough to launch and generate a first actionable plan.
           </div>
@@ -203,13 +203,13 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
 
       {step === 2 ? (
         <div className="space-y-4">
-          <h4 className="text-3xl font-semibold text-white">Team Access & Skills</h4>
-          <p className="text-sm text-slate-400">
+          <h4 className="app-heading text-3xl font-semibold">Team Access & Skills</h4>
+          <p className="app-copy text-sm">
             Add operators and upload each member CV to auto-fill name, role, and qualifications.
           </p>
           <div className="space-y-3">
             {team.map((member) => (
-              <article key={member.id} className="rounded-xl border border-slate-700 bg-slate-900/40 p-3">
+              <article key={member.id} className="app-list-card rounded-xl border p-3">
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label="Employee Name">
                     <input
@@ -226,7 +226,7 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
                     />
                   </Field>
                   <Field label="CV File" className="md:col-span-2">
-                    <label className="inline-flex w-full cursor-pointer items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500">
+                    <label className="app-upload-label inline-flex w-full cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm">
                       <Upload size={14} />
                       {member.cvFileName || "Upload CV (.pdf, .docx, .txt, .md, .csv, .json, .rtf)"}
                       <input
@@ -238,14 +238,14 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
                     </label>
                     {member.cvError ? <p className="mt-1 text-xs text-rose-400">{member.cvError}</p> : null}
                     {member.qualifications.length ? (
-                      <p className="mt-2 text-xs text-slate-400">
+                      <p className="app-copy mt-2 text-xs">
                         Extracted: {member.qualifications.join(", ")}
                       </p>
                     ) : null}
                   </Field>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs text-slate-500">CV is parsed on backend and can still be edited manually.</span>
+                  <span className="app-muted text-xs">CV is parsed on backend and can still be edited manually.</span>
                   {team.length > 1 ? (
                     <button type="button" onClick={() => removeMember(member.id)} className="text-xs text-rose-400">
                       Remove
@@ -258,7 +258,7 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
           <button
             type="button"
             onClick={addMember}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:border-slate-500"
+            className="app-ghost-btn inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold"
           >
             <Plus size={12} />
             Add Operator
@@ -268,42 +268,42 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
 
       {step === 3 ? (
         <div className="space-y-4">
-          <h4 className="text-2xl font-semibold text-white">Final Review & Launch</h4>
-          <p className="text-sm text-slate-400">Verify workspace configuration before engine initialization.</p>
+          <h4 className="app-heading text-2xl font-semibold">Final Review & Launch</h4>
+          <p className="app-copy text-sm">Verify workspace configuration before engine initialization.</p>
           <div className="grid gap-4 md:grid-cols-2">
-            <article className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-              <p className="mb-2 text-xs uppercase tracking-[0.16em] text-blue-300">Workspace Summary</p>
+            <article className="app-list-card rounded-xl border p-4">
+              <p className="app-badge mb-2 inline-flex rounded-full border px-2 py-1 text-xs uppercase tracking-[0.16em]">Workspace Summary</p>
               <SummaryRow label="Workspace" value={workspaceName || "N/A"} />
               <SummaryRow label="Company" value={companyName || "N/A"} />
               <SummaryRow label="Goal" value={primaryGoal || "N/A"} />
               <SummaryRow label="Revenue" value={annualRevenue || "N/A"} />
             </article>
-            <article className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-              <p className="mb-2 text-xs uppercase tracking-[0.16em] text-blue-300">Assigned Operators</p>
+            <article className="app-list-card rounded-xl border p-4">
+              <p className="app-badge mb-2 inline-flex rounded-full border px-2 py-1 text-xs uppercase tracking-[0.16em]">Assigned Operators</p>
               <div className="space-y-2">
                 {team
                   .filter((member) => member.name.trim() || member.role.trim())
                   .map((member) => (
-                    <div key={member.id} className="rounded-lg border border-slate-700 bg-slate-950/50 px-3 py-2">
-                      <p className="text-sm font-semibold text-slate-200">{member.name || "Unnamed operator"}</p>
-                      <p className="text-xs text-slate-400">{member.role || "Role pending"}</p>
+                    <div key={member.id} className="app-card rounded-lg border px-3 py-2">
+                      <p className="app-heading text-sm font-semibold">{member.name || "Unnamed operator"}</p>
+                      <p className="app-copy text-xs">{member.role || "Role pending"}</p>
                     </div>
                   ))}
               </div>
             </article>
           </div>
-          <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-200">
+          <div className="app-status-info rounded-xl border px-3 py-2 text-xs">
             <Info size={12} className="mr-2 inline-block" />
             Initializing the Management Engine allocates resources and activates security protocols.
           </div>
         </div>
       ) : null}
 
-      <footer className="mt-6 flex items-center justify-between border-t border-slate-800 pt-4">
+      <footer className="app-modal-section mt-6 flex items-center justify-between border-t pt-4">
         <button
           type="button"
           onClick={() => (step === 1 ? onClose() : setStep((prev) => Math.max(1, prev - 1)))}
-          className="rounded-full px-4 py-2 text-sm text-slate-400 hover:text-slate-200"
+          className="app-ghost-btn rounded-full border px-4 py-2 text-sm"
         >
           {step === 1 ? "Cancel Setup" : "Back"}
         </button>
@@ -312,11 +312,7 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
             type="button"
             onClick={() => setStep((prev) => Math.min(3, prev + 1))}
             disabled={step === 1 && !canProceedStep1}
-            className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
-              step === 1 && !canProceedStep1
-                ? "cursor-not-allowed bg-slate-700 text-slate-500"
-                : "bg-blue-600 text-white hover:bg-blue-500"
-            }`}
+            className="app-primary-btn rounded-full px-5 py-2 text-sm font-semibold transition"
           >
             Next
           </button>
@@ -325,11 +321,7 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
             type="button"
             onClick={handleLaunch}
             disabled={!canLaunch || isSaving}
-            className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
-              !canLaunch || isSaving
-                ? "cursor-not-allowed bg-slate-700 text-slate-500"
-                : "bg-blue-600 text-white hover:bg-blue-500"
-            }`}
+            className="app-primary-btn rounded-full px-5 py-2 text-sm font-semibold transition"
           >
             {isSaving ? "Initializing..." : "Initialize Management Engine"}
           </button>
@@ -342,7 +334,7 @@ export default function WorkspaceSetupModal({ open, onClose, onCreate, isSaving 
 function Field({ label, className = "", children }) {
   return (
     <label className={className}>
-      <span className="mb-1 block text-xs text-slate-400">{label}</span>
+      <span className="app-copy mb-1 block text-xs">{label}</span>
       {children}
     </label>
   );
@@ -350,8 +342,8 @@ function Field({ label, className = "", children }) {
 
 function SummaryRow({ label, value }) {
   return (
-    <p className="mb-1 text-sm text-slate-300">
-      <span className="text-slate-500">{label}: </span>
+    <p className="app-copy mb-1 text-sm">
+      <span className="app-summary-key">{label}: </span>
       {value}
     </p>
   );

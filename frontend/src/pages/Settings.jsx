@@ -1,32 +1,23 @@
-// src/pages/Settings.jsx
-
 import { useState } from "react";
+import useUIStore from "../store/uiStore";
 
 export default function Settings() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [darkMode, setDarkMode] = useState(true);
+  const { theme, toggleTheme } = useUIStore();
+  const darkMode = theme === "dark";
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-
-      {/* Header */}
+    <div className="mx-auto max-w-4xl space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="text-slate-400 text-sm">
-          Configure your platform preferences
-        </p>
+        <h1 className="app-heading text-2xl font-semibold">Settings</h1>
+        <p className="app-copy text-sm">Configure your platform preferences</p>
       </div>
 
-      {/* Preferences Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-lg space-y-8">
-
-        {/* Notifications */}
-        <div className="flex justify-between items-center">
+      <div className="app-card space-y-8 rounded-2xl border p-8">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-medium">Email Notifications</h3>
-            <p className="text-sm text-slate-400">
-              Receive updates about simulations and analysis
-            </p>
+            <h3 className="app-heading font-medium">Email Notifications</h3>
+            <p className="app-copy text-sm">Receive updates about simulations and analysis</p>
           </div>
 
           <button
@@ -43,17 +34,14 @@ export default function Settings() {
           </button>
         </div>
 
-        {/* Dark Mode */}
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-medium">Dark Mode</h3>
-            <p className="text-sm text-slate-400">
-              Toggle between light and dark interface
-            </p>
+            <h3 className="app-heading font-medium">Dark Mode</h3>
+            <p className="app-copy text-sm">Toggle between light and dark interface</p>
           </div>
 
           <button
-            onClick={() => setDarkMode(!darkMode)}
+            onClick={toggleTheme}
             className={`w-14 h-7 flex items-center rounded-full p-1 transition ${
               darkMode ? "bg-indigo-600" : "bg-slate-700"
             }`}
@@ -65,20 +53,15 @@ export default function Settings() {
             />
           </button>
         </div>
-
       </div>
 
-      {/* Danger Zone */}
-      <div className="bg-slate-900 border border-red-800 rounded-2xl p-8 shadow-lg">
-        <h3 className="text-red-400 font-semibold mb-4">
-          Danger Zone
-        </h3>
+      <div className="app-card rounded-2xl border border-red-800 p-8">
+        <h3 className="mb-4 font-semibold text-red-400">Danger Zone</h3>
 
-        <button className="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-xl transition">
+        <button className="app-danger-btn rounded-xl px-6 py-3 transition">
           Delete Account
         </button>
       </div>
-
     </div>
   );
 }

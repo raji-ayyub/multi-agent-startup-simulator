@@ -239,51 +239,51 @@ export default function ManagementDashboard() {
   };
 
   return (
-    <section className="management-shell h-full text-slate-100">
+    <section className="management-shell app-view h-full">
       <div className="mx-auto flex max-w-[1280px] flex-col gap-5">
-        <header className="rounded-2xl border border-slate-800 bg-[#0b1220] px-6 py-5">
-          <p className="text-xs uppercase tracking-[0.2em] text-blue-300">Active Archive</p>
-          <h1 className="mt-2 text-4xl font-semibold text-white">Startup Management Vault</h1>
-          <p className="mt-2 max-w-3xl text-sm text-slate-400">
+        <header className="app-banner rounded-2xl border px-6 py-5">
+          <p className="app-badge inline-flex rounded-full border px-3 py-1 text-xs uppercase tracking-[0.2em]">Active Archive</p>
+          <h1 className="app-heading mt-3 text-4xl font-semibold">Startup Management Vault</h1>
+          <p className="app-copy mt-2 max-w-3xl text-sm">
             Build management workspaces and run agentic execution plans using company revenue, team size, and
             qualifications.
           </p>
-          <p className="mt-3 inline-flex rounded-full border border-blue-500/40 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-300">
+          <p className="app-badge mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-semibold">
             Active View: {activeTab}
           </p>
         </header>
 
         <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-5">
-            <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
+            <article className="app-card rounded-2xl border p-5">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+                <h2 className="app-heading flex items-center gap-2 text-lg font-semibold">
                   <Building2 size={18} />
                   Company Workspaces
                 </h2>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500">{workspaces.length} total</span>
+                  <span className="app-muted text-xs">{workspaces.length} total</span>
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(true)}
-                    className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-500"
+                    className="app-primary-btn rounded-full px-3 py-1 text-xs font-semibold transition"
                   >
                     + New
                   </button>
                 </div>
               </div>
-              <p className="text-sm text-slate-400">
+              <p className="app-copy text-sm">
                 Workspace and company information are now filled via modal forms to keep the dashboard clean.
               </p>
             </article>
 
-            <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
+            <article className="app-card rounded-2xl border p-5">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-base font-semibold text-white">Workspace Profiles</h3>
-                {isLoading ? <span className="text-xs text-slate-500">Loading...</span> : null}
+                <h3 className="app-heading text-base font-semibold">Workspace Profiles</h3>
+                {isLoading ? <span className="app-muted text-xs">Loading...</span> : null}
               </div>
               {workspaces.length === 0 ? (
-                <p className="text-sm text-slate-500">No management workspace yet. Create your first one above.</p>
+                <p className="app-muted text-sm">No management workspace yet. Create your first one above.</p>
               ) : (
                 <div className="grid gap-2">
                   {workspaces.map((workspace) => (
@@ -293,12 +293,12 @@ export default function ManagementDashboard() {
                       onClick={() => selectWorkspace(workspace.workspace_id)}
                       className={`rounded-lg border px-3 py-2 text-left transition ${
                         activeWorkspace?.workspace_id === workspace.workspace_id
-                          ? "border-blue-500/60 bg-blue-500/10"
-                          : "border-slate-700 bg-slate-900/40 hover:border-slate-500"
+                          ? "app-badge"
+                          : "app-card-subtle hover:border-slate-500"
                       }`}
                     >
-                      <p className="text-sm font-semibold text-slate-100">{workspace.workspace_name}</p>
-                      <p className="text-xs text-slate-400">
+                      <p className="app-heading text-sm font-semibold">{workspace.workspace_name}</p>
+                      <p className="app-copy text-xs">
                         {workspace.company_name} | Revenue: {workspace.annual_revenue || "N/A"} | Team:{" "}
                         {workspace.employee_count || 0}
                       </p>
@@ -310,9 +310,9 @@ export default function ManagementDashboard() {
           </div>
 
           <div className="space-y-5">
-            <article className="rounded-2xl border border-slate-800 bg-[#101827] p-5">
+            <article className="app-card-alt rounded-2xl border p-5">
               <div className="flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+                <h2 className="app-heading flex items-center gap-2 text-lg font-semibold">
                   <Archive size={18} />
                   Growth Planner
                 </h2>
@@ -320,28 +320,26 @@ export default function ManagementDashboard() {
                   type="button"
                   onClick={openEditModal}
                   disabled={!activeWorkspace}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                    activeWorkspace ? "bg-blue-600 text-white hover:bg-blue-500" : "cursor-not-allowed bg-slate-700 text-slate-500"
-                  }`}
+                  className="app-primary-btn rounded-full px-3 py-1 text-xs font-semibold transition"
                 >
                   Edit Profile
                 </button>
               </div>
               {!activeWorkspace ? (
-                <p className="mt-4 text-sm text-slate-500">Select a workspace to edit profile and plan activities.</p>
+                <p className="app-muted mt-4 text-sm">Select a workspace to edit profile and plan activities.</p>
               ) : (
-                <div className="mt-4 grid gap-2 rounded-xl border border-slate-700 bg-slate-900/40 p-4 text-sm">
-                  <p className="text-slate-200"><span className="text-slate-500">Workspace:</span> {activeWorkspace.workspace_name}</p>
-                  <p className="text-slate-200"><span className="text-slate-500">Revenue:</span> {activeWorkspace.annual_revenue || "N/A"}</p>
-                  <p className="text-slate-200"><span className="text-slate-500">Employees:</span> {activeWorkspace.employee_count || 0}</p>
-                  <p className="text-slate-200"><span className="text-slate-500">Stage:</span> {activeWorkspace.stage || "N/A"}</p>
+                <div className="app-card-subtle mt-4 grid gap-2 rounded-xl border p-4 text-sm">
+                  <p className="app-copy"><span className="app-muted">Workspace:</span> {activeWorkspace.workspace_name}</p>
+                  <p className="app-copy"><span className="app-muted">Revenue:</span> {activeWorkspace.annual_revenue || "N/A"}</p>
+                  <p className="app-copy"><span className="app-muted">Employees:</span> {activeWorkspace.employee_count || 0}</p>
+                  <p className="app-copy"><span className="app-muted">Stage:</span> {activeWorkspace.stage || "N/A"}</p>
                 </div>
               )}
             </article>
 
-            <article className="rounded-2xl border border-slate-800 bg-[#101827] p-5">
+            <article className="app-card-alt rounded-2xl border p-5">
               <div className="flex items-center justify-between">
-                <h3 className="flex items-center gap-2 text-base font-semibold text-white">
+                <h3 className="app-heading flex items-center gap-2 text-base font-semibold">
                   <Sparkles size={16} />
                   Agentic Activity Planner
                 </h3>
@@ -349,16 +347,12 @@ export default function ManagementDashboard() {
                   type="button"
                   onClick={() => setShowPlanModal(true)}
                   disabled={!activeWorkspace}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                    activeWorkspace
-                      ? "bg-emerald-500 text-black hover:bg-emerald-400"
-                      : "cursor-not-allowed bg-slate-700 text-slate-500"
-                  }`}
+                  className="app-success-btn rounded-full px-3 py-1 text-xs font-semibold transition"
                 >
                   New Plan
                 </button>
               </div>
-              <p className="mt-3 text-sm text-slate-400">
+              <p className="app-copy mt-3 text-sm">
                 Planning input is captured through a modal and added to the tactical board after generation.
               </p>
             </article>
@@ -367,22 +361,22 @@ export default function ManagementDashboard() {
 
         {activeTab !== "SIGNALS" ? (
         <section className="grid gap-5 lg:grid-cols-[1fr_0.34fr]">
-          <article className="rounded-2xl border border-slate-800 bg-[#0b1220] p-5">
-            <h3 className="mb-4 text-base font-semibold text-white">Current Tasks</h3>
+          <article className="app-card rounded-2xl border p-5">
+            <h3 className="app-heading mb-4 text-base font-semibold">Current Tasks</h3>
             {!latestPlan?.activities?.length ? (
-              <p className="text-sm text-slate-500">Generate a plan to populate tactical tasks.</p>
+              <p className="app-muted text-sm">Generate a plan to populate tactical tasks.</p>
             ) : (
               <div className="space-y-2">
                 {latestPlan.activities.map((task) => (
                   <div
                     key={`${task.title}-${task.week_target}`}
-                    className="grid gap-2 rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2 md:grid-cols-[1fr_auto_auto_auto]"
+                    className="app-card-subtle grid gap-2 rounded-lg border px-3 py-2 md:grid-cols-[1fr_auto_auto_auto]"
                   >
                     <div>
-                      <p className="text-sm font-semibold text-slate-200">{task.title}</p>
-                      <p className="text-xs text-slate-500">{task.rationale}</p>
+                      <p className="app-heading text-sm font-semibold">{task.title}</p>
+                      <p className="app-muted text-xs">{task.rationale}</p>
                     </div>
-                    <p className="text-xs text-slate-400">{task.owner}</p>
+                    <p className="app-copy text-xs">{task.owner}</p>
                     <p
                       className={`text-xs font-semibold ${
                         task.priority === "HIGH"
@@ -401,10 +395,10 @@ export default function ManagementDashboard() {
             )}
           </article>
 
-          <article className="rounded-2xl border border-slate-800 bg-[#0b1220] p-5">
-            <h3 className="text-sm font-semibold text-slate-200">Growth Velocity</h3>
+          <article className="app-card rounded-2xl border p-5">
+            <h3 className="app-heading text-sm font-semibold">Growth Velocity</h3>
             <p className="mt-3 text-4xl font-semibold text-blue-300">{growthVelocity}%</p>
-            <p className="mt-1 text-xs text-slate-500">Current execution momentum signal.</p>
+            <p className="app-muted mt-1 text-xs">Current execution momentum signal.</p>
             <div className="mt-4 flex gap-1.5">
               {[0, 1, 2, 3, 4].map((index) => (
                 <div
@@ -419,44 +413,44 @@ export default function ManagementDashboard() {
 
         {activeTab !== "PLANNER" ? (
         <section className="grid gap-5 lg:grid-cols-2">
-          <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
-            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
+          <article className="app-card rounded-2xl border p-5">
+            <h4 className="app-heading mb-3 flex items-center gap-2 text-sm font-semibold">
               <Users2 size={15} />
               Team Capability Snapshot
             </h4>
             {!activeWorkspace ? (
-              <p className="text-sm text-slate-500">Select a workspace to manage team members.</p>
+              <p className="app-muted text-sm">Select a workspace to manage team members.</p>
             ) : (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-slate-400">
+                  <p className="app-copy text-xs">
                     {(activeWorkspace.team_members || []).length} member(s) with persisted roles and qualifications.
                   </p>
                   <button
                     type="button"
                     onClick={openCreateTeamModal}
-                    className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-500"
+                    className="app-primary-btn inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition"
                   >
                     <UserPlus size={12} />
                     Add Member
                   </button>
                 </div>
                 {(activeWorkspace.team_members || []).length === 0 ? (
-                  <p className="text-sm text-slate-500">No team members added yet.</p>
+                  <p className="app-muted text-sm">No team members added yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {(activeWorkspace.team_members || []).map((member) => (
-                      <article key={member.member_id} className="rounded-lg border border-slate-700 bg-slate-900/40 p-3">
+                      <article key={member.member_id} className="app-card-subtle rounded-lg border p-3">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="text-sm font-semibold text-slate-200">{member.name}</p>
-                            <p className="text-xs text-slate-400">{member.role || "Role pending"}</p>
+                            <p className="app-heading text-sm font-semibold">{member.name}</p>
+                            <p className="app-copy text-xs">{member.role || "Role pending"}</p>
                           </div>
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
                               onClick={() => openEditTeamModal(member)}
-                              className="rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:border-slate-400"
+                              className="app-ghost-btn rounded-md border px-2 py-1 text-xs"
                             >
                               <span className="inline-flex items-center gap-1">
                                 <Pencil size={12} />
@@ -466,7 +460,7 @@ export default function ManagementDashboard() {
                             <button
                               type="button"
                               onClick={() => handleDeleteTeamMember(member.member_id)}
-                              className="rounded-md border border-rose-500/60 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10"
+                              className="app-status-danger rounded-md border border-rose-500/60 px-2 py-1 text-xs"
                             >
                               <span className="inline-flex items-center gap-1">
                                 <Trash2 size={12} />
@@ -476,7 +470,7 @@ export default function ManagementDashboard() {
                           </div>
                         </div>
                         {member.qualifications?.length ? (
-                          <p className="mt-2 text-xs text-slate-400">{member.qualifications.join(", ")}</p>
+                          <p className="app-copy mt-2 text-xs">{member.qualifications.join(", ")}</p>
                         ) : null}
                       </article>
                     ))}
@@ -486,19 +480,19 @@ export default function ManagementDashboard() {
             )}
           </article>
 
-          <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
-            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
+          <article className="app-card rounded-2xl border p-5">
+            <h4 className="app-heading mb-3 flex items-center gap-2 text-sm font-semibold">
               <TrendingUp size={15} />
               Plan History
             </h4>
             {planHistory.length === 0 ? (
-              <p className="text-sm text-slate-500">No plan runs yet.</p>
+              <p className="app-muted text-sm">No plan runs yet.</p>
             ) : (
               <div className="space-y-2">
                 {planHistory.slice(0, 6).map((item) => (
-                  <div key={item.plan_id} className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2">
-                    <p className="text-sm font-semibold text-slate-200">{item.objective}</p>
-                    <p className="text-xs text-slate-500">{new Date(item.created_at).toLocaleString()}</p>
+                  <div key={item.plan_id} className="app-card-subtle rounded-lg border px-3 py-2">
+                    <p className="app-heading text-sm font-semibold">{item.objective}</p>
+                    <p className="app-muted text-xs">{new Date(item.created_at).toLocaleString()}</p>
                   </div>
                 ))}
               </div>
@@ -509,17 +503,17 @@ export default function ManagementDashboard() {
 
         {activeTab !== "HOME" ? (
         <section className="grid gap-5 lg:grid-cols-2">
-          <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
-            <h4 className="mb-3 text-sm font-semibold text-slate-200">Execution Calendar</h4>
+          <article className="app-card rounded-2xl border p-5">
+            <h4 className="app-heading mb-3 text-sm font-semibold">Execution Calendar</h4>
             {executionCalendar.length === 0 ? (
-              <p className="text-sm text-slate-500">Generate a plan to populate the execution calendar.</p>
+              <p className="app-muted text-sm">Generate a plan to populate the execution calendar.</p>
             ) : (
               <div className="grid gap-2 md:grid-cols-2">
                 {executionCalendar.map((item) => (
-                  <div key={item.id} className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2">
-                    <p className="text-sm font-semibold text-slate-200">{item.title}</p>
-                    <p className="text-xs text-slate-400">Owner: {item.owner}</p>
-                    <p className="text-xs text-slate-500">Due: {item.dueDate.toLocaleDateString()}</p>
+                  <div key={item.id} className="app-card-subtle rounded-lg border px-3 py-2">
+                    <p className="app-heading text-sm font-semibold">{item.title}</p>
+                    <p className="app-copy text-xs">Owner: {item.owner}</p>
+                    <p className="app-muted text-xs">Due: {item.dueDate.toLocaleDateString()}</p>
                     <p
                       className={`mt-1 text-xs font-semibold ${
                         item.priority === "HIGH"
@@ -536,10 +530,10 @@ export default function ManagementDashboard() {
               </div>
             )}
           </article>
-          <article className="rounded-2xl border border-slate-800 bg-[#0d1525] p-5">
-            <h4 className="mb-3 text-sm font-semibold text-slate-200">Agent Activity Stream</h4>
+          <article className="app-card rounded-2xl border p-5">
+            <h4 className="app-heading mb-3 text-sm font-semibold">Agent Activity Stream</h4>
             {agentEvents.length === 0 ? (
-              <p className="text-sm text-slate-500">No agent events yet. Trigger an action to start streaming.</p>
+              <p className="app-muted text-sm">No agent events yet. Trigger an action to start streaming.</p>
             ) : (
               <div className="space-y-2">
                 {agentEvents.slice(0, 12).map((event, index) => (
@@ -548,7 +542,7 @@ export default function ManagementDashboard() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.24, delay: index * 0.02 }}
-                    className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2"
+                    className="app-card-subtle rounded-lg border px-3 py-2"
                   >
                     <div className="flex items-center gap-2">
                       <motion.span
@@ -562,10 +556,10 @@ export default function ManagementDashboard() {
                             : "bg-blue-400"
                         }`}
                       />
-                      <p className="text-xs font-semibold text-slate-200">{event.phase}</p>
-                      <p className="text-[11px] text-slate-500">{new Date(event.timestamp).toLocaleTimeString()}</p>
+                      <p className="app-heading text-xs font-semibold">{event.phase}</p>
+                      <p className="app-muted text-[11px]">{new Date(event.timestamp).toLocaleTimeString()}</p>
                     </div>
-                    <p className="mt-1 text-xs text-slate-400">{event.message}</p>
+                    <p className="app-copy mt-1 text-xs">{event.message}</p>
                   </motion.div>
                 ))}
               </div>
