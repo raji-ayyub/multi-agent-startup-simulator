@@ -3,6 +3,7 @@ import { Archive, Building2, Pencil, Sparkles, Trash2, TrendingUp, UserPlus, Use
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useLocation } from "react-router-dom";
+import { listActiveAgents } from "../../services/agentService";
 import { useAuthStore } from "../../store/authStore";
 import useManagementStore from "../../store/managementStore";
 import ActivityPlanModal from "../../components/management/ActivityPlanModal";
@@ -54,6 +55,7 @@ export default function ManagementDashboard() {
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState(null);
   const [teamDraft, setTeamDraft] = useState(defaultTeamDraft);
+  const [approvedManagementAgents, setApprovedManagementAgents] = useState([]);
   const activeTab = useMemo(() => {
     if (location.pathname.startsWith("/management/planner")) return "PLANNER";
     if (location.pathname.startsWith("/management/signals")) return "SIGNALS";
@@ -65,6 +67,18 @@ export default function ManagementDashboard() {
       fetchWorkspaces(user.email);
     }
   }, [fetchWorkspaces, user?.email]);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const items = await listActiveAgents();
+        setApprovedManagementAgents(items.filter((item) => item.workspace_mode === "management"));
+      } catch {
+        setApprovedManagementAgents([]);
+      }
+    };
+    run();
+  }, []);
 
   useEffect(() => {
     if (!activeWorkspace) {
@@ -355,6 +369,25 @@ export default function ManagementDashboard() {
               <p className="app-copy mt-3 text-sm">
                 Planning input is captured through a modal and added to the tactical board after generation.
               </p>
+            </article>
+
+            <article className="app-card-alt rounded-2xl border p-5">
+              <div className="flex items-center justify-between">
+                <h3 className="app-heading text-base font-semibold">Management Agents</h3>
+                <span className="app-muted text-xs">{approvedManagementAgents.length} approved</span>
+              </div>
+              {approvedManagementAgents.length === 0 ? (
+                <p className="app-muted mt-3 text-sm">No approved management agents yet. Use Agent Hub to request reporting, calendar, or talent support.</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {approvedManagementAgents.slice(0, 3).map((agent) => (
+                    <div key={agent.request_id} className="app-card-subtle rounded-lg border px-3 py-2">
+                      <p className="app-heading text-sm font-semibold">{agent.title}</p>
+                      <p className="app-copy text-xs">{agent.admin_notes || agent.notes}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </article>
           </div>
         </div>

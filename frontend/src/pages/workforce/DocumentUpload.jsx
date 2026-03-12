@@ -16,6 +16,9 @@ export default function DocumentUpload() {
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "text/plain",
+    "text/markdown",
+    "application/rtf",
+    "text/rtf",
   ];
 
   const handleFileChange = (e) => {
@@ -23,7 +26,7 @@ export default function DocumentUpload() {
     if (!selected) return;
 
     if (!allowedTypes.includes(selected.type)) {
-      setError("Only PDF, DOC, DOCX, or TXT files are allowed.");
+      setError("Only PDF, DOC, DOCX, TXT, MD, or RTF files are allowed.");
       setFile(null);
       return;
     }
@@ -76,7 +79,7 @@ export default function DocumentUpload() {
 
       <input
         type="file"
-        accept=".pdf,.doc,.docx,.txt"
+        accept=".pdf,.doc,.docx,.txt,.md,.rtf"
         onChange={handleFileChange}
         className="theme-input w-full rounded-xl border px-4 py-3"
         disabled={loading}

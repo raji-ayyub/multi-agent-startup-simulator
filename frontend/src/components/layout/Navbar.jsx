@@ -1,16 +1,22 @@
-import { useState } from "react";
-import { Bell } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bell, Bot, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import useSimulationStore from "../../store/simulationStore";
 import { useAuthStore } from "../../store/authStore";
+import useNotificationStore from "../../store/notificationStore";
 
 export default function Navbar() {
   const { overallScore } = useSimulationStore();
   const { user, logout } = useAuthStore();
+  const { items, unreadCount, fetchNotifications, markOneRead } = useNotificationStore();
   const navigate = useNavigate();
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+
+  useEffect(() => {
+    fetchNotifications({ limit: 6 });
+  }, [fetchNotifications]);
 
   const handleLogout = () => {
     logout();
@@ -23,7 +29,9 @@ export default function Navbar() {
         <h2 className="truncate text-sm font-semibold sm:text-base lg:text-lg">
           Multi-Agent Strategy Simulator
         </h2>
-        <p className="app-copy hidden text-xs sm:block">Strategic Intelligence for Founders</p>
+        <p className="app-copy hidden text-xs sm:block">
+          {user?.role === "OPERATOR" ? "Strategic intelligence for operating teams" : "Strategic intelligence for founders"}
+        </p>
       </div>
 
       <div className="relative flex items-center gap-2 sm:gap-4">
@@ -40,30 +48,80 @@ export default function Navbar() {
           </div>
         )}
 
+        <button
+          type="button"
+          onClick={() => navigate("/agents")}
+          className="app-ghost-btn hidden rounded-lg border p-2 transition sm:inline-flex"
+          aria-label="Agent Hub"
+        >
+          <Bot size={18} />
+        </button>
+        {user?.role === "ADMIN" ? (
+          <button
+            type="button"
+            onClick={() => navigate("/admin/dashboard")}
+            className="app-ghost-btn hidden rounded-lg border p-2 transition sm:inline-flex"
+            aria-label="Admin Dashboard"
+          >
+            <ShieldCheck size={18} />
+          </button>
+        ) : null}
+
         <div className="relative">
           <button
             onClick={() => {
               setShowNotifications(!showNotifications);
               setShowUserMenu(false);
+              if (!showNotifications) {
+                fetchNotifications({ limit: 6 });
+              }
             }}
             className="app-ghost-btn relative rounded-lg border p-2 transition"
           >
             <Bell size={20} />
-            <span className="absolute -top-1 -right-1 rounded-full bg-red-500 px-1.5 text-xs text-white">
-              2
-            </span>
+            {unreadCount > 0 ? (
+              <span className="absolute -top-1 -right-1 rounded-full bg-red-500 px-1.5 text-xs text-white">
+                {unreadCount}
+              </span>
+            ) : null}
           </button>
 
           {showNotifications && (
             <div className="app-dropdown absolute right-0 z-50 mt-3 w-[min(18rem,calc(100vw-1.25rem))] rounded-xl border shadow-xl">
               <div className="app-divider border-b p-4 font-medium">Notifications</div>
               <div className="app-copy p-4 space-y-3 text-sm">
-                <p>Simulation completed successfully</p>
-                <p>Document analysis ready</p>
+                {items.length === 0 ? (
+                  <p>No notifications yet.</p>
+                ) : (
+                  items.slice(0, 4).map((item) => (
+                    <button
+                      key={item.notification_id}
+                      type="button"
+                      onClick={async () => {
+                        if (!item.is_read) {
+                          await markOneRead(item.notification_id);
+                        }
+                        setShowNotifications(false);
+                        navigate(item.link || "/notifications");
+                      }}
+                      className="block w-full text-left"
+                    >
+                      <p className="text-sm font-medium">{item.title}</p>
+                      <p className="app-muted text-xs">{item.message}</p>
+                    </button>
+                  ))
+                )}
               </div>
-              <div className="app-dropdown-item cursor-pointer rounded-b-xl p-3 text-center text-indigo-400">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNotifications(false);
+                  navigate("/notifications");
+                }}
+                className="app-dropdown-item w-full cursor-pointer rounded-b-xl p-3 text-center text-indigo-400"
+              >
                 View All
-              </div>
+              </button>
             </div>
           )}
         </div>
@@ -87,9 +145,17 @@ export default function Navbar() {
               <button onClick={() => navigate("/profile")} className="app-dropdown-item w-full rounded-t-xl px-4 py-3 text-left">
                 Profile
               </button>
+              <button onClick={() => navigate("/agents")} className="app-dropdown-item w-full px-4 py-3 text-left">
+                Agent Hub
+              </button>
               <button onClick={() => navigate("/settings")} className="app-dropdown-item w-full px-4 py-3 text-left">
                 Settings
               </button>
+              {user?.role === "ADMIN" ? (
+                <button onClick={() => navigate("/admin/dashboard")} className="app-dropdown-item w-full px-4 py-3 text-left">
+                  Admin Dashboard
+                </button>
+              ) : null}
               <div className="app-divider border-t" />
               <button onClick={handleLogout} className="app-dropdown-item w-full rounded-b-xl px-4 py-3 text-left text-red-400">
                 Logout

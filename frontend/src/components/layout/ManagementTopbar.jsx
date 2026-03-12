@@ -1,6 +1,9 @@
+import { useEffect } from "react";
 import { Bell, Building2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import useManagementStore from "../../store/managementStore";
+import useNotificationStore from "../../store/notificationStore";
 
 const initials = (name) =>
   String(name || "U")
@@ -13,7 +16,14 @@ const initials = (name) =>
 export default function ManagementTopbar() {
   const { user } = useAuthStore();
   const { isLoading, isSaving, isPlanning } = useManagementStore();
+  const { unreadCount, fetchNotifications } = useNotificationStore();
+  const navigate = useNavigate();
   const agentBusy = isLoading || isSaving || isPlanning;
+
+  useEffect(() => {
+    fetchNotifications({ limit: 6 });
+  }, [fetchNotifications]);
+
   return (
     <header className="app-topbar management-shell min-h-16 border-b border-slate-800 bg-[#060d16] px-3 py-2 sm:px-5 lg:px-8">
       <div className="flex h-full items-center justify-between">
@@ -32,9 +42,13 @@ export default function ManagementTopbar() {
           <button
             type="button"
             aria-label="Notifications"
-            className="app-avatar-shell flex h-8 w-8 items-center justify-center rounded-full border"
+            onClick={() => navigate("/notifications")}
+            className="app-avatar-shell relative flex h-8 w-8 items-center justify-center rounded-full border"
           >
             <Bell size={15} />
+            {unreadCount > 0 ? (
+              <span className="absolute ml-4 -mt-5 rounded-full bg-rose-500 px-1.5 text-[10px] text-white">{unreadCount}</span>
+            ) : null}
           </button>
           <button
             type="button"

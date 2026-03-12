@@ -9,7 +9,7 @@ import openai
 import pdfplumber
 
 
-ALLOWED_CV_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".csv", ".json", ".log", ".rtf"}
+ALLOWED_CV_EXTENSIONS = {".pdf", ".doc", ".docx", ".txt", ".md", ".csv", ".json", ".log", ".rtf"}
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 client = openai.OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
@@ -34,6 +34,13 @@ def _extract_text_docx(file_path: str) -> str:
     return docx2txt.process(file_path) or ""
 
 
+def _extract_text_doc(file_path: str) -> str:
+    with open(file_path, "rb") as handle:
+        raw = handle.read()
+    decoded = raw.decode("utf-8", errors="ignore") or raw.decode("latin-1", errors="ignore")
+    return re.sub(r"[\x00-\x08\x0b-\x1f]+", " ", decoded)
+
+
 def _extract_text_plain(file_path: str) -> str:
     with open(file_path, "r", encoding="utf-8", errors="ignore") as handle:
         return handle.read()
@@ -54,6 +61,8 @@ def extract_cv_text(file_name: str, raw_bytes: bytes) -> Tuple[str, str]:
             text = _extract_text_pdf(temp_path)
         elif extension == ".docx":
             text = _extract_text_docx(temp_path)
+        elif extension == ".doc":
+            text = _extract_text_doc(temp_path)
         else:
             text = _extract_text_plain(temp_path)
         return text, extension

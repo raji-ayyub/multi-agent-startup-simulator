@@ -21,8 +21,14 @@ const methodology = [
 ];
 
 export default function About() {
-  const { isAuthenticated } = useAuthStore();
-  const ctaHref = isAuthenticated ? "/dashboard" : "/signup";
+  const { isAuthenticated, user } = useAuthStore();
+  const ctaHref = isAuthenticated
+    ? user?.role === "OPERATOR"
+      ? "/management"
+      : user?.role === "ADMIN"
+      ? "/admin/dashboard"
+      : "/dashboard"
+    : "/signup";
 
   return (
     <div className="marketing-page min-h-screen">

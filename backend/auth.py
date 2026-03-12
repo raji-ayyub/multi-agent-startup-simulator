@@ -2,12 +2,14 @@ import os
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
+
+from database import get_db
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from models import User
+from models import User, UserAccessProfile
 from schemas import TokenData
 
 # Password hashing
@@ -64,7 +66,7 @@ def verify_token(token: str) -> Optional[str]:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(None)
+    db: Session = Depends(get_db),
 ) -> User:
     """Get the current authenticated user from the JWT token."""
     token = credentials.credentials
@@ -78,17 +80,67 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token_data = TokenData(email=email)
-
-    if token_data.email is None:
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Note: db will be properly injected in the route
-    return token_data
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive.",
+        )
+
+    return user
+
+
+def get_or_create_access_profile(
+    db: Session,
+    user: User,
+    default_role: str = "FOUNDER",
+) -> UserAccessProfile:
+    profile = db.query(UserAccessProfile).filter(UserAccessProfile.user_id == user.id).first()
+    if profile:
+        return profile
+
+    profile = UserAccessProfile(
+        user_id=user.id,
+        role=(default_role or "FOUNDER").upper(),
+        title="",
+    )
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def get_current_token_data(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TokenData:
+    profile = get_or_create_access_profile(db, current_user)
+    return TokenData(email=current_user.email, role=profile.role)
+
+
+def require_roles(*roles: str):
+    allowed_roles = {role.upper() for role in roles}
+
+    def dependency(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> User:
+        profile = get_or_create_access_profile(db, current_user)
+        if profile.role.upper() not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to this resource.",
+            )
+        return current_user
+
+    return dependency
 
 
 def generate_password_reset_token() -> str:

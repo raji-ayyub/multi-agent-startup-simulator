@@ -3,8 +3,10 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from auth import get_current_user, get_or_create_access_profile
 from database import get_db
-from models import SimulationRun
+from models import SimulationRun, User
+from platform_service import create_notification
 from .schemas import (
     SimulationIntakeTurnRequest,
     SimulationIntakeTurnResponse,
@@ -75,10 +77,25 @@ def simulation_intake_turn(payload: SimulationIntakeTurnRequest):
 
 
 @simulation_router.post("/run", response_model=SimulationRunResponse)
-def run_simulation_endpoint(payload: SimulationRunRequest, db: Session = Depends(get_db)):
+def run_simulation_endpoint(
+    payload: SimulationRunRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
-        result = run_simulation(payload)
-        _persist_simulation_run(db, payload, result)
+        scoped_payload = payload.model_copy(update={"owner_email": current_user.email})
+        result = run_simulation(scoped_payload)
+        _persist_simulation_run(db, scoped_payload, result)
+        create_notification(
+            db,
+            category="SIMULATION",
+            title="Simulation completed",
+            message=f"{result.startup_name} finished with score {result.overall_score}/100.",
+            link="/simulation/results",
+            target_user_id=current_user.id,
+            metadata={"simulation_id": result.simulation_id},
+        )
+        db.commit()
         return result
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Simulation failed: {str(exc)}")
@@ -89,10 +106,14 @@ def list_simulations(
     email: str | None = Query(default=None),
     limit: int = Query(default=25, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    profile = get_or_create_access_profile(db, current_user)
     query = db.query(SimulationRun)
-    if email:
+    if profile.role.upper() == "ADMIN" and email:
         query = query.filter(SimulationRun.owner_email == email)
+    elif profile.role.upper() != "ADMIN":
+        query = query.filter(SimulationRun.owner_email == current_user.email)
 
     rows = query.order_by(SimulationRun.created_at.desc()).limit(limit).all()
     return [
@@ -109,10 +130,17 @@ def list_simulations(
 
 
 @simulation_router.get("/{simulation_id}", response_model=SimulationRunDetail)
-def get_simulation(simulation_id: str, db: Session = Depends(get_db)):
+def get_simulation(
+    simulation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     row = db.query(SimulationRun).filter(SimulationRun.id == simulation_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Simulation not found.")
+    profile = get_or_create_access_profile(db, current_user)
+    if profile.role.upper() != "ADMIN" and row.owner_email != current_user.email:
+        raise HTTPException(status_code=403, detail="You do not have access to this simulation.")
 
     return SimulationRunDetail(
         simulation_id=row.id,
@@ -134,15 +162,19 @@ def rerun_simulation(
     simulation_id: str,
     payload: SimulationRerunRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     original = db.query(SimulationRun).filter(SimulationRun.id == simulation_id).first()
     if not original:
         raise HTTPException(status_code=404, detail="Simulation not found.")
+    profile = get_or_create_access_profile(db, current_user)
+    if profile.role.upper() != "ADMIN" and original.owner_email != current_user.email:
+        raise HTTPException(status_code=403, detail="You do not have access to this simulation.")
 
     base_payload = original.input_payload or {}
     overrides = payload.model_dump(exclude_none=True)
     run_as_new_version = bool(overrides.pop("run_as_new_version", False))
-    merged = {**base_payload, **overrides}
+    merged = {**base_payload, **overrides, "owner_email": current_user.email}
 
     if run_as_new_version:
         merged["startup_name"] = _next_versioned_startup_name(
@@ -155,16 +187,33 @@ def rerun_simulation(
         run_payload = SimulationRunRequest.model_validate(merged)
         result = run_simulation(run_payload)
         _persist_simulation_run(db, run_payload, result)
+        create_notification(
+            db,
+            category="SIMULATION",
+            title="Simulation rerun completed",
+            message=f"{result.startup_name} rerun finished with score {result.overall_score}/100.",
+            link="/simulation/results",
+            target_user_id=current_user.id,
+            metadata={"simulation_id": result.simulation_id},
+        )
+        db.commit()
         return result
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Simulation rerun failed: {str(exc)}")
 
 
 @simulation_router.delete("/{simulation_id}")
-def delete_simulation(simulation_id: str, db: Session = Depends(get_db)):
+def delete_simulation(
+    simulation_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     row = db.query(SimulationRun).filter(SimulationRun.id == simulation_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Simulation not found.")
+    profile = get_or_create_access_profile(db, current_user)
+    if profile.role.upper() != "ADMIN" and row.owner_email != current_user.email:
+        raise HTTPException(status_code=403, detail="You do not have access to this simulation.")
 
     db.delete(row)
     db.commit()

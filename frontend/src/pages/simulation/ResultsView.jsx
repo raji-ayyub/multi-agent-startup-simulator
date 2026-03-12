@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { BarChart3, Download, Pencil, Rocket, Trash2, TrendingUp, Users, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
 import useSimulationStore from "../../store/simulationStore";
@@ -17,6 +17,7 @@ const confidenceLabel = (score) => {
 };
 
 export default function ResultsView() {
+  const navigate = useNavigate();
   const {
     fetchSimulations,
     fetchSimulationDetail,
@@ -239,9 +240,13 @@ export default function ResultsView() {
               <p className="app-sim-accent-soft mt-1 inline-flex rounded border px-2 py-1 text-[11px] font-semibold">{confidenceLabel(score)}</p>
               <h2 className="app-heading mt-2 text-5xl font-bold">{score >= 65 ? "PROCEED TO SEED" : "ITERATE BEFORE SCALE"}</h2>
             </div>
-            <button type="button" className="app-sim-accent-soft inline-flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold">
+            <button
+              type="button"
+              onClick={() => navigate(`/reports?simulation=${activeSimulation.simulation_id}`)}
+              className="app-sim-accent-soft inline-flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold"
+            >
               <Download size={16} />
-              Download Full Strategy Deck
+              Generate Full Strategy Deck
             </button>
           </div>
           <p className="app-copy mt-3 text-sm">{activeSimulation.synthesis}</p>
