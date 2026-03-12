@@ -1,4 +1,4 @@
-import { Bell, BriefcaseBusiness, ClipboardList, LineChart, Settings, UserCircle2 } from "lucide-react";
+import { Bell, Bot, BriefcaseBusiness, CalendarDays, ClipboardList, FileText, LineChart, Settings, UserCircle2 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import ModeSwitch from "./ModeSwitch";
@@ -7,9 +7,12 @@ const menuItems = [
   { title: "Management Home", icon: BriefcaseBusiness, path: "/management", end: true },
   { title: "Activity Planner", icon: ClipboardList, path: "/management/planner", end: true },
   { title: "Execution Signals", icon: LineChart, path: "/management/signals", end: true },
+  { title: "Reports", icon: FileText, path: "/reports", end: true },
+  { title: "Calendar", icon: CalendarDays, path: "/calendar", end: true },
 ];
 
 const systemItems = [
+  { title: "Agent Hub", icon: Bot, path: "/agents" },
   { title: "Notifications", icon: Bell, path: "/notifications" },
   { title: "Settings", icon: Settings, path: "/settings" },
 ];
@@ -66,7 +69,7 @@ export default function ManagementSidebar() {
           </div>
           <div>
             <p className="app-heading text-sm font-medium">{user?.fullName || user?.name || "Olivia Trent"}</p>
-            <p className="app-muted text-xs">Operations Lead</p>
+            <p className="app-muted text-xs">{user?.title || (user?.role === "FOUNDER" ? "Founder" : "Operator")}</p>
           </div>
         </div>
       </div>

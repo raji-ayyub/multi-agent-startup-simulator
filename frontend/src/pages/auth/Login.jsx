@@ -19,9 +19,9 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const success = await login(formData);
-    if (success) {
-      navigate("/dashboard");
+    const result = await login(formData);
+    if (result?.ok) {
+      navigate(result.route);
     }
   };
 
@@ -104,6 +104,12 @@ export default function Login() {
           Don't have an account?{" "}
           <Link to="/signup" className="auth-link hover:underline">
             Sign up
+          </Link>
+        </div>
+        <div className="auth-deep-subtitle mt-2 text-center text-[11px]">
+          Need a governance workspace?{" "}
+          <Link to="/admin/setup" className="auth-link hover:underline">
+            Private admin setup
           </Link>
         </div>
 

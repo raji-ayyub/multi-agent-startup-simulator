@@ -1,15 +1,17 @@
-import { Bell, BarChart3, LayoutDashboard, Settings, Sparkles, UserCircle2 } from "lucide-react";
+import { Bell, Bot, BarChart3, CalendarDays, LayoutDashboard, Settings, Sparkles, UserCircle2 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import ModeSwitch from "./ModeSwitch";
 
 const menuItems = [
   { title: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { title: "Simulations", icon: Sparkles, path: "/simulation" },
-  { title: "Reports", icon: BarChart3, path: "/simulation/results" },
+  { title: "Simulations", icon: Sparkles, path: "/simulation/results" },
+  { title: "Reports", icon: BarChart3, path: "/reports" },
+  { title: "Calendar", icon: CalendarDays, path: "/calendar" },
 ];
 
 const systemItems = [
+  { title: "Agent Hub", icon: Bot, path: "/agents" },
   { title: "Notifications", icon: Bell, path: "/notifications" },
   { title: "Settings", icon: Settings, path: "/settings" },
 ];
@@ -64,7 +66,7 @@ export default function Sidebar() {
           </div>
           <div>
             <p className="app-heading text-sm font-medium">{user?.fullName || user?.name || "Olivia Trent"}</p>
-            <p className="app-muted text-xs">Dev Lead</p>
+            <p className="app-muted text-xs">{user?.title || (user?.role === "OPERATOR" ? "Operator" : "Founder")}</p>
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
+from auth import get_current_user, get_or_create_access_profile
 from database import get_db
 from models import (
     ManagementActivityMonitor,
@@ -10,6 +11,7 @@ from models import (
     ManagementPlanRun,
     ManagementTeamMember,
     ManagementWorkspace,
+    User,
 )
 from .schemas import (
     ManagementActivityPlanRequest,
@@ -26,6 +28,7 @@ from .schemas import (
     ManagementWorkspaceUpdate,
 )
 from .cv_parser import extract_cv_text, parse_cv_profile
+from platform_service import create_notification
 from .service import (
     build_agent_memory_context,
     compute_monitor_signal_score,
@@ -94,6 +97,12 @@ def _persist_plan_monitor_items(db: Session, workspace_id: str, plan_run: Manage
         db.add(monitor)
 
 
+def _ensure_workspace_access(db: Session, current_user: User, workspace: ManagementWorkspace):
+    profile = get_or_create_access_profile(db, current_user)
+    if profile.role.upper() != "ADMIN" and workspace.owner_email != current_user.email:
+        raise HTTPException(status_code=403, detail="You do not have access to this workspace.")
+
+
 @management_router.post("/cv/parse", response_model=ManagementCvParseResponse)
 async def parse_management_cv(file: UploadFile = File(...)):
     file_name = file.filename or "cv-upload"
@@ -114,9 +123,13 @@ async def parse_management_cv(file: UploadFile = File(...)):
 
 
 @management_router.post("/workspaces", response_model=ManagementWorkspaceResponse)
-def create_management_workspace(payload: ManagementWorkspaceCreate, db: Session = Depends(get_db)):
+def create_management_workspace(
+    payload: ManagementWorkspaceCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     workspace = ManagementWorkspace(
-        owner_email=payload.owner_email,
+        owner_email=current_user.email,
         company_name=payload.company_name.strip(),
         workspace_name=payload.workspace_name.strip(),
         description=(payload.description or "").strip(),
@@ -145,6 +158,16 @@ def create_management_workspace(payload: ManagementWorkspaceCreate, db: Session 
         db.commit()
         db.refresh(workspace)
 
+    create_notification(
+        db,
+        category="WORKSPACE",
+        title="Management workspace ready",
+        message=f"{workspace.workspace_name} is ready for planning and agent operations.",
+        link="/management",
+        target_user_id=current_user.id,
+        metadata={"workspace_id": workspace.id},
+    )
+    db.commit()
     return serialize_workspace(workspace)
 
 
@@ -153,10 +176,13 @@ def list_management_workspaces(
     owner_email: str = Query(..., min_length=5),
     limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    profile = get_or_create_access_profile(db, current_user)
+    scoped_email = owner_email if profile.role.upper() == "ADMIN" else current_user.email
     rows = (
         db.query(ManagementWorkspace)
-        .filter(ManagementWorkspace.owner_email == owner_email)
+        .filter(ManagementWorkspace.owner_email == scoped_email)
         .order_by(ManagementWorkspace.updated_at.desc())
         .limit(limit)
         .all()
@@ -165,10 +191,15 @@ def list_management_workspaces(
 
 
 @management_router.get("/workspaces/{workspace_id}", response_model=ManagementWorkspaceResponse)
-def get_management_workspace(workspace_id: str, db: Session = Depends(get_db)):
+def get_management_workspace(
+    workspace_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     row = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == workspace_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Management workspace not found.")
+    _ensure_workspace_access(db, current_user, row)
     return serialize_workspace(row)
 
 
@@ -177,10 +208,12 @@ def update_management_workspace(
     workspace_id: str,
     payload: ManagementWorkspaceUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     row = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == workspace_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Management workspace not found.")
+    _ensure_workspace_access(db, current_user, row)
 
     updates = payload.model_dump(exclude_none=True)
     if "workspace_name" in updates:
@@ -209,10 +242,15 @@ def update_management_workspace(
     "/workspaces/{workspace_id}/team",
     response_model=list[ManagementTeamMemberResponse],
 )
-def list_workspace_team_members(workspace_id: str, db: Session = Depends(get_db)):
+def list_workspace_team_members(
+    workspace_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     workspace = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == workspace_id).first()
     if not workspace:
         raise HTTPException(status_code=404, detail="Management workspace not found.")
+    _ensure_workspace_access(db, current_user, workspace)
     return serialize_workspace(workspace).get("team_members", [])
 
 
@@ -224,10 +262,12 @@ def add_workspace_team_member(
     workspace_id: str,
     payload: ManagementTeamMemberCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     workspace = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == workspace_id).first()
     if not workspace:
         raise HTTPException(status_code=404, detail="Management workspace not found.")
+    _ensure_workspace_access(db, current_user, workspace)
 
     row = ManagementTeamMember(
         workspace_id=workspace_id,
@@ -239,6 +279,15 @@ def add_workspace_team_member(
     db.add(row)
     db.flush()
     _persist_team_member_memory(db, row)
+    create_notification(
+        db,
+        category="TEAM",
+        title="Team member added",
+        message=f"{row.name} was added to {workspace.workspace_name}.",
+        link="/management",
+        target_user_id=current_user.id,
+        metadata={"workspace_id": workspace.id, "member_id": row.id},
+    )
     db.commit()
     db.refresh(row)
     return ManagementTeamMemberResponse(
@@ -261,6 +310,7 @@ def update_workspace_team_member(
     member_id: str,
     payload: ManagementTeamMemberUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     row = (
         db.query(ManagementTeamMember)
@@ -269,6 +319,10 @@ def update_workspace_team_member(
     )
     if not row:
         raise HTTPException(status_code=404, detail="Team member not found.")
+    workspace = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Management workspace not found.")
+    _ensure_workspace_access(db, current_user, workspace)
 
     updates = payload.model_dump(exclude_none=True)
     if "name" in updates:
@@ -283,6 +337,15 @@ def update_workspace_team_member(
     db.add(row)
     db.flush()
     _persist_team_member_memory(db, row)
+    create_notification(
+        db,
+        category="TEAM",
+        title="Team member updated",
+        message=f"{row.name}'s management profile was updated.",
+        link="/management",
+        target_user_id=current_user.id,
+        metadata={"workspace_id": workspace_id, "member_id": row.id},
+    )
     db.commit()
     db.refresh(row)
     return ManagementTeamMemberResponse(
@@ -301,7 +364,12 @@ def delete_workspace_team_member(
     workspace_id: str,
     member_id: str,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    workspace = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Management workspace not found.")
+    _ensure_workspace_access(db, current_user, workspace)
     row = (
         db.query(ManagementTeamMember)
         .filter(ManagementTeamMember.workspace_id == workspace_id, ManagementTeamMember.id == member_id)
@@ -311,6 +379,15 @@ def delete_workspace_team_member(
         raise HTTPException(status_code=404, detail="Team member not found.")
 
     db.delete(row)
+    create_notification(
+        db,
+        category="TEAM",
+        title="Team member removed",
+        message=f"{row.name} was removed from {workspace.workspace_name}.",
+        link="/management",
+        target_user_id=current_user.id,
+        metadata={"workspace_id": workspace.id, "member_id": member_id},
+    )
     db.commit()
     return {"status": "deleted", "member_id": member_id}
 
@@ -323,10 +400,12 @@ def generate_workspace_plan(
     workspace_id: str,
     payload: ManagementActivityPlanRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     row = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == workspace_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="Management workspace not found.")
+    _ensure_workspace_access(db, current_user, row)
 
     memory_rows = (
         db.query(ManagementAgentMemory)
@@ -371,6 +450,15 @@ def generate_workspace_plan(
     )
     row.updated_at = datetime.utcnow()
     db.add(row)
+    create_notification(
+        db,
+        category="PLAN",
+        title="Management plan generated",
+        message=f"A new activity plan was generated for {row.workspace_name}.",
+        link="/management/planner",
+        target_user_id=current_user.id,
+        metadata={"workspace_id": row.id, "plan_id": plan_run.id},
+    )
     db.commit()
     db.refresh(plan_run)
     return ManagementActivityPlanResponse(**serialize_plan_run(plan_run))
@@ -384,10 +472,12 @@ def list_workspace_plans(
     workspace_id: str,
     limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     workspace = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == workspace_id).first()
     if not workspace:
         raise HTTPException(status_code=404, detail="Management workspace not found.")
+    _ensure_workspace_access(db, current_user, workspace)
 
     rows = (
         db.query(ManagementPlanRun)
@@ -407,10 +497,12 @@ def list_workspace_memory(
     workspace_id: str,
     limit: int = Query(default=30, ge=1, le=200),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     workspace = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == workspace_id).first()
     if not workspace:
         raise HTTPException(status_code=404, detail="Management workspace not found.")
+    _ensure_workspace_access(db, current_user, workspace)
 
     rows = (
         db.query(ManagementAgentMemory)
@@ -431,10 +523,12 @@ def list_workspace_monitor(
     status: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     workspace = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == workspace_id).first()
     if not workspace:
         raise HTTPException(status_code=404, detail="Management workspace not found.")
+    _ensure_workspace_access(db, current_user, workspace)
 
     query = db.query(ManagementActivityMonitor).filter(ManagementActivityMonitor.workspace_id == workspace_id)
     if status:
@@ -453,7 +547,12 @@ def update_monitor_item(
     item_id: str,
     payload: ManagementMonitorUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    workspace = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Management workspace not found.")
+    _ensure_workspace_access(db, current_user, workspace)
     row = (
         db.query(ManagementActivityMonitor)
         .filter(ManagementActivityMonitor.workspace_id == workspace_id, ManagementActivityMonitor.id == item_id)

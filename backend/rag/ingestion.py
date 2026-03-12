@@ -13,6 +13,7 @@ from psycopg2 import pool, DatabaseError, OperationalError
 from psycopg2.extras import execute_values
 import openai
 import pdfplumber
+import docx2txt
 
 
 
@@ -150,7 +151,7 @@ def validate_file(file_path: str, max_size_mb: int = 100) -> Tuple[bool, str]:
     if file_size_mb > max_size_mb:
         return False, f"File size {file_size_mb:.2f} MB exceeds limit of {max_size_mb} MB"
     
-    allowed_extensions = {'.pdf', '.txt', '.md'}
+    allowed_extensions = {'.pdf', '.doc', '.docx', '.txt', '.md', '.rtf'}
     if path.suffix.lower() not in allowed_extensions:
         return False, f"Unsupported file type: {path.suffix}. Allowed: {allowed_extensions}"
     
@@ -182,6 +183,24 @@ def extract_text_from_txt_md(file_path: str) -> str:
         raise
 
 
+def extract_text_from_docx(file_path: str) -> str:
+    try:
+        return docx2txt.process(file_path) or ""
+    except Exception as e:
+        logger.error(f"DOCX extraction failed for {file_path}: {e}")
+        raise
+
+
+def extract_text_from_doc(file_path: str) -> str:
+    try:
+        with open(file_path, "rb") as f:
+            raw = f.read()
+        return " ".join(raw.decode("utf-8", errors="ignore").split())
+    except Exception as e:
+        logger.error(f"DOC extraction failed for {file_path}: {e}")
+        raise
+
+
 def extract_text(file_path: str) -> str:
     """
     Extract text based on file extension.
@@ -191,6 +210,10 @@ def extract_text(file_path: str) -> str:
     suffix = path.suffix.lower()
     if suffix == '.pdf':
         text = extract_text_from_pdf(file_path)
+    elif suffix == '.docx':
+        text = extract_text_from_docx(file_path)
+    elif suffix == '.doc':
+        text = extract_text_from_doc(file_path)
     else:  # .txt or .md
         text = extract_text_from_txt_md(file_path)
     

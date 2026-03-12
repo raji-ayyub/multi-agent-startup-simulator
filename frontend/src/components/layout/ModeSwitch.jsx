@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
+import { useAuthStore } from "../../store/authStore";
 
 export default function ModeSwitch({ mode = "simulation" }) {
+  const { user } = useAuthStore();
+  if (user?.role === "ADMIN") return null;
   const isSimulation = mode === "simulation";
   return (
     <div className="mode-switch mt-4 flex rounded-full border p-1">

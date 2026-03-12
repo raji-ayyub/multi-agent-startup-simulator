@@ -50,9 +50,15 @@ const pillars = [
 ];
 
 export default function Landing() {
-  const { isAuthenticated } = useAuthStore();
-  const primaryHref = isAuthenticated ? "/dashboard" : "/signup";
-  const secondaryHref = isAuthenticated ? "/simulation" : "/login";
+  const { isAuthenticated, user } = useAuthStore();
+  const primaryHref = isAuthenticated
+    ? user?.role === "OPERATOR"
+      ? "/management"
+      : user?.role === "ADMIN"
+      ? "/admin/dashboard"
+      : "/dashboard"
+    : "/signup";
+  const secondaryHref = isAuthenticated ? (user?.role === "OPERATOR" ? "/management" : "/simulation") : "/login";
 
   return (
     <div className="landing-page marketing-page min-h-screen bg-[#05080f] text-slate-100">
@@ -101,6 +107,9 @@ export default function Landing() {
             <p className="landing-copy mt-5 max-w-xl text-base leading-relaxed">
               PentraAI runs your startup idea through Market, Customer, and Investor agents to expose blind spots
               before you commit significant resources.
+            </p>
+            <p className="landing-muted mt-4 text-xs">
+              Founder and operator workspaces now sit behind one governed platform with admin-approved agent access.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">

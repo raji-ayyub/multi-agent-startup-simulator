@@ -1,18 +1,20 @@
 // src/pages/auth/Signup.jsx
 import { useState } from "react";
 import { useAuthStore } from "../../store/authStore";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import AuthLayout from "../../components/layout/AuthLayout";
 
 export default function Signup() {
   const { signup, isLoading, error } = useAuthStore();
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     password: "",
+    role: "FOUNDER",
   });
   const [emailValid, setEmailValid] = useState(true);
   const [passwordStrength, setPasswordStrength] = useState("");
@@ -56,10 +58,12 @@ export default function Signup() {
       return;
     }
 
-    const success = await signup(formData);
-    if (!success) {
+    const result = await signup(formData);
+    if (!result?.ok) {
       setSubmitError("Unable to create account.");
+      return;
     }
+    navigate(result.route);
   };
 
   const strengthColor = {
@@ -107,6 +111,28 @@ export default function Signup() {
                 className="auth-input w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-[#B8C45A]"
                 required
               />
+            </div>
+
+            <div>
+              <label className="app-copy mb-2 block text-xs">Primary Workspace</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: "FOUNDER", label: "Founder", hint: "Simulation-first access" },
+                  { value: "OPERATOR", label: "Operator", hint: "Management-first access" },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, role: option.value })}
+                    className={`rounded-lg border px-3 py-3 text-left transition ${
+                      formData.role === option.value ? "border-[#B8C45A] bg-[#0f1710]" : "border-slate-700"
+                    }`}
+                  >
+                    <p className="text-sm font-semibold">{option.label}</p>
+                    <p className="mt-1 text-[11px] text-slate-400">{option.hint}</p>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>
