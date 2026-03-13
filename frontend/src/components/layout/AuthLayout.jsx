@@ -2,7 +2,7 @@ const AuthLayout = ({ children }) => {
   return (
     <div className="auth-shell min-h-screen grid grid-cols-1 lg:grid-cols-[42%_58%]">
       <div className="auth-side relative hidden overflow-hidden border-r lg:block">
-        <div className="absolute inset-0 bg-[url('/images/business-suit.jpg')] bg-cover bg-center" />
+        <div className="absolute inset-0 bg-[url('/images/businessman.jpg')] bg-cover bg-center" />
         <div className="auth-side-overlay absolute inset-0" />
 
         <div className="absolute top-8 left-8 flex items-center gap-3 z-20">
@@ -11,7 +11,7 @@ const AuthLayout = ({ children }) => {
             alt="Logo"
             className="auth-brand-mark h-8 w-8 rounded-lg p-1"
           />
-          <h1 className="auth-highlight text-sm font-semibold tracking-wide">PentraAI</h1>
+          <h1 className="text-[#e2e78d] text-sm font-semibold tracking-wide">PentraAI</h1>
         </div>
 
         <div className="relative z-10 flex h-full flex-col justify-between px-8 py-10">
@@ -21,7 +21,7 @@ const AuthLayout = ({ children }) => {
               <br />
               enterprise
               <br />
-              <span className="auth-highlight text-7xl">workflow</span> with
+              <span className="text-[#e2e78d] text-7xl">workflow</span> with
               <br />
               AI-driven
               <br />
