@@ -274,11 +274,11 @@ html[data-theme] .auth-brand-mark {
 }
 
 html[data-theme] .auth-highlight {
-  color: #e2e78d;
+  color: var(--landing-brand);
 }
 
 html[data-theme] .auth-copy {
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 html[data-theme] .auth-trust {
@@ -485,7 +485,7 @@ html[data-theme] .app-view {
 }
 
 html[data-theme] .app-heading {
-  color: whitesmoke;
+  color: var(--text-primary);
 }
 
 html[data-theme] .app-copy {
