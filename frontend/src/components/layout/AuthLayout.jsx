@@ -16,7 +16,7 @@ const AuthLayout = ({ children }) => {
 
         <div className="relative z-10 flex h-full flex-col justify-between px-8 py-10">
           <div className="mt-12">
-            <h2 className="app-heading text-6xl font-black leading-[1.1] tracking-tight">
+            <h2 className="text-[#f8fafc] text-6xl font-black leading-[1.1] tracking-tight">
               Supercharge your
               <br />
               enterprise
@@ -27,7 +27,7 @@ const AuthLayout = ({ children }) => {
               <br />
               precision.
             </h2>
-            <p className="auth-copy mt-6 text-sm leading-relaxed">
+            <p className="text-gray-400 mt-6 text-sm leading-relaxed">
               Experience the next generation of business intelligence. Join over
               500+ enterprises scaling with PentraAI.
             </p>
@@ -44,7 +44,7 @@ const AuthLayout = ({ children }) => {
                 />
               ))}
             </div>
-            <p className="auth-trust text-xs">Trusted by world class teams</p>
+            <p className="text-gray-400 text-xs">Trusted by world class teams</p>
           </div>
         </div>
       </div>
