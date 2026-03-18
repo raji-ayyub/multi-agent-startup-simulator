@@ -156,6 +156,12 @@ const useSimulationStore = create((set, get) => ({
         ...overrides,
         run_as_new_version: Boolean(runAsNewVersion),
       });
+      let detail = null;
+      try {
+        detail = await getSimulation(response.simulation_id);
+      } catch {
+        detail = null;
+      }
       const summary = mapSummaryToRecent({
         simulation_id: response.simulation_id,
         startup_name: response.startup_name,
@@ -170,12 +176,12 @@ const useSimulationStore = create((set, get) => ({
         overallScore: response.overall_score,
         recommendations: response.recommendations || [],
         simulationError: null,
-        lastSimulationResult: response,
-        activeSimulation: response,
+        lastSimulationResult: detail || response,
+        activeSimulation: detail || response,
         dashboardMetrics: response.metrics || { ...DEFAULT_METRICS },
         recentSimulations: [summary, ...state.recentSimulations.filter((x) => x.id !== summary.id)].slice(0, 50),
       }));
-      return response;
+      return detail || response;
     } catch (error) {
       set({
         isRunning: false,
@@ -228,6 +234,12 @@ const useSimulationStore = create((set, get) => ({
       }));
 
       const response = await runSimulation(get().startupIdea);
+      let detail = null;
+      try {
+        detail = await getSimulation(response.simulation_id);
+      } catch {
+        detail = null;
+      }
       const summary = mapSummaryToRecent({
         simulation_id: response.simulation_id,
         startup_name: response.startup_name,
@@ -242,13 +254,13 @@ const useSimulationStore = create((set, get) => ({
         overallScore: response.overall_score,
         recommendations: response.recommendations || [],
         simulationError: null,
-        lastSimulationResult: response,
-        activeSimulation: response,
+        lastSimulationResult: detail || response,
+        activeSimulation: detail || response,
         dashboardMetrics: response.metrics || { ...DEFAULT_METRICS },
         recentSimulations: [summary, ...state.recentSimulations.filter((x) => x.id !== summary.id)].slice(0, 50),
       }));
 
-      return response;
+      return detail || response;
     } catch (error) {
       set({
         isRunning: false,

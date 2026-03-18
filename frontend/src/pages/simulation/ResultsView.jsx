@@ -16,6 +16,27 @@ const confidenceLabel = (score) => {
   return "CAUTION";
 };
 
+const MAX_SIMULATION_VERSION = 3;
+
+const parseSimulationVersion = (name) => {
+  const raw = String(name || "").trim();
+  if (!raw) {
+    return { base: "Startup", version: 1 };
+  }
+
+  const match = raw.match(/^(.*?)(?:_v(\d+))?$/i);
+  if (!match) {
+    return { base: raw, version: 1 };
+  }
+
+  const base = String(match[1] || raw).trim() || "Startup";
+  const parsedVersion = Number(match[2] || 1);
+  return {
+    base,
+    version: Number.isFinite(parsedVersion) && parsedVersion > 0 ? parsedVersion : 1,
+  };
+};
+
 export default function ResultsView() {
   const navigate = useNavigate();
   const {
@@ -57,6 +78,22 @@ export default function ResultsView() {
     () => (activeSimulation?.agents || []).flatMap((agent) => agent.risks || []).slice(0, 4),
     [activeSimulation]
   );
+  const versionState = useMemo(() => {
+    const current = parseSimulationVersion(activeSimulation?.startup_name);
+    const relatedVersions = recentSimulations
+      .map((item) => parseSimulationVersion(item.name))
+      .filter((item) => item.base.toLowerCase() === current.base.toLowerCase())
+      .map((item) => item.version);
+    const highestVersion = relatedVersions.length > 0 ? Math.max(...relatedVersions) : current.version;
+    const nextVersion = highestVersion + 1;
+
+    return {
+      currentVersion: current.version,
+      highestVersion,
+      nextVersion,
+      canCreateNewVersion: nextVersion <= MAX_SIMULATION_VERSION,
+    };
+  }, [activeSimulation?.startup_name, recentSimulations]);
 
   if (isLoadingHistory && !activeSimulation) {
     return <div className="app-copy">Loading simulations...</div>;
@@ -93,6 +130,10 @@ export default function ResultsView() {
 
   const runRerun = async (runAsNewVersion = false) => {
     if (!activeSimulation?.simulation_id) return;
+    if (runAsNewVersion && !versionState.canCreateNewVersion) {
+      toast.error(`New version reruns stop at v${MAX_SIMULATION_VERSION}. Use standard rerun instead.`);
+      return;
+    }
     try {
       await rerunSimulationFromExisting({
         simulationId: activeSimulation.simulation_id,
@@ -280,7 +321,9 @@ export default function ResultsView() {
             <header className="app-modal-section flex items-center justify-between border-b px-5 py-4">
               <div>
                 <h3 className="app-heading text-lg font-semibold">Revisit Simulation</h3>
-                <p className="app-copy text-xs">Update fields and rerun, or create a new version.</p>
+                <p className="app-copy text-xs">
+                  Update fields and rerun. New versions are supported up to v{MAX_SIMULATION_VERSION}.
+                </p>
               </div>
               <button
                 type="button"
@@ -322,22 +365,31 @@ export default function ResultsView() {
               </div>
             </div>
             <footer className="app-modal-section flex items-center justify-between border-t px-5 py-4">
-              <button
-                type="button"
-                onClick={() => runRerun(false)}
-                disabled={isRunning}
-                className="app-primary-btn rounded-lg px-4 py-2 text-sm font-semibold"
-              >
-                {isRunning ? "Running..." : "Rerun Simulation"}
-              </button>
-              <button
-                type="button"
-                onClick={() => runRerun(true)}
-                disabled={isRunning}
-                className="app-success-btn rounded-lg px-4 py-2 text-sm font-semibold"
-              >
-                {isRunning ? "Running..." : "Run as New Version (_v2)"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => runRerun(false)}
+                  disabled={isRunning}
+                  className="app-primary-btn rounded-lg px-4 py-2 text-sm font-semibold"
+                >
+                  {isRunning ? "Running..." : "Rerun Simulation"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runRerun(true)}
+                  disabled={isRunning || !versionState.canCreateNewVersion}
+                  className="app-success-btn rounded-lg px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isRunning
+                    ? "Running..."
+                    : versionState.canCreateNewVersion
+                    ? `Run as New Version (_v${versionState.nextVersion})`
+                    : `Max Version Reached (v${MAX_SIMULATION_VERSION})`}
+                </button>
+              </div>
+              <p className="app-copy text-xs">
+                Current chain: v{versionState.currentVersion} of max v{MAX_SIMULATION_VERSION}.
+              </p>
             </footer>
           </section>
         </div>
