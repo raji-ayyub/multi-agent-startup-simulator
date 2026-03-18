@@ -26,6 +26,16 @@ export default function NotificationsPage() {
     return "System-wide governance";
   };
 
+  const formatMetadataNote = (item) => {
+    if (item.category === "AGENT_APPROVAL" && item.metadata?.requester_email) {
+      const name = item.metadata?.requester_name || item.metadata.requester_email;
+      const role = item.metadata?.requester_role ? ` | ${item.metadata.requester_role}` : "";
+      const mode = item.metadata?.workspace_mode ? ` | ${item.metadata.workspace_mode}` : "";
+      return `Requested by ${name}${role}${mode}`;
+    }
+    return "";
+  };
+
   const handleOpen = async (item) => {
     if (!item.is_read) {
       await markOneRead(item.notification_id);
@@ -104,6 +114,7 @@ export default function NotificationsPage() {
                         <p className="text-sm font-semibold">{item.title}</p>
                         <p className="app-muted mt-1 text-[11px] uppercase tracking-[0.16em]">{item.category}</p>
                         {isAdmin ? <p className="app-muted mt-1 text-xs">{formatAudience(item)}</p> : null}
+                        {isAdmin && formatMetadataNote(item) ? <p className="app-muted mt-1 text-xs">{formatMetadataNote(item)}</p> : null}
                       </div>
                       <p className="app-muted text-xs">{new Date(item.created_at).toLocaleString()}</p>
                     </div>

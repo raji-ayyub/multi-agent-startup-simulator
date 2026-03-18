@@ -95,6 +95,9 @@ export default function AdminDashboard() {
                     <div>
                       <p className="text-sm font-semibold">{request.title}</p>
                       <p className="app-muted text-xs">
+                        Requested by {request.requester_name || request.requester_email}
+                      </p>
+                      <p className="app-muted text-xs">
                         {request.requester_email} | {request.requester_role} | {request.workspace_mode}
                       </p>
                     </div>
@@ -141,6 +144,9 @@ export default function AdminDashboard() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold">{request.title}</p>
+                      <p className="app-muted text-xs">
+                        Requested by {request.requester_name || request.requester_email}
+                      </p>
                       <p className="app-muted text-xs">
                         {request.requester_email} | {request.requester_role} | {request.workspace_mode}
                       </p>

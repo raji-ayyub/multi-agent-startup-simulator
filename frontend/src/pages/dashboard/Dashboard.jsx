@@ -45,7 +45,7 @@ export default function Dashboard() {
   return (
     <section className="app-view h-full">
       <div className="mx-auto flex max-w-[1220px] flex-col gap-5">
-        <header className="app-card rounded-xl border px-5 py-4">
+        <header className="hidden app-card rounded-xl border px-5 py-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="app-heading text-[32px] font-semibold leading-tight">Hello {firstName}</h1>

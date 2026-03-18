@@ -86,6 +86,7 @@ class AgentRequestCreate(BaseModel):
 
 class AgentRequestResponse(BaseModel):
     request_id: str
+    requester_name: str
     requester_email: EmailStr
     requester_role: UserRole
     workspace_mode: str
