@@ -55,34 +55,53 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 DATABASE_URL = os.environ.get("DATABASE_URL")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+RAG_DB_POOL_MIN_CONN = max(1, int(os.environ.get("RAG_DB_POOL_MIN_CONN", "1")))
+RAG_DB_POOL_MAX_CONN = max(RAG_DB_POOL_MIN_CONN, int(os.environ.get("RAG_DB_POOL_MAX_CONN", "2")))
 
-if not all([SUPABASE_URL, SUPABASE_KEY, DATABASE_URL, OPENAI_API_KEY]):
-    raise ValueError("Missing required environment variables")
-
-# Supabase client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# OpenAI client
-openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+supabase: Client | None = None
+openai_client = None
+connection_pool = None
 
 
-# Enhance DATABASE_URL with keepalive parameters to prevent connection drops
-if "?" in DATABASE_URL:
-    DATABASE_URL += "&keepalives=1&keepalives_idle=30&keepalives_interval=10&keepalives_count=5&connect_timeout=10"
-else:
-    DATABASE_URL += "?keepalives=1&keepalives_idle=30&keepalives_interval=10&keepalives_count=5&connect_timeout=10"
+def _require_env(name: str, value: str | None) -> str:
+    if not value:
+        raise ValueError(f"{name} environment variable not set")
+    return value
 
 
+def _build_database_url(value: str) -> str:
+    if "?" in value:
+        return value + "&keepalives=1&keepalives_idle=30&keepalives_interval=10&keepalives_count=5&connect_timeout=10"
+    return value + "?keepalives=1&keepalives_idle=30&keepalives_interval=10&keepalives_count=5&connect_timeout=10"
 
-# PostgreSQL connection pool
-try:
-    connection_pool = psycopg2.pool.SimpleConnectionPool(
-        1, 20, DATABASE_URL  # min 1, max 20 connections
-    )
-    logger.info("Database connection pool created")
-except Exception as e:
-    logger.error(f"Failed to create connection pool: {e}")
-    raise
+
+def _get_supabase_client() -> Client:
+    global supabase
+    if supabase is None:
+        supabase = create_client(
+            _require_env("SUPABASE_URL", SUPABASE_URL),
+            _require_env("SUPABASE_KEY", SUPABASE_KEY),
+        )
+    return supabase
+
+
+def _get_openai_client():
+    global openai_client
+    if openai_client is None:
+        openai_client = openai.OpenAI(api_key=_require_env("OPENAI_API_KEY", OPENAI_API_KEY))
+    return openai_client
+
+
+def _get_connection_pool():
+    global connection_pool
+    if connection_pool is None:
+        connection_pool = psycopg2.pool.SimpleConnectionPool(
+            RAG_DB_POOL_MIN_CONN,
+            RAG_DB_POOL_MAX_CONN,
+            _build_database_url(_require_env("DATABASE_URL", DATABASE_URL)),
+        )
+        logger.info("Database connection pool created for ingestion")
+    return connection_pool
 
 
 
@@ -97,7 +116,7 @@ def get_db_connection():
     for attempt in range(max_attempts):
         conn = None
         try:
-            conn = connection_pool.getconn()
+            conn = _get_connection_pool().getconn()
             
             # simple query test to verify connection
             with conn.cursor() as cur:
@@ -111,7 +130,7 @@ def get_db_connection():
             
             if conn:
                 # Release the broken connection and have the pool discard it
-                connection_pool.putconn(conn, close=True)
+                _get_connection_pool().putconn(conn, close=True)
             
             if attempt == max_attempts - 1:
                 logger.error("Max attempts reached, could not get a valid database connection")
@@ -133,7 +152,7 @@ def release_db_connection(conn, close=False):
     """
     if conn:
         try:
-            connection_pool.putconn(conn, close=close)
+            _get_connection_pool().putconn(conn, close=close)
         except Exception as e:
             logger.error(f"Error releasing DB connection: {e}")
 
@@ -282,7 +301,7 @@ def generate_embeddings_batch(texts: List[str], batch_size: int = 100) -> List[L
         batch = texts[i:i+batch_size]
 
         try:
-            response = openai_client.embeddings.create(
+            response = _get_openai_client().embeddings.create(
                 model="text-embedding-3-small",
                 input=batch
             )
@@ -311,7 +330,7 @@ def upload_to_storage(local_file_path: str, source_type: str) -> str:
         data = f.read()
 
     try:
-        supabase.storage.from_(bucket).upload(storage_path, data)
+        _get_supabase_client().storage.from_(bucket).upload(storage_path, data)
     except Exception as e:
         logger.error(f"Supabase upload error: {e}")
         raise Exception(f"Supabase upload failed: {e}")

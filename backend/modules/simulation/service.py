@@ -17,11 +17,6 @@ from .schemas import (
     SimulationRunResponse,
 )
 
-try:
-    from tools import build_context, rerank_with_mmr, retrieve_docs
-except Exception:
-    build_context = rerank_with_mmr = retrieve_docs = None
-
 
 logger = logging.getLogger(__name__)
 
@@ -490,7 +485,10 @@ def run_intake_turn(
 
 
 def _tool_context(query: str, top_k: int = 4) -> str:
-    if retrieve_docs is None or rerank_with_mmr is None or build_context is None:
+    try:
+        from tools import build_context, rerank_with_mmr, retrieve_docs
+    except Exception as exc:
+        logger.warning("Tool context helpers unavailable. error=%s", exc)
         return ""
     try:
         docs = retrieve_docs(query, top_k=max(top_k, 5))
