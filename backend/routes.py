@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import tempfile
 from datetime import datetime
@@ -23,9 +24,6 @@ from auth import (
 from database import get_db
 from email_utils import send_password_reset_email
 from models import User, UserAccessProfile
-from rag.ingestion import ingest_document
-from rag.model import generate_answer
-from rag.retrieval import build_context, retrieve_context
 from schemas import (
     ChangePassword,
     PasswordResetRequest,
@@ -40,6 +38,7 @@ from schemas import (
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 def _serialize_user(user: User, profile: UserAccessProfile | None) -> UserResponse:
@@ -314,12 +313,33 @@ def change_password(
 rag_router = APIRouter(prefix="/api/v1", tags=["Ingestion"])
 
 
+def _load_rag_runtime():
+    try:
+        from rag.ingestion import ingest_document
+        from rag.model import generate_answer
+        from rag.retrieval import build_context, retrieve_context
+
+        return {
+            "ingest_document": ingest_document,
+            "generate_answer": generate_answer,
+            "build_context": build_context,
+            "retrieve_context": retrieve_context,
+        }
+    except Exception as exc:
+        logger.exception("RAG runtime unavailable during request handling.")
+        raise HTTPException(
+            status_code=503,
+            detail="RAG features are unavailable because a required dependency or environment variable is missing.",
+        ) from exc
+
+
 @rag_router.post("/ingest")
 async def ingest_document_endpoint(
     file: UploadFile = File(..., description="PDF, DOC, DOCX, TXT, MD, or RTF file to ingest"),
     title: str = Form(..., description="Document title"),
     source_type: Optional[str] = Form("pdf", description="Source type (pdf, txt, md)"),
 ):
+    rag_runtime = _load_rag_runtime()
     allowed_extensions = {".pdf", ".doc", ".docx", ".txt", ".md", ".rtf"}
     file_ext = Path(file.filename).suffix.lower()
     if file_ext not in allowed_extensions:
@@ -341,7 +361,7 @@ async def ingest_document_endpoint(
 
     try:
         result = await asyncio.to_thread(
-            ingest_document,
+            rag_runtime["ingest_document"],
             local_file_path=tmp_path,
             title=title,
             source_type=source_type,
@@ -358,11 +378,12 @@ async def ingest_document_endpoint(
 
 @rag_router.post("/rag/search")
 async def rag_search(question: str):
-    chunks = retrieve_context(question, top_k=5)
+    rag_runtime = _load_rag_runtime()
+    chunks = rag_runtime["retrieve_context"](question, top_k=5)
     if not chunks:
         return {"answer": "No relevant information found.", "sources": []}
 
-    context = build_context(chunks)
-    answer = generate_answer(context, question)
+    context = rag_runtime["build_context"](chunks)
+    answer = rag_runtime["generate_answer"](context, question)
     sources = [chunk[1] for chunk in chunks]
     return {"answer": answer, "sources": sources}

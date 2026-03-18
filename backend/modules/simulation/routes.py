@@ -21,6 +21,7 @@ from .schemas import (
 from .service import run_intake_turn, run_simulation
 
 simulation_router = APIRouter(prefix="/api/v1/simulations", tags=["simulations"])
+MAX_SIMULATION_VERSION = 3
 
 
 def _persist_simulation_run(db: Session, payload: SimulationRunRequest, result: SimulationRunResponse) -> SimulationRun:
@@ -43,12 +44,24 @@ def _persist_simulation_run(db: Session, payload: SimulationRunRequest, result: 
     return record
 
 
+def _split_startup_name_version(name: str | None) -> tuple[str, int]:
+    value = (name or "").strip()
+    if not value:
+        return "Startup", 1
+    match = re.match(r"^(?P<base>.+?)_v(?P<version>\d+)$", value, flags=re.IGNORECASE)
+    if not match:
+        return value, 1
+    base = (match.group("base") or "").strip() or "Startup"
+    version = max(1, int(match.group("version") or 1))
+    return base, version
+
+
 def _next_versioned_startup_name(
     db: Session,
     owner_email: str | None,
     original_name: str,
 ) -> str:
-    base = re.sub(r"_v\d+$", "", (original_name or "").strip(), flags=re.IGNORECASE) or "Startup"
+    base, _ = _split_startup_name_version(original_name)
     query = db.query(SimulationRun.startup_name)
     if owner_email:
         query = query.filter(SimulationRun.owner_email == owner_email)
@@ -56,13 +69,15 @@ def _next_versioned_startup_name(
 
     max_version = 1
     for name in names:
-        if name == base:
-            max_version = max(max_version, 1)
-            continue
-        match = re.match(rf"^{re.escape(base)}_v(\d+)$", name, flags=re.IGNORECASE)
-        if match:
-            max_version = max(max_version, int(match.group(1)))
+        candidate_base, candidate_version = _split_startup_name_version(name)
+        if candidate_base.lower() == base.lower():
+            max_version = max(max_version, candidate_version)
 
+    if max_version >= MAX_SIMULATION_VERSION:
+        raise HTTPException(
+            status_code=400,
+            detail=f"New version reruns are limited to v{MAX_SIMULATION_VERSION}. Use standard rerun for further iterations.",
+        )
     return f"{base}_v{max_version + 1}"
 
 
@@ -229,6 +244,8 @@ def rerun_simulation(
         )
         db.commit()
         return result
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Simulation rerun failed: {str(exc)}")
 
