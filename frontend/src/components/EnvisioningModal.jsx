@@ -41,6 +41,9 @@ const AGENTIC_LOGS = [
   { role: "INVESTOR AGENT", message: "Scoring growth and runway..." },
 ];
 const FALLBACK_LOGS = AGENTIC_LOGS;
+const SIMULATION_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const SIMULATION_UPLOAD_ACCEPT =
+  ".pdf,.doc,.docx,.txt,.md,.csv,.json,.log,.rtf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain,text/markdown,text/csv,application/json,text/rtf";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -53,6 +56,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     launchSimulationFromBrief,
     patchIdeaFields,
     runIntakeTurn,
+    uploadIntakeFile,
     simulationError,
   } = useSimulationStore();
 
@@ -247,24 +251,24 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     setIsUploadLoading(true);
     setBannerMessage("");
     try {
-      const maxBytes = 2 * 1024 * 1024;
+      const maxBytes = SIMULATION_UPLOAD_MAX_BYTES;
       if (file.size > maxBytes) {
-        setBannerMessage("File too large. Please upload files up to 2MB.");
+        setBannerMessage("File too large. Please upload files up to 10MB.");
         return;
       }
 
-      const fileText = await file.text();
-      const trimmed = fileText.trim();
+      const upload = await uploadIntakeFile(file);
+      const trimmed = String(upload?.extracted_text || "").trim();
       if (!trimmed) {
         setBannerMessage("Uploaded file is empty.");
         return;
       }
 
       const clipped = trimmed.slice(0, 6000);
-      const uploadMessage = `Uploaded file: ${file.name}\n\n${clipped}`;
+      const uploadMessage = `Uploaded file: ${upload?.file_name || file.name}\n\n${clipped}`;
       await submitMessage(uploadMessage);
     } catch (error) {
-      setBannerMessage("Unable to read that file. Try a text-based file.");
+      setBannerMessage(error?.message || simulationError || "Unable to read that file. Try a PDF, Word, or text document.");
     } finally {
       setIsUploadLoading(false);
     }
@@ -411,7 +415,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                     type="file"
                     onChange={handleFileUpload}
                     className="hidden"
-                    accept=".txt,.md,.csv,.json,.log,text/plain,text/markdown,text/csv,application/json"
+                    accept={SIMULATION_UPLOAD_ACCEPT}
                   />
                   <textarea
                     rows={2}
@@ -431,7 +435,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                     onClick={handlePickFile}
                     disabled={isIntakeLoading || simulationStage || isUploadLoading}
                     className="app-ghost-btn inline-flex h-10 w-10 items-center justify-center rounded-full border transition"
-                    title="Upload text file"
+                    title="Upload supporting file"
                   >
                     {isUploadLoading ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
                   </button>

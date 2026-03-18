@@ -1,13 +1,15 @@
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from auth import get_current_user, get_or_create_access_profile
 from database import get_db
 from models import SimulationRun, User
+from modules.management.cv_parser import extract_cv_text
 from platform_service import create_notification
 from .schemas import (
+    SimulationIntakeFileResponse,
     SimulationIntakeTurnRequest,
     SimulationIntakeTurnResponse,
     SimulationRerunRequest,
@@ -62,6 +64,35 @@ def _next_versioned_startup_name(
             max_version = max(max_version, int(match.group(1)))
 
     return f"{base}_v{max_version + 1}"
+
+
+@simulation_router.post("/intake/file", response_model=SimulationIntakeFileResponse)
+async def simulation_intake_file_upload(file: UploadFile = File(...)):
+    file_name = file.filename or "simulation-upload"
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Uploaded file exceeds 10MB limit.")
+
+    try:
+        text, extension = extract_cv_text(file_name, content)
+        normalized = re.sub(r"\r\n?", "\n", str(text or ""))
+        normalized = re.sub(r"[ \t]+", " ", normalized)
+        normalized = re.sub(r"\n{3,}", "\n\n", normalized).strip()
+        if not normalized:
+            raise HTTPException(status_code=400, detail="Uploaded file does not contain readable text.")
+        return SimulationIntakeFileResponse(
+            file_name=file_name,
+            extension=extension,
+            extracted_text=normalized[:20000],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Unable to extract text from uploaded file.")
 
 
 @simulation_router.post("/intake/turn", response_model=SimulationIntakeTurnResponse)

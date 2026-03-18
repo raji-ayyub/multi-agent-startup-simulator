@@ -89,6 +89,12 @@ class SimulationIntakeTurnRequest(BaseModel):
     history: List[Dict[str, str]] = Field(default_factory=list)
 
 
+class SimulationIntakeFileResponse(BaseModel):
+    file_name: str
+    extension: str
+    extracted_text: str
+
+
 class SimulationIntakeTurnResponse(BaseModel):
     assistant_message: str
     collected_fields: Dict[str, Any]
