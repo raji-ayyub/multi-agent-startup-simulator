@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -14,6 +15,7 @@ from routes import rag_router
 from routes import router as auth_router
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 
 def get_cors_origins():
@@ -32,8 +34,10 @@ def get_cors_origins():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    create_tables()
-    print("Database tables initialized")
+    if create_tables():
+        logger.info("Database tables initialized")
+    else:
+        logger.warning("Database tables were not initialized during startup because the database was unavailable.")
     yield
 
 
