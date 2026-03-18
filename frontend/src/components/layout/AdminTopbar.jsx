@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Bell, Settings, ShieldCheck } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -21,10 +22,14 @@ const titles = {
 export default function AdminTopbar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { unreadCount } = useNotificationStore();
+  const { unreadCount, fetchNotifications } = useNotificationStore();
 
   const tab = searchParams.get("tab") || "overview";
   const header = titles[tab] || titles.overview;
+
+  useEffect(() => {
+    fetchNotifications({ limit: 50 });
+  }, [fetchNotifications]);
 
   return (
     <header className="app-topbar min-h-16 border-b border-slate-800 bg-[#081018] px-3 py-3 sm:px-5 lg:px-8">

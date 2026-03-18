@@ -131,6 +131,10 @@ class NotificationResponse(BaseModel):
     message: str
     link: str
     metadata: Dict[str, Any]
+    target_user_id: Optional[int] = None
+    target_user_email: Optional[EmailStr] = None
+    target_role: str = ""
+    audience_scope: str = "DIRECT"
     is_read: bool
     created_at: datetime
     read_at: Optional[datetime] = None

@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
 
@@ -193,6 +193,24 @@ class AppNotification(Base):
     notification_payload = Column("metadata", JSON, nullable=False, default=dict)
     is_read = Column(Boolean, nullable=False, default=False, index=True)
     read_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class NotificationReadReceipt(Base):
+    __tablename__ = "notification_read_receipts"
+    __table_args__ = (
+        UniqueConstraint("notification_id", "user_id", name="uq_notification_read_receipts_notification_user"),
+    )
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    notification_id = Column(
+        String(36),
+        ForeignKey("app_notifications.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    read_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 

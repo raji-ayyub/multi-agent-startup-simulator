@@ -4,7 +4,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from auth import get_current_user, get_or_create_access_profile, require_roles
@@ -16,6 +16,7 @@ from models import (
     CalendarEvent,
     ManagementPlanRun,
     ManagementWorkspace,
+    NotificationReadReceipt,
     SimulationRun,
     User,
     UserAccessProfile,
@@ -72,6 +73,79 @@ def _ensure_simulation_access(db: Session, current_user: User, simulation: Simul
         raise HTTPException(status_code=403, detail="You do not have access to this simulation.")
 
 
+def _notification_query(db: Session, current_user: User, profile: UserAccessProfile):
+    query = db.query(AppNotification)
+    if profile.role.upper() == "ADMIN":
+        return query
+
+    role = (profile.role or "").upper()
+    return query.filter(
+        or_(
+            AppNotification.target_user_id == current_user.id,
+            and_(
+                AppNotification.target_user_id.is_(None),
+                AppNotification.target_role == role,
+            ),
+        )
+    )
+
+
+def _notification_read_exists(db: Session, user_id: int):
+    return (
+        db.query(NotificationReadReceipt.id)
+        .filter(
+            NotificationReadReceipt.notification_id == AppNotification.id,
+            NotificationReadReceipt.user_id == user_id,
+        )
+        .exists()
+    )
+
+
+def _notification_receipt_map(db: Session, user_id: int, notification_ids: list[str]) -> dict[str, datetime]:
+    if not notification_ids:
+        return {}
+
+    rows = (
+        db.query(NotificationReadReceipt.notification_id, NotificationReadReceipt.read_at)
+        .filter(
+            NotificationReadReceipt.user_id == user_id,
+            NotificationReadReceipt.notification_id.in_(notification_ids),
+        )
+        .all()
+    )
+    return {notification_id: read_at for notification_id, read_at in rows if notification_id}
+
+
+def _notification_user_email_map(db: Session, target_user_ids: list[int]) -> dict[int, str]:
+    if not target_user_ids:
+        return {}
+
+    rows = db.query(User.id, User.email).filter(User.id.in_(target_user_ids)).all()
+    return {user_id: email for user_id, email in rows if user_id is not None and email}
+
+
+def _serialize_notifications_for_viewer(
+    db: Session,
+    current_user: User,
+    rows: list[AppNotification],
+) -> list[NotificationResponse]:
+    notification_ids = [row.id for row in rows if row.id]
+    target_user_ids = list({row.target_user_id for row in rows if row.target_user_id is not None})
+    receipt_map = _notification_receipt_map(db, current_user.id, notification_ids)
+    email_map = _notification_user_email_map(db, target_user_ids)
+
+    return [
+        NotificationResponse(
+            **serialize_notification(
+                row,
+                viewer_read_at=receipt_map.get(row.id),
+                target_user_email=email_map.get(row.target_user_id) if row.target_user_id is not None else None,
+            )
+        )
+        for row in rows
+    ]
+
+
 @platform_router.get("/notifications", response_model=list[NotificationResponse])
 def list_notifications(
     unread_only: bool = Query(default=False),
@@ -80,17 +154,11 @@ def list_notifications(
     current_user: User = Depends(get_current_user),
 ):
     profile = get_or_create_access_profile(db, current_user)
-    query = db.query(AppNotification).filter(
-        or_(
-            AppNotification.target_user_id == current_user.id,
-            AppNotification.target_role == profile.role.upper(),
-            AppNotification.target_role == "ALL",
-        )
-    )
+    query = _notification_query(db, current_user, profile)
     if unread_only:
-        query = query.filter(AppNotification.is_read.is_(False))
+        query = query.filter(~_notification_read_exists(db, current_user.id))
     rows = query.order_by(AppNotification.created_at.desc()).limit(limit).all()
-    return [NotificationResponse(**serialize_notification(row)) for row in rows]
+    return _serialize_notifications_for_viewer(db, current_user, rows)
 
 
 @platform_router.patch("/notifications/{notification_id}/read", response_model=NotificationReadResponse)
@@ -101,22 +169,30 @@ def mark_notification_read(
 ):
     profile = get_or_create_access_profile(db, current_user)
     row = (
-        db.query(AppNotification)
-        .filter(
-            AppNotification.id == notification_id,
-            or_(
-                AppNotification.target_user_id == current_user.id,
-                AppNotification.target_role == profile.role.upper(),
-                AppNotification.target_role == "ALL",
-            ),
-        )
+        _notification_query(db, current_user, profile)
+        .filter(AppNotification.id == notification_id)
         .first()
     )
     if not row:
         raise HTTPException(status_code=404, detail="Notification not found.")
-    row.is_read = True
-    row.read_at = datetime.utcnow()
-    db.add(row)
+
+    receipt = (
+        db.query(NotificationReadReceipt)
+        .filter(
+            NotificationReadReceipt.notification_id == row.id,
+            NotificationReadReceipt.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not receipt:
+        receipt = NotificationReadReceipt(
+            notification_id=row.id,
+            user_id=current_user.id,
+            read_at=datetime.utcnow(),
+        )
+    else:
+        receipt.read_at = datetime.utcnow()
+    db.add(receipt)
     db.commit()
     return NotificationReadResponse(updated=1)
 
@@ -128,21 +204,19 @@ def mark_all_notifications_read(
 ):
     profile = get_or_create_access_profile(db, current_user)
     rows = (
-        db.query(AppNotification)
-        .filter(
-            AppNotification.is_read.is_(False),
-            or_(
-                AppNotification.target_user_id == current_user.id,
-                AppNotification.target_role == profile.role.upper(),
-                AppNotification.target_role == "ALL",
-            ),
-        )
+        _notification_query(db, current_user, profile)
+        .filter(~_notification_read_exists(db, current_user.id))
         .all()
     )
+    now = datetime.utcnow()
     for row in rows:
-        row.is_read = True
-        row.read_at = datetime.utcnow()
-        db.add(row)
+        db.add(
+            NotificationReadReceipt(
+                notification_id=row.id,
+                user_id=current_user.id,
+                read_at=now,
+            )
+        )
     db.commit()
     return NotificationReadResponse(updated=len(rows))
 

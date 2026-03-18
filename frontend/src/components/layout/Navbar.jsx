@@ -13,9 +13,20 @@ export default function Navbar() {
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const isAdmin = user?.role === "ADMIN";
+
+  const formatAudience = (item) => {
+    if (item.audience_scope === "DIRECT") {
+      return item.target_user_email ? `Direct to ${item.target_user_email}` : "Direct notification";
+    }
+    if (item.audience_scope === "ROLE") {
+      return `Role inbox: ${item.target_role}`;
+    }
+    return "System-wide governance";
+  };
 
   useEffect(() => {
-    fetchNotifications({ limit: 6 });
+    fetchNotifications({ limit: 50 });
   }, [fetchNotifications]);
 
   const handleLogout = () => {
@@ -73,7 +84,7 @@ export default function Navbar() {
               setShowNotifications(!showNotifications);
               setShowUserMenu(false);
               if (!showNotifications) {
-                fetchNotifications({ limit: 6 });
+                fetchNotifications({ limit: 50 });
               }
             }}
             className="app-ghost-btn relative rounded-lg border p-2 transition"
@@ -107,6 +118,7 @@ export default function Navbar() {
                       className="block w-full text-left"
                     >
                       <p className="text-sm font-medium">{item.title}</p>
+                      {isAdmin ? <p className="app-muted text-[11px]">{formatAudience(item)}</p> : null}
                       <p className="app-muted text-xs">{item.message}</p>
                     </button>
                   ))

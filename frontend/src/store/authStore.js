@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import api, { getApiErrorMessage } from "../api/axios";
+import useNotificationStore from "./notificationStore";
 
 export const DEFAULT_ROLE = "FOUNDER";
 
@@ -36,6 +37,7 @@ const persistSession = ({ accessToken, user }) => {
 const clearSession = () => {
   localStorage.removeItem("accessToken");
   localStorage.removeItem("authUser");
+  useNotificationStore.getState().reset();
 };
 
 export const useAuthStore = create((set) => ({
