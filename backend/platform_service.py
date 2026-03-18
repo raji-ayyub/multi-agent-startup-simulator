@@ -31,12 +31,18 @@ def create_notification(
     message: str,
     link: str = "",
     target_user_id: int | None = None,
-    target_role: str = "ALL",
+    target_role: str | None = None,
     metadata: Dict[str, Any] | None = None,
 ) -> AppNotification:
+    normalized_role = (target_role or "").strip().upper()
+    if target_user_id is None and not normalized_role:
+        raise ValueError("Notification audience must be explicit.")
+    if target_user_id is not None and not normalized_role:
+        normalized_role = "DIRECT"
+
     row = AppNotification(
         target_user_id=target_user_id,
-        target_role=(target_role or "ALL").upper(),
+        target_role=normalized_role,
         category=(category or "GENERAL").upper(),
         title=(title or "").strip()[:255],
         message=(message or "").strip()[:5000],
@@ -48,7 +54,19 @@ def create_notification(
     return row
 
 
-def serialize_notification(row: AppNotification) -> Dict[str, Any]:
+def serialize_notification(
+    row: AppNotification,
+    *,
+    viewer_read_at: datetime | None = None,
+    target_user_email: str | None = None,
+) -> Dict[str, Any]:
+    if row.target_user_id is not None:
+        audience_scope = "DIRECT"
+    elif (row.target_role or "").upper() == "ALL":
+        audience_scope = "SYSTEM"
+    else:
+        audience_scope = "ROLE"
+
     return {
         "notification_id": row.id,
         "category": row.category or "GENERAL",
@@ -56,9 +74,13 @@ def serialize_notification(row: AppNotification) -> Dict[str, Any]:
         "message": row.message or "",
         "link": row.link or "",
         "metadata": row.notification_payload if isinstance(row.notification_payload, dict) else {},
-        "is_read": bool(row.is_read),
+        "target_user_id": row.target_user_id,
+        "target_user_email": target_user_email,
+        "target_role": row.target_role or "",
+        "audience_scope": audience_scope,
+        "is_read": viewer_read_at is not None,
         "created_at": row.created_at,
-        "read_at": row.read_at,
+        "read_at": viewer_read_at,
     }
 
 

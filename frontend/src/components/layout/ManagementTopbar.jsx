@@ -21,7 +21,7 @@ export default function ManagementTopbar() {
   const agentBusy = isLoading || isSaving || isPlanning;
 
   useEffect(() => {
-    fetchNotifications({ limit: 6 });
+    fetchNotifications({ limit: 50 });
   }, [fetchNotifications]);
 
   return (

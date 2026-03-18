@@ -50,6 +50,19 @@ export async function intakeSimulationTurn(payload) {
   }
 }
 
+export async function extractSimulationFile(file) {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const { data } = await api.post("/api/v1/simulations/intake/file", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to read uploaded file."));
+  }
+}
+
 export async function listSimulations() {
   try {
     const email = getCurrentUserEmail();

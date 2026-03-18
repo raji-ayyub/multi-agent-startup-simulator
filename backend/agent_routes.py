@@ -71,9 +71,15 @@ AGENT_CATALOG = [
 ]
 
 
-def _serialize_agent_request(row: AgentRequest, approved_by_email: str | None = None) -> AgentRequestResponse:
+def _serialize_agent_request(
+    row: AgentRequest,
+    *,
+    requester_name: str | None = None,
+    approved_by_email: str | None = None,
+) -> AgentRequestResponse:
     return AgentRequestResponse(
         request_id=row.id,
+        requester_name=(requester_name or row.requester_email or "").strip(),
         requester_email=row.requester_email,
         requester_role=row.requester_role,
         workspace_mode=row.workspace_mode,
@@ -113,14 +119,24 @@ def list_agent_requests(
         query = query.filter(AgentRequest.requester_user_id == current_user.id)
 
     rows = query.limit(100).all()
-    approver_ids = [row.approved_by_user_id for row in rows if row.approved_by_user_id]
-    approvers = {}
-    if approver_ids:
-        approvers = {
-            user.id: user.email
-            for user in db.query(User).filter(User.id.in_(approver_ids)).all()
+    related_user_ids = {
+        user_id
+        for user_id in [*(row.requester_user_id for row in rows if row.requester_user_id), *(row.approved_by_user_id for row in rows if row.approved_by_user_id)]
+    }
+    users_by_id = {}
+    if related_user_ids:
+        users_by_id = {
+            user.id: user
+            for user in db.query(User).filter(User.id.in_(related_user_ids)).all()
         }
-    return [_serialize_agent_request(row, approvers.get(row.approved_by_user_id)) for row in rows]
+    return [
+        _serialize_agent_request(
+            row,
+            requester_name=users_by_id.get(row.requester_user_id).full_name if users_by_id.get(row.requester_user_id) else None,
+            approved_by_email=users_by_id.get(row.approved_by_user_id).email if users_by_id.get(row.approved_by_user_id) else None,
+        )
+        for row in rows
+    ]
 
 
 @agent_router.post("/agents/requests", response_model=AgentRequestResponse)
@@ -149,14 +165,21 @@ def create_agent_request(
         db,
         category="AGENT_APPROVAL",
         title="New agent approval request",
-        message=f"{current_user.email} requested {catalog_item['display_name']} access.",
+        message=f"{current_user.full_name} ({current_user.email}) requested {catalog_item['display_name']} access.",
         link="/admin/dashboard",
         target_role="ADMIN",
-        metadata={"request_id": request_row.id, "agent_type": request_row.agent_type},
+        metadata={
+            "request_id": request_row.id,
+            "agent_type": request_row.agent_type,
+            "requester_name": current_user.full_name,
+            "requester_email": current_user.email,
+            "requester_role": profile.role.upper(),
+            "workspace_mode": payload.workspace_mode,
+        },
     )
     db.commit()
     db.refresh(request_row)
-    return _serialize_agent_request(request_row)
+    return _serialize_agent_request(request_row, requester_name=current_user.full_name)
 
 
 @agent_router.patch("/agents/requests/{request_id}", response_model=AgentRequestResponse)
@@ -187,7 +210,7 @@ def decide_agent_request(
     )
     db.commit()
     db.refresh(row)
-    return _serialize_agent_request(row, current_user.email)
+    return _serialize_agent_request(row, requester_name=row.requester_email, approved_by_email=current_user.email)
 
 
 @agent_router.get("/agents/active", response_model=list[AgentAccessResponse])
@@ -247,15 +270,22 @@ def get_admin_overview(
         .limit(8)
         .all()
     )
-    approver_ids = [row.approved_by_user_id for row in recent_rows if row.approved_by_user_id]
-    approvers = {}
-    if approver_ids:
-        approvers = {
-            user.id: user.email
-            for user in db.query(User).filter(User.id.in_(approver_ids)).all()
+    related_user_ids = {
+        user_id
+        for user_id in [*(row.requester_user_id for row in recent_rows if row.requester_user_id), *(row.approved_by_user_id for row in recent_rows if row.approved_by_user_id)]
+    }
+    users_by_id = {}
+    if related_user_ids:
+        users_by_id = {
+            user.id: user
+            for user in db.query(User).filter(User.id.in_(related_user_ids)).all()
         }
     recent_requests = [
-        _serialize_agent_request(row, approvers.get(row.approved_by_user_id))
+        _serialize_agent_request(
+            row,
+            requester_name=users_by_id.get(row.requester_user_id).full_name if users_by_id.get(row.requester_user_id) else None,
+            approved_by_email=users_by_id.get(row.approved_by_user_id).email if users_by_id.get(row.approved_by_user_id) else None,
+        )
         for row in recent_rows
     ]
 

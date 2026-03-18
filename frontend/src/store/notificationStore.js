@@ -67,6 +67,14 @@ const useNotificationStore = create((set, get) => ({
     const items = await get().fetchNotifications({ unreadOnly: false, limit: 20 });
     return items.filter((item) => !item.is_read).length;
   },
+
+  reset: () =>
+    set({
+      items: [],
+      unreadCount: 0,
+      isLoading: false,
+      error: null,
+    }),
 }));
 
 export default useNotificationStore;

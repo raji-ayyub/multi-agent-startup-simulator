@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   deleteSimulation,
+  extractSimulationFile,
   getSimulation,
   intakeSimulationTurn,
   listSimulations,
@@ -272,6 +273,19 @@ const useSimulationStore = create((set, get) => ({
     } catch (error) {
       set({
         simulationError: error?.message || "Unable to process intake conversation.",
+      });
+      throw error;
+    }
+  },
+
+  uploadIntakeFile: async (file) => {
+    try {
+      const response = await extractSimulationFile(file);
+      set({ simulationError: null });
+      return response;
+    } catch (error) {
+      set({
+        simulationError: error?.message || "Unable to read uploaded file.",
       });
       throw error;
     }

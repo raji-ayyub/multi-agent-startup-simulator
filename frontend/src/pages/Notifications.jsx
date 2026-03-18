@@ -3,15 +3,38 @@ import { Bell, CheckCheck, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+import { useAuthStore } from "../store/authStore";
 import useNotificationStore from "../store/notificationStore";
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const { items, unreadCount, isLoading, fetchNotifications, markOneRead, markEverythingRead } = useNotificationStore();
+  const isAdmin = user?.role === "ADMIN";
 
   useEffect(() => {
-    fetchNotifications({ limit: 50 });
+      fetchNotifications({ limit: 50 });
   }, [fetchNotifications]);
+
+  const formatAudience = (item) => {
+    if (item.audience_scope === "DIRECT") {
+      return item.target_user_email ? `Direct to ${item.target_user_email}` : "Direct notification";
+    }
+    if (item.audience_scope === "ROLE") {
+      return `Role inbox: ${item.target_role}`;
+    }
+    return "System-wide governance";
+  };
+
+  const formatMetadataNote = (item) => {
+    if (item.category === "AGENT_APPROVAL" && item.metadata?.requester_email) {
+      const name = item.metadata?.requester_name || item.metadata.requester_email;
+      const role = item.metadata?.requester_role ? ` | ${item.metadata.requester_role}` : "";
+      const mode = item.metadata?.workspace_mode ? ` | ${item.metadata.workspace_mode}` : "";
+      return `Requested by ${name}${role}${mode}`;
+    }
+    return "";
+  };
 
   const handleOpen = async (item) => {
     if (!item.is_read) {
@@ -38,7 +61,9 @@ export default function NotificationsPage() {
           </p>
           <h1 className="app-heading mt-3 text-4xl font-semibold">Notifications</h1>
           <p className="app-copy mt-2 max-w-3xl text-sm">
-            Governance updates, report readiness, simulation completions, and management events are routed here by role and ownership.
+            {isAdmin
+              ? "You can review the full platform notification stream here. Your read state is personal to your admin view and does not clear another user's inbox."
+              : "Governance updates, report readiness, simulation completions, and management events are routed here by role and ownership."}
           </p>
         </header>
 
@@ -59,7 +84,7 @@ export default function NotificationsPage() {
               className="app-primary-btn mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
             >
               <CheckCheck size={15} />
-              Mark All Read
+              {isAdmin ? "Mark My View Read" : "Mark All Read"}
             </button>
           </article>
 
@@ -88,6 +113,8 @@ export default function NotificationsPage() {
                       <div>
                         <p className="text-sm font-semibold">{item.title}</p>
                         <p className="app-muted mt-1 text-[11px] uppercase tracking-[0.16em]">{item.category}</p>
+                        {isAdmin ? <p className="app-muted mt-1 text-xs">{formatAudience(item)}</p> : null}
+                        {isAdmin && formatMetadataNote(item) ? <p className="app-muted mt-1 text-xs">{formatMetadataNote(item)}</p> : null}
                       </div>
                       <p className="app-muted text-xs">{new Date(item.created_at).toLocaleString()}</p>
                     </div>
