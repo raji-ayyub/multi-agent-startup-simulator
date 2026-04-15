@@ -1,24 +1,57 @@
 import api, { getApiErrorMessage } from "../api/axios";
 
+const REPORT_TEMPLATES_CACHE_TTL_MS = 60000;
+const NOTIFICATIONS_CACHE_TTL_MS = 10000;
+
 let reportTemplatesCache = null;
+let reportTemplatesCacheTs = 0;
+let reportTemplatesInFlight = null;
+const notificationsCache = new Map();
+const notificationsInFlight = new Map();
+const reportsInFlight = new Map();
+
+function invalidateNotificationsCache() {
+  notificationsCache.clear();
+  notificationsInFlight.clear();
+}
 
 export async function listNotifications({ unreadOnly = false, limit = 50 } = {}) {
-  try {
-    const { data } = await api.get("/api/v1/notifications", {
-      params: {
-        unread_only: unreadOnly,
-        limit,
-      },
-    });
-    return Array.isArray(data) ? data : [];
-  } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Unable to load notifications."));
+  const cacheKey = `notifications:${unreadOnly ? "1" : "0"}:${limit}`;
+  const now = Date.now();
+  const cached = notificationsCache.get(cacheKey);
+  if (cached && now - cached.ts < NOTIFICATIONS_CACHE_TTL_MS) {
+    return cached.items;
   }
+  if (notificationsInFlight.has(cacheKey)) {
+    return notificationsInFlight.get(cacheKey);
+  }
+
+  const request = (async () => {
+    try {
+      const { data } = await api.get("/api/v1/notifications", {
+        params: {
+          unread_only: unreadOnly,
+          limit,
+        },
+      });
+      const items = Array.isArray(data) ? data : [];
+      notificationsCache.set(cacheKey, { ts: Date.now(), items });
+      return items;
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, "Unable to load notifications."));
+    } finally {
+      notificationsInFlight.delete(cacheKey);
+    }
+  })();
+
+  notificationsInFlight.set(cacheKey, request);
+  return request;
 }
 
 export async function markNotificationRead(notificationId) {
   try {
     const { data } = await api.patch(`/api/v1/notifications/${notificationId}/read`);
+    invalidateNotificationsCache();
     return data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to update notification."));
@@ -28,6 +61,7 @@ export async function markNotificationRead(notificationId) {
 export async function markAllNotificationsRead() {
   try {
     const { data } = await api.post("/api/v1/notifications/read-all");
+    invalidateNotificationsCache();
     return data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to mark notifications as read."));
@@ -35,27 +69,39 @@ export async function markAllNotificationsRead() {
 }
 
 export async function listReports(params = {}) {
-  try {
-    const { data } = await api.get("/api/v1/reports", { params });
-    if (Array.isArray(data)) {
-      return {
-        items: data,
-        page: Number(params?.page || 1),
-        page_size: Number(params?.page_size || data.length || 1),
-        total: data.length,
-        total_pages: 1,
-      };
-    }
-    return {
-      items: Array.isArray(data?.items) ? data.items : [],
-      page: Number(data?.page || 1),
-      page_size: Number(data?.page_size || params?.page_size || 8),
-      total: Number(data?.total || 0),
-      total_pages: Number(data?.total_pages || 1),
-    };
-  } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Unable to load reports."));
+  const requestKey = JSON.stringify(params || {});
+  if (reportsInFlight.has(requestKey)) {
+    return reportsInFlight.get(requestKey);
   }
+
+  const request = (async () => {
+    try {
+      const { data } = await api.get("/api/v1/reports", { params });
+      if (Array.isArray(data)) {
+        return {
+          items: data,
+          page: Number(params?.page || 1),
+          page_size: Number(params?.page_size || data.length || 1),
+          total: data.length,
+          total_pages: 1,
+        };
+      }
+      return {
+        items: Array.isArray(data?.items) ? data.items : [],
+        page: Number(data?.page || 1),
+        page_size: Number(data?.page_size || params?.page_size || 8),
+        total: Number(data?.total || 0),
+        total_pages: Number(data?.total_pages || 1),
+      };
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, "Unable to load reports."));
+    } finally {
+      reportsInFlight.delete(requestKey);
+    }
+  })();
+
+  reportsInFlight.set(requestKey, request);
+  return request;
 }
 
 export async function getReport(reportId) {
@@ -94,17 +140,43 @@ export async function generateReport(payload) {
   }
 }
 
-export async function listReportTemplates({ forceRefresh = false } = {}) {
-  if (!forceRefresh && Array.isArray(reportTemplatesCache) && reportTemplatesCache.length) {
-    return reportTemplatesCache;
-  }
+export async function planReportOutline({ simulation_id, report_type, report_name }) {
   try {
-    const { data } = await api.get("/api/v1/reports/templates");
-    reportTemplatesCache = Array.isArray(data) ? data : [];
-    return reportTemplatesCache;
+    const { data } = await api.post("/api/v1/reports/plan-outline", {
+      simulation_id,
+      report_type,
+      report_name,
+    });
+    return data;
   } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Unable to load report templates."));
+    throw new Error(getApiErrorMessage(error, "Unable to generate report outline."));
   }
+}
+
+export async function listReportTemplates({ forceRefresh = false } = {}) {
+  const now = Date.now();
+  if (!forceRefresh && Array.isArray(reportTemplatesCache) && reportTemplatesCache.length && now - reportTemplatesCacheTs < REPORT_TEMPLATES_CACHE_TTL_MS) {
+    return reportTemplatesCache;
+  }
+  if (!forceRefresh && reportTemplatesInFlight) {
+    return reportTemplatesInFlight;
+  }
+
+  const request = (async () => {
+    try {
+      const { data } = await api.get("/api/v1/reports/templates");
+      reportTemplatesCache = Array.isArray(data) ? data : [];
+      reportTemplatesCacheTs = Date.now();
+      return reportTemplatesCache;
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, "Unable to load report templates."));
+    } finally {
+      reportTemplatesInFlight = null;
+    }
+  })();
+
+  reportTemplatesInFlight = request;
+  return request;
 }
 
 function sanitizeFileBase(value = "") {

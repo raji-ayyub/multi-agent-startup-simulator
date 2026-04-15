@@ -1,13 +1,14 @@
 // src/pages/auth/Signup.jsx
 import { useState } from "react";
 import { useAuthStore } from "../../store/authStore";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import AuthLayout from "../../components/layout/AuthLayout";
 
 export default function Signup() {
   const { signup, isLoading, error } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [formData, setFormData] = useState({
@@ -63,7 +64,10 @@ export default function Signup() {
       setSubmitError("Unable to create account.");
       return;
     }
-    navigate(result.route);
+    const fromPath = location.state?.from?.pathname
+      ? `${location.state.from.pathname}${location.state.from.search || ""}${location.state.from.hash || ""}`
+      : "";
+    navigate(fromPath || result.route, { replace: true });
   };
 
   const strengthColor = {

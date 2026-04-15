@@ -159,12 +159,28 @@ class ReportSection(BaseModel):
     body: str
 
 
+class OutlineSection(BaseModel):
+    heading: str = Field(..., min_length=1, max_length=120)
+    description: str = Field(default="", max_length=500)
+
+
+class PlanOutlineRequest(BaseModel):
+    simulation_id: str = Field(..., min_length=3, max_length=64)
+    report_type: ReportType = "viability_report"
+    report_name: str = Field(default="Business Insight Report", min_length=1, max_length=255)
+
+
+class PlanOutlineResponse(BaseModel):
+    outline: List[OutlineSection]
+
+
 class BusinessReportGenerateRequest(BaseModel):
     simulation_id: str = Field(..., min_length=3, max_length=64)
     workspace_id: Optional[str] = Field(default=None, min_length=3, max_length=64)
     report_name: str = Field(default="Business Insight Report", min_length=3, max_length=255)
     report_type: ReportType = "viability_report"
     template_id: str = Field(default="obsidian_board", min_length=3, max_length=64)
+    outline: Optional[List[OutlineSection]] = None
 
 
 class BusinessReportResponse(BaseModel):

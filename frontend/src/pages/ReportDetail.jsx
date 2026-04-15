@@ -125,7 +125,7 @@ export default function ReportDetailPage() {
               </button>
               <button type="button" onClick={() => navigate(`/reports/${reportId}/edit`)} className="app-ghost-btn inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold">
                 <Pencil size={13} />
-                Edit
+                Preview / Edit
               </button>
               <button type="button" onClick={handleExport} disabled={isExporting} className="app-primary-btn inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold">
                 {isExporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}

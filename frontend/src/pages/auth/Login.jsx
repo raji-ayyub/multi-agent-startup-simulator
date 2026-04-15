@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useAuthStore } from "../../store/authStore";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import AuthLayout from "../../components/layout/AuthLayout";
 
 export default function Login() {
   const { login, isLoading, error } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -21,7 +22,10 @@ export default function Login() {
     e.preventDefault();
     const result = await login(formData);
     if (result?.ok) {
-      navigate(result.route);
+      const fromPath = location.state?.from?.pathname
+        ? `${location.state.from.pathname}${location.state.from.search || ""}${location.state.from.hash || ""}`
+        : "";
+      navigate(fromPath || result.route, { replace: true });
     }
   };
 

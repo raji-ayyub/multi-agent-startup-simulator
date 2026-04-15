@@ -33,6 +33,7 @@ from platform_service import (
     create_notification,
     generate_business_report,
     list_report_templates,
+    plan_report_outline,
     resolve_template_for_report_type,
     serialize_calendar_event,
     serialize_notification,
@@ -45,6 +46,8 @@ from schemas import (
     BusinessReportListItem,
     BusinessReportListResponse,
     BusinessReportUpdateRequest,
+    PlanOutlineRequest,
+    PlanOutlineResponse,
     ReportTemplateItem,
     BusinessReportResponse,
     CalendarEventCreate,
@@ -319,6 +322,24 @@ def get_report_templates():
     return [ReportTemplateItem(**item) for item in list_report_templates()]
 
 
+@platform_router.post("/reports/plan-outline", response_model=PlanOutlineResponse)
+def plan_report_outline_endpoint(
+    payload: PlanOutlineRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    simulation = db.query(SimulationRun).filter(SimulationRun.id == payload.simulation_id).first()
+    if not simulation:
+        raise HTTPException(status_code=404, detail="Simulation not found.")
+    _ensure_simulation_access(db, current_user, simulation)
+    outline = plan_report_outline(
+        simulation=simulation,
+        report_name=payload.report_name,
+        report_type=payload.report_type,
+    )
+    return PlanOutlineResponse(outline=outline)
+
+
 @platform_router.post("/reports/generate", response_model=BusinessReportResponse)
 def generate_report(
     payload: BusinessReportGenerateRequest,
@@ -343,11 +364,13 @@ def generate_report(
         provided_name=payload.report_name,
     )
 
+    approved_outline = [s.model_dump() for s in payload.outline] if payload.outline else None
     report_payload = generate_business_report(
         simulation=simulation,
         workspace=workspace,
         report_name=resolved_report_name,
         report_type=payload.report_type,
+        outline=approved_outline,
     )
     try:
         export_html = build_report_html(

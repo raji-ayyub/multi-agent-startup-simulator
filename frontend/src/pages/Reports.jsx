@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, FilePlus2, FileText, Loader2, PencilRuler, Trash2 } from "lucide-react";
+import { Download, FilePlus2, FileText, LayoutList, Loader2, PencilRuler, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import LoadingScreen from "../components/feedback/LoadingScreen";
 import { listManagementWorkspaces } from "../services/managementService";
-import { deleteReport, exportReport, generateReport, listReportTemplates, listReports } from "../services/platformService";
+import { deleteReport, exportReport, generateReport, listReportTemplates, listReports, planReportOutline } from "../services/platformService";
 import { listSimulations } from "../services/simulationService";
 import { useAuthStore } from "../store/authStore";
 
@@ -174,6 +175,7 @@ export default function ReportsPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [exportingId, setExportingId] = useState("");
   const [deletingId, setDeletingId] = useState("");
+  const [pendingDeleteReport, setPendingDeleteReport] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalReports, setTotalReports] = useState(0);
@@ -182,6 +184,9 @@ export default function ReportsPage() {
     template: false,
     title: false,
   });
+
+  const [outlineStep, setOutlineStep] = useState(null); // null | 'planning' | 'review'
+  const [outlineItems, setOutlineItems] = useState([]);
 
   const [draft, setDraft] = useState({
     simulation_id: "",
@@ -317,24 +322,29 @@ export default function ReportsPage() {
     setDraft((current) => ({ ...current, report_name: nextTitle }));
   };
 
-  const handleGenerate = async (event) => {
+  const resolvedDraft = () => ({
+    reportName: draft.report_name.trim() || buildSuggestedReportTitle(selectedSimulation, draft.report_type),
+    templateId: draft.template_id || inferSuggestedTemplateId(draft.report_type, templates),
+  });
+
+  const handleGenerate = async (event, approvedOutline = null) => {
     event.preventDefault();
     if (!draft.simulation_id) {
       toast.error("Select a simulation first.");
       return;
     }
-    const resolvedReportName = draft.report_name.trim() || buildSuggestedReportTitle(selectedSimulation, draft.report_type);
-    const resolvedTemplate = draft.template_id || inferSuggestedTemplateId(draft.report_type, templates);
+    const { reportName, templateId } = resolvedDraft();
     setIsGenerating(true);
     try {
       const created = await generateReport({
         simulation_id: draft.simulation_id,
         workspace_id: draft.workspace_id || null,
-        report_name: resolvedReportName,
+        report_name: reportName,
         report_type: draft.report_type,
-        template_id: resolvedTemplate,
+        template_id: templateId,
+        outline: approvedOutline || null,
       });
-      toast.success("Report generated.");
+      toast.success(approvedOutline ? "Report generated from your outline." : "Report generated.");
       await loadReportsPage(1);
       navigate(`/reports/${created.report_id}`);
     } catch (error) {
@@ -343,6 +353,45 @@ export default function ReportsPage() {
       setIsGenerating(false);
     }
   };
+
+  const handlePlanOutline = async () => {
+    if (!draft.simulation_id) {
+      toast.error("Select a simulation first.");
+      return;
+    }
+    const { reportName } = resolvedDraft();
+    setOutlineStep("planning");
+    try {
+      const response = await planReportOutline({
+        simulation_id: draft.simulation_id,
+        report_type: draft.report_type,
+        report_name: reportName,
+      });
+      setOutlineItems(response.outline || []);
+      setOutlineStep("review");
+    } catch (error) {
+      toast.error(error.message);
+      setOutlineStep(null);
+    }
+  };
+
+  const handleGenerateFromOutline = async () => {
+    setOutlineStep(null);
+    await handleGenerate({ preventDefault: () => {} }, outlineItems);
+  };
+
+  const updateOutlineItem = (index, field, value) =>
+    setOutlineItems((current) =>
+      current.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    );
+
+  const removeOutlineItem = (index) => {
+    if (outlineItems.length <= 1) return;
+    setOutlineItems((current) => current.filter((_, i) => i !== index));
+  };
+
+  const addOutlineItem = () =>
+    setOutlineItems((current) => [...current, { heading: "New Page", description: "" }]);
 
   const handleQuickExport = async (report) => {
     setExportingId(report.report_id);
@@ -362,8 +411,13 @@ export default function ReportsPage() {
 
   const handleDeleteReport = async (report) => {
     if (!report?.report_id) return;
-    const confirmed = window.confirm(`Delete "${report.report_name}"? This cannot be undone.`);
-    if (!confirmed) return;
+    setPendingDeleteReport(report);
+  };
+
+  const confirmDeleteReport = async () => {
+    const report = pendingDeleteReport;
+    if (!report?.report_id) return;
+    setPendingDeleteReport(null);
 
     setDeletingId(report.report_id);
     const reportId = report.report_id;
@@ -507,9 +561,18 @@ export default function ReportsPage() {
                   Reapply smart defaults
                 </button>
                 <button
+                  type="button"
+                  onClick={handlePlanOutline}
+                  disabled={isGenerating || outlineStep === "planning" || !draft.simulation_id}
+                  className="app-ghost-btn inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {outlineStep === "planning" ? <Loader2 size={15} className="animate-spin" /> : <LayoutList size={15} />}
+                  {outlineStep === "planning" ? "Planning..." : "Plan Outline"}
+                </button>
+                <button
                   type="submit"
-                  disabled={isGenerating}
-                  className="app-primary-btn inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+                  disabled={isGenerating || outlineStep === "planning"}
+                  className="app-primary-btn inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isGenerating ? <Loader2 size={15} className="animate-spin" /> : <FilePlus2 size={15} />}
                   {isGenerating ? "Generating..." : "Generate Report"}
@@ -525,7 +588,7 @@ export default function ReportsPage() {
             </div>
 
             {isLoadingContext || isLoadingReports ? (
-              <p className="app-muted text-sm">Loading reports...</p>
+              <LoadingScreen message="Loading reports..." mode="page" className="min-h-[220px]" />
             ) : reports.length === 0 ? (
               <p className="app-muted text-sm">No reports yet. Generate your first report.</p>
             ) : (
@@ -549,7 +612,7 @@ export default function ReportsPage() {
                           </p>
                           <p className="app-muted mt-1 text-xs">Updated {formatDate(report.updated_at || report.created_at)}</p>
                         </div>
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-col md:flex-row gap-2">
                           <button
                             type="button"
                             onClick={() => navigate(`/reports/${report.report_id}`)}
@@ -608,6 +671,115 @@ export default function ReportsPage() {
             )}
           </article>
         </section>
+
+        {outlineStep === "review" ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+            <div className="app-card flex max-h-[88vh] w-full max-w-lg flex-col rounded-2xl border p-6">
+              <div className="mb-5 flex items-start justify-between">
+                <div>
+                  <h3 className="app-heading text-lg font-semibold">Report Outline</h3>
+                  <p className="app-copy mt-1 text-sm">
+                    Agent planned {outlineItems.length} pages. Edit headings and descriptions before generating.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOutlineStep(null)}
+                  className="app-ghost-btn ml-4 shrink-0 rounded-lg border p-1.5"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                {outlineItems.map((item, index) => (
+                  <div key={index} className="app-card-subtle rounded-xl border p-3">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-2 w-6 shrink-0 text-center text-[11px] font-bold text-cyan-400">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <input
+                          value={item.heading}
+                          onChange={(e) => updateOutlineItem(index, "heading", e.target.value)}
+                          className="theme-input w-full rounded-lg border px-2.5 py-1.5 text-sm font-semibold"
+                          placeholder="Page heading"
+                        />
+                        {item.description ? (
+                          <p className="app-muted mt-1.5 text-xs leading-relaxed">{item.description}</p>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeOutlineItem(index)}
+                        disabled={outlineItems.length <= 1}
+                        className="app-ghost-btn mt-1 shrink-0 rounded border p-1 disabled:opacity-30"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={addOutlineItem}
+                className="app-ghost-btn mt-3 inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold"
+              >
+                <Plus size={13} />
+                Add Page
+              </button>
+
+              <div className="mt-4 flex items-center justify-end gap-2 border-t pt-4">
+                <button
+                  type="button"
+                  onClick={() => setOutlineStep(null)}
+                  className="app-ghost-btn rounded-lg border px-3 py-2 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateFromOutline}
+                  disabled={isGenerating || outlineItems.length === 0}
+                  className="app-primary-btn inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <FilePlus2 size={14} />}
+                  {isGenerating ? "Generating..." : "Generate Report"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {pendingDeleteReport ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
+            <article className="app-card w-full max-w-md rounded-2xl border p-5">
+              <h3 className="app-heading text-base font-semibold">Delete report?</h3>
+              <p className="app-copy mt-2 text-sm">
+                This will permanently remove <span className="font-semibold">{pendingDeleteReport.report_name}</span>.
+              </p>
+              <p className="app-muted mt-1 text-xs">This action cannot be undone.</p>
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPendingDeleteReport(null)}
+                  className="app-ghost-btn rounded-lg border px-3 py-2 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteReport}
+                  className="app-danger-btn rounded-lg px-3 py-2 text-xs font-semibold"
+                >
+                  Delete report
+                </button>
+              </div>
+            </article>
+          </div>
+        ) : null}
       </div>
     </section>
   );

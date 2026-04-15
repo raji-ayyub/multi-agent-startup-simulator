@@ -854,6 +854,67 @@ def _report_section_blueprint(report_type: str) -> List[str]:
     return blueprints.get(normalized, blueprints["business_report"])
 
 
+def plan_report_outline(
+    *,
+    simulation: SimulationRun,
+    report_name: str,
+    report_type: str,
+) -> List[Dict[str, str]]:
+    """Lightweight LLM call that returns a 4-page outline: [{heading, description}].
+    Falls back to blueprint headings with empty descriptions when LLM is unavailable."""
+    normalized = _normalize_report_type(report_type)
+    fallback_headings = _report_section_blueprint(normalized)
+    fallback = [{"heading": h, "description": ""} for h in fallback_headings]
+
+    if client is None:
+        return fallback
+
+    try:
+        response = client.chat.completions.create(
+            model=os.getenv("SIMULATION_MODEL", "gpt-4o-mini"),
+            temperature=0.3,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a strategic report architect. "
+                        "Return strict JSON with key 'outline': an array of exactly 4 objects, each with "
+                        "'heading' (max 80 chars — specific to this startup, not generic) and "
+                        "'description' (1-2 sentences about what this page will cover, max 200 chars). "
+                        "Headings must feel tailored to the startup context, not generic section titles."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Report type: {normalized}\n"
+                        f"Report title: {report_name}\n\n"
+                        f"Startup context:\n{_simulation_context(simulation)}\n\n"
+                        "Generate a 4-page report outline with specific, insight-driven headings "
+                        "and brief descriptions of what each page will cover."
+                    ),
+                },
+            ],
+        )
+        raw = (response.choices[0].message.content or "").strip()
+        parsed = json.loads(raw) if raw else {}
+        outline = parsed.get("outline")
+        if not isinstance(outline, list) or len(outline) < 2:
+            return fallback
+        result = []
+        for item in outline[:6]:
+            if not isinstance(item, dict):
+                continue
+            heading = str(item.get("heading") or "").strip()[:120]
+            description = str(item.get("description") or "").strip()[:500]
+            if heading:
+                result.append({"heading": heading, "description": description})
+        return result if len(result) >= 2 else fallback
+    except Exception:
+        return fallback
+
+
 def _fallback_report(
     simulation: SimulationRun,
     workspace: ManagementWorkspace | None,
@@ -919,14 +980,33 @@ def generate_business_report(
     workspace: ManagementWorkspace | None,
     report_name: str,
     report_type: str,
+    outline: List[Dict[str, str]] | None = None,
 ) -> Dict[str, Any]:
     normalized_report_type = _normalize_report_type(report_type)
+    # Derive section titles from approved outline if provided, else use blueprint
+    if outline and len(outline) >= 2:
+        section_titles = [item["heading"] for item in outline]
+    else:
+        section_titles = _report_section_blueprint(normalized_report_type)
+
     fallback = _fallback_report(simulation, workspace, report_name, normalized_report_type)
+    # Override fallback headings with outline titles when provided
+    if outline and len(outline) >= 2:
+        for i, item in enumerate(outline[:len(fallback["sections"])]):
+            if i < len(fallback["sections"]):
+                fallback["sections"][i]["heading"] = item["heading"]
+
     if client is None:
         return fallback
 
     try:
-        section_titles = _report_section_blueprint(normalized_report_type)
+        # Build outline context string for the LLM when an approved outline exists
+        outline_context = ""
+        if outline and len(outline) >= 2:
+            lines = [f"  {i+1}. {item['heading']}" + (f" — {item['description']}" if item.get('description') else "")
+                     for i, item in enumerate(outline)]
+            outline_context = "Approved outline (use these headings verbatim):\n" + "\n".join(lines) + "\n\n"
+
         response = client.chat.completions.create(
             model=os.getenv("SIMULATION_MODEL", "gpt-4o-mini"),
             temperature=0.2,
@@ -945,6 +1025,7 @@ def generate_business_report(
                     "content": (
                         f"Report type: {normalized_report_type}\n"
                         f"Required section headings: {json.dumps(section_titles)}\n\n"
+                        f"{outline_context}"
                         f"Report title: {report_name}\n\n"
                         f"Simulation context:\n{_simulation_context(simulation)}\n\n"
                         f"Management context:\n{_workspace_context(workspace)}"
