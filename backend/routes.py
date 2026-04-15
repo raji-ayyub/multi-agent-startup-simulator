@@ -49,6 +49,7 @@ def _serialize_user(user: User, profile: UserAccessProfile | None) -> UserRespon
         company_name=user.company_name,
         role=(profile.role if profile else "FOUNDER"),
         title=(profile.title if profile else ""),
+        is_pro=(profile.is_pro if profile else False),
         is_active=user.is_active,
         created_at=user.created_at,
         updated_at=user.updated_at,

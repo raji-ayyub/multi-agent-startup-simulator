@@ -1,11 +1,12 @@
 import axios from "axios";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  "https://multi-agent-startup-simulator.onrender.com";
-
-
-// const API_BASE_URL ="http://localhost:8000"; 
+const normalizeBaseUrl = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/^http:\/\/localhost(?=[:/]|$)/i, "http://127.0.0.1")
+    .replace(/^https:\/\/localhost(?=[:/]|$)/i, "https://127.0.0.1")
+    .replace(/\/+$/, "");
+const API_BASE_URL = normalizeBaseUrl(import.meta.env.VITE_API_URL) || "http://127.0.0.1:8000";
 
 const api = axios.create({
   baseURL: API_BASE_URL,

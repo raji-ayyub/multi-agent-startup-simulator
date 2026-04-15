@@ -11,6 +11,7 @@ from database import create_tables
 from modules.management.routes import management_router
 from modules.simulation.routes import simulation_router
 from platform_routes import platform_router
+from platform_service import ensure_report_renderer_ready, get_report_renderer_health
 from routes import rag_router
 from routes import router as auth_router
 
@@ -38,6 +39,18 @@ async def lifespan(app: FastAPI):
         logger.info("Database tables initialized")
     else:
         logger.warning("Database tables were not initialized during startup because the database was unavailable.")
+    strict_reports = os.getenv("REQUIRE_REPORT_RENDERER", "false").strip().lower() in {"1", "true", "yes", "on"}
+    try:
+        status = ensure_report_renderer_ready(strict=strict_reports)
+        logger.info(
+            "Report renderer status html_ready=%s pdf_ready=%s strict=%s",
+            status["html_renderer_ready"],
+            status["pdf_renderer_ready"],
+            strict_reports,
+        )
+    except Exception:
+        logger.exception("Report renderer readiness check failed with strict mode enabled.")
+        raise
     yield
 
 
@@ -54,6 +67,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 app.include_router(auth_router)
@@ -76,9 +90,15 @@ def read_root():
 
 @app.get("/health", tags=["health"])
 def health_check():
+    renderer = get_report_renderer_health()
     return {
         "status": "healthy",
         "service": "petra-ai-startup-simulator-api",
+        "report_renderer": {
+            "ready": renderer["ready"],
+            "html_renderer_ready": renderer["html_renderer_ready"],
+            "pdf_renderer_ready": renderer["pdf_renderer_ready"],
+        },
     }
 
 

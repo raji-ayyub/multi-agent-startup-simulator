@@ -2,7 +2,7 @@ import logging
 import os
 import time
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
@@ -45,6 +45,52 @@ SessionLocal = sessionmaker(
 )
 
 
+def _has_column(inspector, table_name: str, column_name: str) -> bool:
+    try:
+        return any(col.get("name") == column_name for col in inspector.get_columns(table_name))
+    except Exception:
+        return False
+
+
+def _run_lightweight_migrations() -> None:
+    """Best-effort additive migrations for deployments without Alembic."""
+    try:
+        inspector = inspect(engine)
+    except Exception:
+        return
+
+    with engine.begin() as conn:
+        # user_access_profiles.is_pro
+        if _has_column(inspector, "user_access_profiles", "is_pro") is False:
+            conn.execute(text("ALTER TABLE user_access_profiles ADD COLUMN is_pro BOOLEAN DEFAULT FALSE"))
+            conn.execute(text("UPDATE user_access_profiles SET is_pro = FALSE WHERE is_pro IS NULL"))
+
+        # business_insight_reports version pointers
+        if _has_column(inspector, "business_insight_reports", "published_version_id") is False:
+            conn.execute(text("ALTER TABLE business_insight_reports ADD COLUMN published_version_id VARCHAR(36)"))
+        if _has_column(inspector, "business_insight_reports", "latest_draft_version_id") is False:
+            conn.execute(text("ALTER TABLE business_insight_reports ADD COLUMN latest_draft_version_id VARCHAR(36)"))
+        if _has_column(inspector, "business_insight_reports", "report_type") is False:
+            conn.execute(text("ALTER TABLE business_insight_reports ADD COLUMN report_type VARCHAR(64) DEFAULT 'viability_report'"))
+        if _has_column(inspector, "business_insight_reports", "template_id") is False:
+            conn.execute(text("ALTER TABLE business_insight_reports ADD COLUMN template_id VARCHAR(64) DEFAULT 'obsidian_board'"))
+
+        # indexes (ignore failures if already present)
+        for statement in [
+            "CREATE INDEX IF NOT EXISTS ix_user_access_profiles_is_pro ON user_access_profiles (is_pro)",
+            "CREATE INDEX IF NOT EXISTS ix_business_insight_reports_published_version_id ON business_insight_reports (published_version_id)",
+            "CREATE INDEX IF NOT EXISTS ix_business_insight_reports_latest_draft_version_id ON business_insight_reports (latest_draft_version_id)",
+            "CREATE INDEX IF NOT EXISTS ix_business_insight_reports_report_type ON business_insight_reports (report_type)",
+            "CREATE INDEX IF NOT EXISTS ix_business_insight_report_versions_report_id ON business_insight_report_versions (report_id)",
+            "CREATE INDEX IF NOT EXISTS ix_business_insight_report_versions_status ON business_insight_report_versions (status)",
+            "CREATE INDEX IF NOT EXISTS ix_business_insight_report_versions_content_hash ON business_insight_report_versions (content_hash)",
+        ]:
+            try:
+                conn.execute(text(statement))
+            except Exception:
+                pass
+
+
 def get_db():
     """Dependency to get database session."""
     db = SessionLocal()
@@ -62,6 +108,7 @@ def create_tables():
     for attempt in range(1, attempts + 1):
         try:
             Base.metadata.create_all(bind=engine)
+            _run_lightweight_migrations()
             return True
         except OperationalError as exc:
             if attempt >= attempts:

@@ -33,6 +33,8 @@ const Settings = lazy(() => import("../pages/Settings"));
 const AgentHub = lazy(() => import("../pages/AgentHub"));
 const NotificationsPage = lazy(() => import("../pages/Notifications"));
 const ReportsPage = lazy(() => import("../pages/Reports"));
+const ReportDetailPage = lazy(() => import("../pages/ReportDetail"));
+const ReportEditPage = lazy(() => import("../pages/ReportEdit"));
 const CalendarPage = lazy(() => import("../pages/Calendar"));
 const AdminDashboard = lazy(() => import("../pages/admin/AdminDashboard"));
 const AdminSetup = lazy(() => import("../pages/admin/AdminSetup"));
@@ -209,6 +211,24 @@ export default function App() {
                 <RoleAwareLayout>
                   <ReportsPage />
                 </RoleAwareLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/:reportId"
+            element={
+              <ProtectedRoute>
+                <RoleAwareLayout>
+                  <ReportDetailPage />
+                </RoleAwareLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/:reportId/edit"
+            element={
+              <ProtectedRoute>
+                <ReportEditPage />
               </ProtectedRoute>
             }
           />
