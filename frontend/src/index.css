@@ -46,8 +46,8 @@ html[data-theme="dark"] {
   --accent-text: #93c5fd;
   --success-soft: rgba(16, 185, 129, 0.16);
   --success-text: #86efac;
-  --warning-soft: rgba(245, 158, 11, 0.18);
-  --warning-text: #fcd34d;
+  --warning-soft: rgba(245, 163, 11, 0.18);
+  --warning-text: #fde68a;
   --danger-soft: rgba(239, 68, 68, 0.16);
   --danger-text: #fda4af;
   --overlay: rgba(2, 6, 23, 0.78);
