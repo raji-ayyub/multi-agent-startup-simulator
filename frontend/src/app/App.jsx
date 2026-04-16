@@ -35,6 +35,8 @@ const ReportEditPage = lazy(() => import("../pages/ReportEdit"));
 const CalendarPage = lazy(() => import("../pages/Calendar"));
 const AdminDashboard = lazy(() => import("../pages/admin/AdminDashboard"));
 const AdminSetup = lazy(() => import("../pages/admin/AdminSetup"));
+const PrivacyPolicyPage = lazy(() => import("../pages/PrivacyPolicy"));
+const TermsOfUsePage = lazy(() => import("../pages/TermsOfUse"));
 
 const ProtectedRoute = ({ children, allowRoles = [] }) => {
   const { isAuthenticated, user, hasHydrated } = useAuthStore();
@@ -124,6 +126,8 @@ export default function App() {
           <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
           <Route path="/reset-password/:token" element={<PublicRoute><ResetPassword /></PublicRoute>} />
           <Route path="/admin/setup" element={<PublicRoute><AdminSetup /></PublicRoute>} />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms-of-use" element={<TermsOfUsePage />} />
 
           <Route path="/" element={<Landing />} />
           <Route path="/about" element={<About />} />

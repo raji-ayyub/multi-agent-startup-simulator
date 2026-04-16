@@ -118,7 +118,14 @@ export default function Login() {
         </div>
 
         <p className="app-muted mt-6 text-center text-[10px] leading-relaxed tracking-wide">
-          By continuing, you agree to PentraAI Terms and Privacy Policy.
+          By continuing, you agree to PentraAI{" "}
+          <Link to="/terms-of-use" className="auth-link hover:underline">
+            Terms of Use
+          </Link>{" "}
+          and{" "}
+          <Link to="/privacy-policy" className="auth-link hover:underline">
+            Privacy Policy
+          </Link>.
         </p>
       </div>
     </AuthLayout>

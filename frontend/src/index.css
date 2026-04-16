@@ -114,9 +114,19 @@ html[data-theme="dark"] {
   --app-sim-accent: #fde68a;
   --app-sim-accent-soft: rgba(245, 158, 11, 0.12);
   --app-sim-verdict-bg: linear-gradient(90deg, rgba(245, 158, 11, 0.24), rgba(17, 24, 39, 0.98));
-  --app-marketing-card: #ffffff;
-  --app-marketing-header: rgba(255, 255, 255, 0.9);
+  --app-marketing-card: #0f1623;
+  --app-marketing-header: rgba(6, 10, 18, 0.9);
   --app-marketing-band: linear-gradient(145deg, #0b1322, #081327);
+  --legal-bg: #060b14;
+  --legal-surface: rgba(15, 22, 35, 0.72);
+  --legal-surface-strong: #0f1623;
+  --legal-surface-soft: rgba(18, 31, 46, 0.72);
+  --legal-border: rgba(56, 79, 108, 0.42);
+  --legal-accent: #38bdf8;
+  --legal-accent-soft: rgba(56, 189, 248, 0.14);
+  --legal-copy: #9fb0c5;
+  --legal-heading: #e6edf7;
+  --legal-shadow: 0 24px 50px rgba(3, 7, 18, 0.45);
 }
 
 html[data-theme="light"] {
@@ -214,6 +224,16 @@ html[data-theme="light"] {
   --app-marketing-card: #ffffff;
   --app-marketing-header: rgba(255, 255, 255, 0.92);
   --app-marketing-band: linear-gradient(145deg, #eff6ff, #dbeafe);
+  --legal-bg: #f3f7fc;
+  --legal-surface: #ffffff;
+  --legal-surface-strong: #ffffff;
+  --legal-surface-soft: #f8fbff;
+  --legal-border: #d7e1ee;
+  --legal-accent: #0284c7;
+  --legal-accent-soft: rgba(2, 132, 199, 0.11);
+  --legal-copy: #52637a;
+  --legal-heading: #0f172a;
+  --legal-shadow: 0 16px 40px rgba(148, 163, 184, 0.22);
 }
 
 html[data-theme] .light-theme-toggle {
@@ -889,4 +909,102 @@ html[data-theme="dark"] .marketing-page :is(.text-slate-500, .text-slate-400) {
 
 html[data-theme="dark"] .marketing-page :is(.border-slate-200, .border-slate-300, .border-slate-800) {
   border-color: var(--border) !important;
+}
+
+html[data-theme] .legal-page {
+  background: var(--legal-bg);
+  color: var(--legal-heading);
+}
+
+html[data-theme] .legal-page .landing-ambient {
+  opacity: 0.65;
+}
+
+html[data-theme] .legal-topbar {
+  background: color-mix(in srgb, var(--legal-bg) 82%, transparent);
+  border-color: var(--legal-border);
+  backdrop-filter: blur(14px);
+}
+
+html[data-theme] .legal-topbar-link {
+  color: var(--legal-copy);
+}
+
+html[data-theme] .legal-topbar-link:hover,
+html[data-theme] .legal-topbar-link.is-active {
+  color: var(--legal-accent);
+}
+
+html[data-theme] .legal-command-btn {
+  background: color-mix(in srgb, var(--legal-surface) 85%, transparent);
+  border-color: var(--legal-border);
+  color: var(--legal-accent);
+}
+
+html[data-theme] .legal-command-btn:hover {
+  background: color-mix(in srgb, var(--legal-surface-soft) 90%, transparent);
+}
+
+html[data-theme] .legal-avatar {
+  background: color-mix(in srgb, var(--legal-accent) 18%, var(--legal-surface-strong));
+  color: var(--legal-heading);
+  border-color: var(--legal-border);
+}
+
+html[data-theme] .legal-sidebar,
+html[data-theme] .legal-panel,
+html[data-theme] .legal-mini-card,
+html[data-theme] .legal-stat-card,
+html[data-theme] .legal-cta {
+  background: var(--legal-surface);
+  border-color: var(--legal-border);
+  box-shadow: var(--legal-shadow);
+}
+
+html[data-theme] .legal-sidebar {
+  backdrop-filter: blur(8px);
+}
+
+html[data-theme] .legal-chip {
+  background: var(--legal-accent-soft);
+  border-color: color-mix(in srgb, var(--legal-accent) 35%, var(--legal-border));
+  color: var(--legal-accent);
+}
+
+html[data-theme] .legal-title {
+  color: var(--legal-heading);
+}
+
+html[data-theme] .legal-title-accent,
+html[data-theme] .legal-section-number {
+  color: var(--legal-accent);
+}
+
+html[data-theme] .legal-copy {
+  color: var(--legal-copy);
+}
+
+html[data-theme] .legal-nav-item {
+  color: var(--legal-copy);
+  border-color: transparent;
+}
+
+html[data-theme] .legal-nav-item:hover {
+  border-color: var(--legal-border);
+  color: var(--legal-heading);
+}
+
+html[data-theme] .legal-nav-item.is-active {
+  background: var(--legal-accent-soft);
+  border-color: color-mix(in srgb, var(--legal-accent) 45%, var(--legal-border));
+  color: var(--legal-accent);
+}
+
+html[data-theme] .legal-divider {
+  border-color: var(--legal-border);
+}
+
+html[data-theme] .legal-footer {
+  background: color-mix(in srgb, var(--legal-bg) 90%, transparent);
+  border-color: var(--legal-border);
 }

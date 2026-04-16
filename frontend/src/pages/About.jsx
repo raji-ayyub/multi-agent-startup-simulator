@@ -1,6 +1,8 @@
-import { BarChart3, Briefcase, SearchCheck, Sparkles, UsersRound } from "lucide-react";
+import { BarChart3, Briefcase, UsersRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
+import ExternalNavbar from "../components/layout/ExternalNavbar";
+import ExternalFooter from "../components/layout/ExternalFooter";
 
 const methodology = [
   {
@@ -32,27 +34,10 @@ export default function About() {
 
   return (
     <div className="marketing-page min-h-screen">
-      <header className="marketing-header sticky top-0 z-20 border-b backdrop-blur">
-        <div className="mx-auto flex max-w-[1100px] items-center justify-between px-5 py-4">
-          <Link to="/" className="flex items-center gap-2 text-sm font-semibold">
-            <div className="landing-logo-badge flex h-7 w-7 items-center justify-center rounded-md text-white">
-              <Sparkles size={14} />
-            </div>
-            PentraAI
-          </Link>
-          <nav className="hidden items-center gap-7 text-sm md:flex">
-            <Link to="/#product" className="landing-nav-link">Product</Link>
-            <Link to="/about" className="landing-nav-link landing-heading font-semibold">About</Link>
-            <Link to="/#method" className="landing-nav-link">Methodology</Link>
-            <Link to="/#pricing" className="landing-nav-link">Pricing</Link>
-          </nav>
-          <Link to={ctaHref} className="app-primary-btn rounded-full px-4 py-2 text-xs font-semibold">
-            Sign Up
-          </Link>
-        </div>
-      </header>
+      <div className="landing-ambient pointer-events-none fixed inset-0" />
+      <ExternalNavbar active="about" />
 
-      <main className="mx-auto max-w-[1100px] px-5 py-14">
+      <main className="relative z-10 mx-auto max-w-[1100px] px-5 py-14">
         <section>
           <p className="app-status-warning inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]">
             The Mission
@@ -147,17 +132,7 @@ export default function About() {
         </section>
       </main>
 
-      <footer className="marketing-header border-t">
-        <div className="app-copy mx-auto flex max-w-[1100px] flex-wrap items-center justify-between gap-4 px-5 py-6 text-sm">
-          <p className="app-heading font-semibold">PentraAI</p>
-          <div className="flex items-center gap-5">
-            <p>Privacy Policy</p>
-            <p>Terms of Service</p>
-            <p>Contact</p>
-          </div>
-          <p>&copy; 2026 PentraAI Systems Inc. All rights reserved.</p>
-        </div>
-      </footer>
+      <ExternalFooter />
     </div>
   );
 }
