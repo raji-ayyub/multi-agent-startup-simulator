@@ -1,0 +1,397 @@
+html {
+  color: #182532;
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.55;
+}
+
+body {
+  margin: 0;
+  orphans: 3;
+  widows: 3;
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+dl,
+table,
+figure {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  break-after: avoid;
+  color: var(--primary-color);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+h1 {
+  font-size: 22pt;
+  line-height: 1.2;
+  margin-bottom: 0.24in;
+}
+
+h2 {
+  font-size: 13pt;
+  margin-bottom: 0.12in;
+}
+
+h3 {
+  font-size: 11pt;
+  margin-bottom: 0.08in;
+}
+
+p + p {
+  margin-top: 0.12in;
+}
+
+.running-strings {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  visibility: hidden;
+}
+
+.running-startup {
+  string-set: startup-name content();
+}
+
+.running-footer {
+  string-set: report-footer content();
+}
+
+.running-date {
+  string-set: report-date content();
+}
+
+.cover-page {
+  page: cover;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0.15in 0;
+  break-after: page;
+  background:
+    linear-gradient(135deg, rgba(18, 59, 93, 0.07), rgba(200, 160, 85, 0.12)),
+    linear-gradient(180deg, #ffffff, #f7f8fa);
+}
+
+.cover-top {
+  max-width: 5.8in;
+}
+
+.cover-logo {
+  max-height: 0.85in;
+  max-width: 2.4in;
+  margin-bottom: 0.35in;
+  object-fit: contain;
+}
+
+.eyebrow,
+.section-kicker,
+.meta-label,
+.table-note,
+.metric-label,
+.metric-note,
+.meta-line {
+  color: var(--secondary-color);
+}
+
+.eyebrow,
+.section-kicker {
+  font-size: 9pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cover-subtitle {
+  max-width: 4.8in;
+  color: #304253;
+  font-size: 12pt;
+}
+
+.cover-bottom {
+  border-top: 1px solid rgba(18, 59, 93, 0.12);
+  padding-top: 0.28in;
+}
+
+.cover-meta-grid,
+.section-grid,
+.metric-grid,
+.card-grid,
+.chart-grid {
+  display: grid;
+  gap: 0.2in;
+}
+
+.cover-meta-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.meta-label {
+  display: block;
+  font-size: 8.6pt;
+  margin-bottom: 0.03in;
+  text-transform: uppercase;
+}
+
+.meta-value {
+  color: #182532;
+  display: block;
+  font-size: 11pt;
+  font-weight: 600;
+}
+
+.toc-page {
+  break-before: page;
+}
+
+.report-section {
+  break-before: auto;
+  margin-top: 0.16in;
+}
+
+.toc-page + .report-section {
+  break-before: page;
+}
+
+.report-section + .report-section {
+  border-top: 1px solid rgba(18, 59, 93, 0.1);
+  margin-top: 0.28in;
+  padding-top: 0.2in;
+}
+
+.toc-list {
+  margin-top: 0.3in;
+  padding-left: 0;
+  list-style: none;
+}
+
+.toc-list li {
+  border-bottom: 1px solid rgba(18, 59, 93, 0.1);
+  margin-bottom: 0.08in;
+  padding-bottom: 0.08in;
+}
+
+.toc-list a {
+  color: #182532;
+  display: block;
+  text-decoration: none;
+}
+
+.toc-list a::after {
+  color: var(--secondary-color);
+  content: target-counter(attr(href), page);
+  float: right;
+}
+
+.section-header {
+  border-bottom: 2px solid rgba(18, 59, 93, 0.16);
+  margin-bottom: 0.22in;
+  padding-bottom: 0.14in;
+}
+
+.content-block,
+.data-table-block {
+  break-inside: auto;
+  margin-bottom: 0.22in;
+}
+
+.section-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 0.22in;
+}
+
+.metric-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 0.22in;
+}
+
+.card-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.chart-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.metric-card,
+.detail-card,
+.chart-card {
+  background: #ffffff;
+  border: 1px solid rgba(18, 59, 93, 0.1);
+  border-radius: 12px;
+  break-inside: auto;
+  box-shadow: 0 8px 24px rgba(24, 37, 50, 0.04);
+  padding: 0.18in;
+}
+
+.metric-value {
+  color: #182532;
+  font-size: 18pt;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.metric-note {
+  font-size: 8.7pt;
+  margin-top: 0.06in;
+}
+
+.recommendation {
+  color: #182532;
+  font-size: 18pt;
+  font-weight: 700;
+}
+
+.recommendation-go {
+  color: #1d6a4d;
+}
+
+.recommendation-go-with-caveats,
+.recommendation-pivot {
+  color: #8a6200;
+}
+
+.recommendation-no-go {
+  color: #8a2030;
+}
+
+.card-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.12in;
+  margin-bottom: 0.1in;
+}
+
+.pill {
+  background: rgba(18, 59, 93, 0.08);
+  border-radius: 999px;
+  color: var(--primary-color);
+  display: inline-block;
+  font-size: 8.5pt;
+  font-weight: 700;
+  padding: 0.04in 0.1in;
+  text-transform: uppercase;
+}
+
+.severity-High .pill,
+.severity-Critical .pill {
+  background: rgba(138, 32, 48, 0.1);
+  color: #8a2030;
+}
+
+.severity-Medium .pill {
+  background: rgba(138, 98, 0, 0.1);
+  color: #8a6200;
+}
+
+.compact-list,
+.bullet-list {
+  margin-top: 0.08in;
+  padding-left: 0.2in;
+}
+
+.compact-list li,
+.bullet-list li {
+  margin-bottom: 0.06in;
+}
+
+.empty-state {
+  color: var(--secondary-color);
+  font-style: italic;
+}
+
+.data-table {
+  border-collapse: collapse;
+  margin-top: 0.08in;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.data-table thead {
+  display: table-header-group;
+}
+
+.data-table th,
+.data-table td {
+  border: 1px solid rgba(18, 59, 93, 0.08);
+  padding: 0.09in 0.11in;
+  text-align: left;
+  vertical-align: top;
+  word-wrap: break-word;
+}
+
+.data-table th {
+  background: rgba(18, 59, 93, 0.08);
+  color: var(--primary-color);
+  font-size: 9pt;
+}
+
+.data-table tbody tr:nth-child(even) {
+  background: rgba(24, 37, 50, 0.02);
+}
+
+.table-note {
+  font-size: 8.8pt;
+  margin-top: 0.08in;
+}
+
+.chart-card img {
+  border-radius: 8px;
+  display: block;
+  max-height: 3.0in;
+  object-fit: contain;
+  width: 100%;
+}
+
+.chart-card figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.04in;
+  margin-top: 0.1in;
+}
+
+.glossary-list {
+  display: grid;
+  gap: 0.12in;
+}
+
+.glossary-list dt {
+  color: var(--primary-color);
+  font-weight: 700;
+}
+
+.glossary-list dd {
+  margin-left: 0;
+}
+
+@media print {
+  .cover-page,
+  .detail-card,
+  .metric-card,
+  .chart-card,
+  .data-table-block {
+    break-inside: auto;
+  }
+
+  .section-grid,
+  .card-grid,
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

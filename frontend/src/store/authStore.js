@@ -29,6 +29,20 @@ const normalizeUser = (user) => {
   };
 };
 
+const readPersistedSession = () => {
+  try {
+    const token = localStorage.getItem("accessToken");
+    const rawUser = localStorage.getItem("authUser");
+    const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+    return {
+      token: token || "",
+      user: normalizeUser(parsedUser),
+    };
+  } catch {
+    return { token: "", user: null };
+  }
+};
+
 const persistSession = ({ accessToken, user }) => {
   localStorage.setItem("accessToken", accessToken);
   localStorage.setItem("authUser", JSON.stringify(normalizeUser(user)));
@@ -40,36 +54,54 @@ const clearSession = () => {
   useNotificationStore.getState().reset();
 };
 
-export const useAuthStore = create((set) => ({
-  user: null,
+const initialSession = readPersistedSession();
+let authCheckPromise = null;
+
+export const useAuthStore = create((set, get) => ({
+  user: initialSession.user,
   dashboardData: null,
-  isAuthenticated: false,
+  isAuthenticated: Boolean(initialSession.token && initialSession.user),
+  hasHydrated: !initialSession.token,
   isLoading: false,
   error: null,
 
-  checkAuth: async () => {
+  checkAuth: async (force = false) => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
       clearSession();
-      set({ user: null, isAuthenticated: false, error: null });
+      set({ user: null, isAuthenticated: false, hasHydrated: true, isLoading: false, error: null });
       return false;
+    }
+    if (!force && get().hasHydrated && get().isAuthenticated) {
+      return true;
+    }
+    if (!force && authCheckPromise) {
+      return authCheckPromise;
     }
 
-    try {
-      const { data } = await api.get("/api/v1/auth/me");
-      const user = normalizeUser(data);
-      localStorage.setItem("authUser", JSON.stringify(user));
-      set({ user, isAuthenticated: true, error: null });
-      return true;
-    } catch (error) {
-      clearSession();
-      set({
-        user: null,
-        isAuthenticated: false,
-        error: getApiErrorMessage(error, "Session expired."),
-      });
-      return false;
-    }
+    set({ isLoading: true, error: null });
+    authCheckPromise = (async () => {
+      try {
+        const { data } = await api.get("/api/v1/auth/me");
+        const user = normalizeUser(data);
+        localStorage.setItem("authUser", JSON.stringify(user));
+        set({ user, isAuthenticated: true, hasHydrated: true, isLoading: false, error: null });
+        return true;
+      } catch (error) {
+        clearSession();
+        set({
+          user: null,
+          isAuthenticated: false,
+          hasHydrated: true,
+          isLoading: false,
+          error: getApiErrorMessage(error, "Session expired."),
+        });
+        return false;
+      } finally {
+        authCheckPromise = null;
+      }
+    })();
+    return authCheckPromise;
   },
 
   login: async ({ email, password }) => {
@@ -78,12 +110,13 @@ export const useAuthStore = create((set) => ({
       const { data } = await api.post("/api/v1/auth/sign-in", { email, password });
       const user = normalizeUser(data.user);
       persistSession({ accessToken: data.access_token, user });
-      set({ user, isAuthenticated: true, isLoading: false, error: null });
+      set({ user, isAuthenticated: true, hasHydrated: true, isLoading: false, error: null });
       return { ok: true, route: getDefaultRouteForRole(user.role) };
     } catch (error) {
       set({
         isLoading: false,
         isAuthenticated: false,
+        hasHydrated: true,
         error: getApiErrorMessage(error, "Unable to sign in."),
       });
       return { ok: false, route: null };
@@ -103,12 +136,13 @@ export const useAuthStore = create((set) => ({
       const { data } = await api.post("/api/v1/auth/sign-up", payload);
       const user = normalizeUser(data.user);
       persistSession({ accessToken: data.access_token, user });
-      set({ user, isAuthenticated: true, isLoading: false, error: null });
+      set({ user, isAuthenticated: true, hasHydrated: true, isLoading: false, error: null });
       return { ok: true, route: getDefaultRouteForRole(user.role) };
     } catch (error) {
       set({
         isLoading: false,
         isAuthenticated: false,
+        hasHydrated: true,
         error: getApiErrorMessage(error, "Unable to create account."),
       });
       return { ok: false, route: null };
@@ -128,11 +162,12 @@ export const useAuthStore = create((set) => ({
       });
       const user = normalizeUser(data.user);
       persistSession({ accessToken: data.access_token, user });
-      set({ user, isAuthenticated: true, isLoading: false, error: null });
+      set({ user, isAuthenticated: true, hasHydrated: true, isLoading: false, error: null });
       return { ok: true, route: getDefaultRouteForRole(user.role) };
     } catch (error) {
       set({
         isLoading: false,
+        hasHydrated: true,
         error: getApiErrorMessage(error, "Unable to create admin account."),
       });
       return { ok: false, route: null };
@@ -213,6 +248,7 @@ export const useAuthStore = create((set) => ({
       user: null,
       dashboardData: null,
       isAuthenticated: false,
+      hasHydrated: true,
       error: null,
     });
   },

@@ -5,12 +5,11 @@ import {
   ChevronRight,
   CircleDot,
   Compass,
-  LineChart,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
+import ExternalNavbar from "../components/layout/ExternalNavbar";
 
 const capabilityCards = [
   {
@@ -64,32 +63,7 @@ export default function Landing() {
     <div className="landing-page marketing-page min-h-screen bg-[#05080f] text-slate-100">
       <div className="landing-ambient pointer-events-none fixed inset-0" />
 
-      <header className="landing-header sticky top-0 z-20 border-b backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1160px] items-center justify-between px-5 py-4">
-          <Link to="/" className="flex items-center gap-2">
-            <img src="/images/Icon.svg" alt="Logo" className="landing-logo-badge h-8 w-8 rounded-lg p-1" />
-            <h1 className="landing-brand text-sm font-semibold tracking-wide">PentraAI</h1>
-          </Link>
-
-          <nav className="hidden items-center gap-7 text-sm md:flex">
-            <a href="/#product" className="landing-nav-link transition">Product</a>
-            <Link to="/about" className="landing-nav-link transition">About</Link>
-            <a href="/#method" className="landing-nav-link transition">Methodology</a>
-            <a href="/#pricing" className="landing-nav-link transition">Pricing</a>
-          </nav>
-
-          <div className="flex items-center gap-2">
-            {!isAuthenticated ? (
-              <Link to="/login" className="landing-ghost-btn rounded-full border px-4 py-2 text-xs font-semibold transition">
-                Sign In
-              </Link>
-            ) : null}
-            <Link to={primaryHref} className="landing-primary-btn rounded-full px-4 py-2 text-xs font-semibold transition">
-              Start Simulation
-            </Link>
-          </div>
-        </div>
-      </header>
+      <ExternalNavbar />
 
       <main className="relative z-10">
         <section className="mx-auto grid max-w-[1160px] gap-8 px-5 pb-16 pt-16 lg:grid-cols-[1.1fr_1fr]">
@@ -128,16 +102,107 @@ export default function Landing() {
 
           <div className="landing-hero-card rounded-2xl border p-4">
             <div className="landing-hero-inner rounded-xl border p-5">
-              <p className="landing-kicker text-[10px] uppercase tracking-[0.2em]">Simulation Environment | Strategic Analysis</p>
-              <div className="landing-chart-panel mt-6 h-64 rounded-xl border p-4">
-                <div className="flex h-full items-end justify-between">
-                  <div className="space-y-2 text-xs">
-                    <p className="landing-accent-text">Probability of Success</p>
-                    <p className="landing-heading text-2xl font-semibold">84.2%</p>
-                    <p className="landing-muted">Live from simulated market conditions.</p>
-                  </div>
-                  <LineChart size={96} className="landing-graph" />
+              {/* Header row */}
+              <div className="flex items-center justify-between">
+                <p className="landing-kicker text-[10px] uppercase tracking-[0.2em]">
+                  Simulation Environment | Strategic Analysis
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-teal-400" />
+                  </span>
+                  <span className="landing-accent-text text-[10px] font-medium tracking-wider">LIVE</span>
                 </div>
+              </div>
+
+              <div className="landing-chart-panel mt-4 rounded-xl border p-4">
+                {/* Primary metric + donut gauge */}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="landing-muted text-[10px] uppercase tracking-widest">Success Probability</p>
+                    <p className="landing-heading mt-1 text-4xl font-bold tracking-tight">84.2%</p>
+                    <p className="mt-1 text-[10px] text-emerald-400">+3.1% from baseline run</p>
+                  </div>
+                  {/* Donut gauge: 84.2% fill */}
+                  <svg width="60" height="60" viewBox="0 0 36 36" className="-rotate-90">
+                    <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="3.5" />
+                    <circle
+                      cx="18" cy="18" r="14" fill="none"
+                      stroke="rgba(45,212,191,0.85)" strokeWidth="3.5"
+                      strokeDasharray="74.1 13.9"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+
+                {/* Sparkline */}
+                <div className="my-3">
+                  <svg viewBox="0 0 220 36" className="w-full landing-graph" style={{ height: 36 }} preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="hero-sg" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stopColor="currentColor" stopOpacity="0.18" />
+                        <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d="M0,32 L25,28 L50,30 L75,22 L100,18 L125,14 L150,10 L175,7 L200,4 L220,2"
+                      fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                    />
+                    <path
+                      d="M0,32 L25,28 L50,30 L75,22 L100,18 L125,14 L150,10 L175,7 L200,4 L220,2 L220,36 L0,36 Z"
+                      fill="url(#hero-sg)"
+                    />
+                  </svg>
+                </div>
+
+                {/* Per-agent scores */}
+                <div className="grid grid-cols-3 gap-2 border-t pt-3" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                  {[
+                    { agent: 'Market',   score: '8.1' },
+                    { agent: 'Customer', score: '7.6' },
+                    { agent: 'Investor', score: '9.0' },
+                  ].map(({ agent, score }) => (
+                    <div
+                      key={agent}
+                      className="rounded-lg p-2"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    >
+                      <div className="mb-0.5 flex items-center gap-1">
+                        <span className="inline-block h-1 w-1 animate-pulse rounded-full bg-teal-400" />
+                        <span className="landing-muted text-[9px] uppercase tracking-wide">{agent}</span>
+                      </div>
+                      <p className="landing-heading text-sm font-semibold">
+                        {score}<span className="landing-muted text-[9px]">/10</span>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Agent insight feed */}
+              <div className="mt-3 space-y-1.5">
+                <p className="landing-muted mb-2 text-[9px] uppercase tracking-[0.18em]">Latest Agent Signals</p>
+                {[
+                  { kind: 'up',   agent: 'Market',   text: 'Underserved SMB segment - low competitive density' },
+                  { kind: 'warn', agent: 'Investor',  text: 'CAC payback exceeds 18-month benchmark' },
+                  { kind: 'up',   agent: 'Customer',  text: 'NPS proxy strong - retention model viable' },
+                ].map(({ kind, agent, text }) => (
+                  <div
+                    key={text}
+                    className="flex items-start gap-2.5 rounded-lg px-3 py-2"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                  >
+                    <span
+                      className="mt-[3px] h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: kind === 'up' ? 'rgba(52,211,153,0.9)' : 'rgba(251,191,36,0.9)' }}
+                    />
+                    <p className="text-[10px] leading-snug">
+                      <span className="landing-accent-text uppercase tracking-wide">{agent} - </span>
+                      <span className="landing-muted">{text}</span>
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -225,8 +290,24 @@ export default function Landing() {
               Strategic simulation infrastructure for founders, operators, and venture teams.
             </p>
           </div>
-          <FooterCol title="Product" links={["Market Analysis", "Risk Modeling", "Pricing Engine", "API Reference"]} />
-          <FooterCol title="Company" links={["About Us", "Methodology", "Careers", "Privacy Policy"]} />
+          <FooterCol
+            title="Product"
+            links={[
+              { label: "Market Analysis" },
+              { label: "Risk Modeling" },
+              { label: "Pricing Engine" },
+              { label: "API Reference" },
+            ]}
+          />
+          <FooterCol
+            title="Company"
+            links={[
+              { label: "About Us", path: "/about" },
+              { label: "Methodology", path: "/#method" },
+              { label: "Terms of Use", path: "/terms-of-use" },
+              { label: "Privacy Policy", path: "/privacy-policy" },
+            ]}
+          />
           <div>
             <p className="landing-heading text-sm font-semibold">Stay Informed</p>
             <div className="landing-input-shell mt-3 flex rounded-lg border px-3 py-2 text-sm">
@@ -247,8 +328,14 @@ function FooterCol({ title, links }) {
     <div>
       <p className="landing-heading text-sm font-semibold">{title}</p>
       <div className="landing-muted mt-3 space-y-2 text-sm">
-        {links.map((link) => (
-          <p key={link}>{link}</p>
+        {links.map((item) => (
+          item.path ? (
+            <Link key={item.label} to={item.path} className="block landing-nav-link">
+              {item.label}
+            </Link>
+          ) : (
+            <p key={item.label}>{item.label}</p>
+          )
         ))}
       </div>
     </div>

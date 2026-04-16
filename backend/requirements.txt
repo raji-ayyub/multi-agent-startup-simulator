@@ -30,3 +30,6 @@ python-multipart
 numpy
 sendgrid>=6.9.1
 docx2txt
+Jinja2
+WeasyPrint
+playwright

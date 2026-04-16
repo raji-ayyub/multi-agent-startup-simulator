@@ -22,7 +22,7 @@ export default function ManagementSidebar() {
   const navigate = useNavigate();
 
   return (
-    <aside className="app-sidebar management-shell flex h-screen w-[248px] flex-col justify-between border-r border-slate-800 bg-[#070b11] px-4 py-5 text-slate-300">
+    <aside className="app-sidebar management-shell flex h-screen w-[248px] flex-col justify-between border-r border-slate-800 bg-[#070b11] px-4 py-5 text-slate-300 overflow-y-auto scrollbar-none">
       <div>
         <div className="px-2">
           <div className="flex items-center gap-2">
@@ -45,7 +45,7 @@ export default function ManagementSidebar() {
           ))}
         </nav>
 
-        <div className="mt-6 px-2">
+        <div className="mt-6 mb-4 px-2">
           <p className="app-muted mb-2 text-[10px] uppercase tracking-[0.2em]">Mode</p>
           <ModeSwitch mode="management" />
         </div>

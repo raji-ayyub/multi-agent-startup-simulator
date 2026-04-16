@@ -1,0 +1,640 @@
+{% macro bullet_list(items, empty_text='Not provided') -%}
+{% if items %}
+<ul class="bullet-list">
+  {% for item in items %}
+  <li>{{ item }}</li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="empty-state">{{ empty_text }}</p>
+{% endif %}
+{%- endmacro %}
+
+{% macro metric_cards(cards, empty_text='Not provided') -%}
+{% if cards %}
+<div class="metric-grid">
+  {% for card in cards %}
+  <article class="metric-card">
+    <p class="metric-label">{{ card.label }}</p>
+    <p class="metric-value">{{ card.display_value }}</p>
+    {% if card.note %}
+    <p class="metric-note">{{ card.note }}</p>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty-state">{{ empty_text }}</p>
+{% endif %}
+{%- endmacro %}
+
+{% macro structured_table(table) -%}
+<article class="data-table-block">
+  <h3>{{ table.title }}</h3>
+  {% if table.columns and table.rows %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        {% for column in table.columns %}
+        <th>{{ column }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in table.rows %}
+      <tr>
+        {% for cell in row %}
+        <td>{{ cell }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">No tabular data provided.</p>
+  {% endif %}
+  {% if table.note %}
+  <p class="table-note">{{ table.note }}</p>
+  {% endif %}
+</article>
+{%- endmacro %}
+
+{% macro chart_gallery(charts, empty_text='No charts provided.') -%}
+{% if charts %}
+<div class="chart-grid">
+  {% for chart in charts %}
+  <figure class="chart-card">
+    {% if chart.uri %}
+    <img src="{{ chart.uri }}" alt="{{ chart.title }}">
+    {% endif %}
+    <figcaption>
+      <strong>{{ chart.title }}</strong>
+      {% if chart.caption %}
+      <span>{{ chart.caption }}</span>
+      {% endif %}
+    </figcaption>
+  </figure>
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty-state">{{ empty_text }}</p>
+{% endif %}
+{%- endmacro %}
+
+{% macro scenario_cards(items, empty_text='No scenario outputs provided.') -%}
+{% if items %}
+<div class="card-grid">
+  {% for item in items %}
+  <article class="detail-card">
+    <h3>{{ item.name }}</h3>
+    {% if item.summary %}
+    <p>{{ item.summary }}</p>
+    {% endif %}
+    {% if item.probability and item.probability != 'Not provided' %}
+    <p class="meta-line">Probability: {{ item.probability }}</p>
+    {% endif %}
+    {% if item.metrics %}
+    <ul class="compact-list">
+      {% for metric in item.metrics %}
+      <li><strong>{{ metric.label }}:</strong> {{ metric.display_value }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty-state">{{ empty_text }}</p>
+{% endif %}
+{%- endmacro %}
+
+{% macro risk_cards(items, empty_text='No material risks provided.') -%}
+{% if items %}
+<div class="card-grid">
+  {% for risk in items %}
+  <article class="detail-card risk-card severity-{{ risk.severity | lower }}">
+    <div class="card-header">
+      <h3>{{ risk.name }}</h3>
+      <span class="pill">{{ risk.severity }}</span>
+    </div>
+    {% if risk.description %}
+    <p>{{ risk.description }}</p>
+    {% endif %}
+    <ul class="compact-list">
+      {% if risk.likelihood %}<li><strong>Likelihood:</strong> {{ risk.likelihood }}</li>{% endif %}
+      {% if risk.impact %}<li><strong>Impact:</strong> {{ risk.impact }}</li>{% endif %}
+      {% if risk.mitigation %}<li><strong>Mitigation:</strong> {{ risk.mitigation }}</li>{% endif %}
+      {% if risk.owner %}<li><strong>Owner:</strong> {{ risk.owner }}</li>{% endif %}
+    </ul>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<p class="empty-state">{{ empty_text }}</p>
+{% endif %}
+{%- endmacro %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ cover.report_title }} - {{ cover.startup_name }}</title>
+  <style>
+    :root {
+      --primary-color: {{ branding.primary_color }};
+      --secondary-color: {{ branding.secondary_color }};
+      --accent-color: {{ branding.accent_color }};
+    }
+    @page {
+      size: {{ branding.page_size }};
+      margin: 0.85in;
+      @top-left {
+        content: string(startup-name);
+      }
+      @top-right {
+        content: "Page " counter(page);
+      }
+      @bottom-left {
+        content: string(report-footer);
+      }
+      @bottom-right {
+        content: string(report-date);
+      }
+    }
+    @page cover {
+      margin: 0.9in;
+      @top-left { content: none; }
+      @top-right { content: none; }
+      @bottom-left { content: none; }
+      @bottom-right { content: none; }
+    }
+    {{ css_content | safe }}
+  </style>
+</head>
+<body>
+  <div class="running-strings">
+    <span class="running-startup">{{ cover.startup_name }}</span>
+    <span class="running-footer">{{ footer_text }}</span>
+    <span class="running-date">{{ footer_date }}</span>
+  </div>
+
+  <section class="cover-page">
+    <div class="cover-top">
+      {% if cover.logo_uri %}
+      <img class="cover-logo" src="{{ cover.logo_uri }}" alt="{{ branding.company_name }} logo">
+      {% endif %}
+      <p class="eyebrow">Professional Startup Simulation Report</p>
+      <h1>{{ cover.report_title }}</h1>
+      <p class="cover-subtitle">{{ cover.subtitle }}</p>
+    </div>
+    <div class="cover-bottom">
+      <div class="cover-meta-grid">
+        <div>
+          <span class="meta-label">Startup</span>
+          <span class="meta-value">{{ cover.startup_name }}</span>
+        </div>
+        <div>
+          <span class="meta-label">Generated</span>
+          <span class="meta-value">{{ cover.generated_date }}</span>
+        </div>
+        <div>
+          <span class="meta-label">Report ID</span>
+          <span class="meta-value">{{ cover.report_id }}</span>
+        </div>
+        <div>
+          <span class="meta-label">Prepared By</span>
+          <span class="meta-value">{{ branding.system_name }}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="toc-page">
+    <header class="section-header">
+      <p class="section-kicker">Contents</p>
+      <h1>Table of Contents</h1>
+    </header>
+    <ol class="toc-list">
+      {% for item in toc %}
+      <li><a href="#{{ item.anchor }}">{{ item.label }}</a></li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <section id="executive-summary" class="report-section">
+    <header class="section-header">
+      <p class="section-kicker">Overview</p>
+      <h1>Executive Summary</h1>
+    </header>
+    <div class="content-block">
+      <p>{{ executive_summary.idea_overview or 'No executive overview provided.' }}</p>
+    </div>
+    {{ metric_cards(executive_summary.highlight_cards, 'No executive highlight metrics provided.') }}
+    <div class="section-grid">
+      <article class="detail-card">
+        <h2>Recommendation</h2>
+        <p class="recommendation recommendation-{{ executive_summary.recommendation | lower | replace(' ', '-') }}">{{ executive_summary.recommendation }}</p>
+        <p class="meta-line">Overall viability score: {{ executive_summary.viability_score }}</p>
+      </article>
+      <article class="detail-card">
+        <h2>Clear Call to Action</h2>
+        <p>{{ executive_summary.call_to_action or 'No direct call-to-action recommendation provided.' }}</p>
+      </article>
+    </div>
+    <div class="content-block">
+      <h2>Biggest Risks</h2>
+      {{ bullet_list(executive_summary.biggest_risks, 'No major risks were supplied for the executive summary.') }}
+    </div>
+  </section>
+
+  {% if section_visibility.business_idea %}
+  <section id="business-idea-overview" class="report-section">
+    <header class="section-header">
+      <p class="section-kicker">{{ section_kickers.business_idea }}</p>
+      <h1>{{ section_titles.business_idea }}</h1>
+    </header>
+    <div class="section-grid">
+      <article class="detail-card">
+        <h2>Problem &amp; Solution</h2>
+        <p>{{ business_idea.problem_statement or 'Problem statement not provided.' }}</p>
+        <p>{{ business_idea.solution_summary or 'Solution summary not provided.' }}</p>
+      </article>
+      <article class="detail-card">
+        <h2>Value Proposition</h2>
+        <p>{{ business_idea.value_proposition or 'Value proposition not provided.' }}</p>
+      </article>
+    </div>
+    <div class="content-block">
+      <h2>Target Customer Segments</h2>
+      {{ bullet_list(business_idea.target_customer_segments, 'Target customer segments not provided.') }}
+    </div>
+    <div class="content-block">
+      <h2>Key Assumptions Used in Simulations</h2>
+      {% if business_idea.key_assumptions %}
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Assumption</th>
+            <th>Value</th>
+            <th>Rationale</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in business_idea.key_assumptions %}
+          <tr>
+            <td>{{ item.category }}</td>
+            <td>{{ item.assumption }}</td>
+            <td>{{ item.value }}</td>
+            <td>{{ item.rationale }}</td>
+            <td>{{ item.source }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-state">No simulation assumptions provided.</p>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if section_visibility.methodology %}
+  <section id="simulation-methodology" class="report-section">
+    <header class="section-header">
+      <p class="section-kicker">{{ section_kickers.methodology }}</p>
+      <h1>{{ section_titles.methodology }}</h1>
+    </header>
+    <div class="content-block">
+      <p>{{ methodology.summary or 'Methodology summary not provided.' }}</p>
+    </div>
+    <div class="section-grid">
+      <article class="detail-card">
+        <h2>Simulation Types</h2>
+        {{ bullet_list(methodology.simulation_types, 'No simulation types provided.') }}
+      </article>
+      <article class="detail-card">
+        <h2>Iterations &amp; Parameters</h2>
+        <p class="meta-line">Iterations: {{ methodology.iteration_count }}</p>
+        {{ bullet_list(methodology.parameters_varied, 'No parameters varied were documented.') }}
+      </article>
+    </div>
+    <div class="section-grid">
+      <article class="detail-card">
+        <h2>Data Sources</h2>
+        {{ bullet_list(methodology.data_sources, 'No data sources were documented.') }}
+      </article>
+      <article class="detail-card">
+        <h2>Assumption Transparency</h2>
+        {{ bullet_list(methodology.transparency_notes, 'No transparency notes were supplied.') }}
+      </article>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if section_visibility.market_feasibility %}
+  <section id="market-feasibility" class="report-section">
+    <header class="section-header">
+      <p class="section-kicker">{{ section_kickers.market_feasibility }}</p>
+      <h1>{{ section_titles.market_feasibility }}</h1>
+    </header>
+    <div class="content-block">
+      <p>{{ market_feasibility.summary or 'Market feasibility commentary not provided.' }}</p>
+    </div>
+    {{ metric_cards(market_feasibility.market_size_cards, 'Market size metrics were not provided.') }}
+    <div class="section-grid">
+      <article class="detail-card">
+        <h2>Target Audience Insights</h2>
+        {{ bullet_list(market_feasibility.target_audience_insights, 'No target audience insights provided.') }}
+      </article>
+      <article class="detail-card">
+        <h2>Competitive Landscape</h2>
+        {{ bullet_list(market_feasibility.competitive_landscape, 'No competitive insights provided.') }}
+      </article>
+    </div>
+    <div class="content-block">
+      <h2>Go-to-Market Simulation Results</h2>
+      {{ scenario_cards(market_feasibility.go_to_market_results) }}
+    </div>
+    <div class="content-block">
+      <h2>Supporting Market Metrics</h2>
+      {{ metric_cards(market_feasibility.key_metrics, 'No additional market metrics provided.') }}
+    </div>
+    {% for table in market_feasibility.tables %}
+    {{ structured_table(table) }}
+    {% endfor %}
+    <div class="content-block">
+      <h2>Market Charts</h2>
+      {{ chart_gallery(market_feasibility.charts) }}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if section_visibility.technical_feasibility %}
+  <section id="technical-feasibility" class="report-section">
+    <header class="section-header">
+      <p class="section-kicker">{{ section_kickers.technical_feasibility }}</p>
+      <h1>{{ section_titles.technical_feasibility }}</h1>
+    </header>
+    <div class="content-block">
+      <p>{{ technical_feasibility.summary or 'Technical feasibility commentary not provided.' }}</p>
+    </div>
+    <div class="section-grid">
+      <article class="detail-card">
+        <h2>Tech Stack / Build Requirements</h2>
+        {{ bullet_list(technical_feasibility.tech_stack, 'No tech stack details provided.') }}
+        <h3>Build Requirements</h3>
+        {{ bullet_list(technical_feasibility.build_requirements, 'No build requirements provided.') }}
+      </article>
+      <article class="detail-card">
+        <h2>Development Timeline &amp; Resource Needs</h2>
+        {% if technical_feasibility.development_timeline %}
+        <ul class="compact-list">
+          {% for item in technical_feasibility.development_timeline %}
+          <li><strong>{{ item.phase }}:</strong> {{ item.timeline }}{% if item.owner %} | {{ item.owner }}{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-state">No development timeline provided.</p>
+        {% endif %}
+        {% if technical_feasibility.resource_needs %}
+        <ul class="compact-list">
+          {% for item in technical_feasibility.resource_needs %}
+          <li><strong>{{ item.role }}:</strong> {{ item.quantity or 'TBD' }}{% if item.timing %} | {{ item.timing }}{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </article>
+    </div>
+    <div class="content-block">
+      <h2>Technical Risks &amp; Mitigations</h2>
+      {{ risk_cards(technical_feasibility.technical_risks, 'No technical risks supplied.') }}
+      <h3>Mitigation Actions</h3>
+      {{ bullet_list(technical_feasibility.mitigations, 'No mitigation actions supplied.') }}
+    </div>
+    {% for table in technical_feasibility.tables %}
+    {{ structured_table(table) }}
+    {% endfor %}
+    <div class="content-block">
+      <h2>Technical Charts</h2>
+      {{ chart_gallery(technical_feasibility.charts) }}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if section_visibility.financial_viability %}
+  <section id="financial-viability" class="report-section">
+    <header class="section-header">
+      <p class="section-kicker">{{ section_kickers.financial_viability }}</p>
+      <h1>{{ section_titles.financial_viability }}</h1>
+    </header>
+    <div class="content-block">
+      <p>{{ financial_viability.summary or 'Financial viability commentary not provided.' }}</p>
+    </div>
+    {{ metric_cards(financial_viability.summary_cards, 'No summary financial metrics provided.') }}
+    <div class="content-block">
+      <h2>Revenue &amp; Cost Projections</h2>
+      {{ scenario_cards(financial_viability.revenue_cost_scenarios, 'No best/base/worst case scenarios provided.') }}
+    </div>
+    <div class="section-grid">
+      <article class="detail-card">
+        <h2>Break-even Analysis</h2>
+        <p>{{ financial_viability.break_even_analysis or 'Break-even analysis not provided.' }}</p>
+      </article>
+      <article class="detail-card">
+        <h2>Cash Flow Projections</h2>
+        <p>{{ financial_viability.cash_flow_summary or 'Cash flow summary not provided.' }}</p>
+      </article>
+    </div>
+    <div class="content-block">
+      <h2>Unit Economics</h2>
+      {{ metric_cards(financial_viability.unit_economics, 'Unit economics not provided.') }}
+    </div>
+    {% for table in financial_viability.tables %}
+    {{ structured_table(table) }}
+    {% endfor %}
+    <div class="content-block">
+      <h2>Monte Carlo / Sensitivity Charts</h2>
+      {{ chart_gallery(financial_viability.charts, 'No financial charts provided.') }}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if section_visibility.operational_feasibility %}
+  <section id="operational-feasibility" class="report-section">
+    <header class="section-header">
+      <p class="section-kicker">{{ section_kickers.operational_feasibility }}</p>
+      <h1>{{ section_titles.operational_feasibility }}</h1>
+    </header>
+    <div class="content-block">
+      <p>{{ operational_feasibility.summary or 'Operational feasibility commentary not provided.' }}</p>
+    </div>
+    <div class="section-grid">
+      <article class="detail-card">
+        <h2>Team &amp; Resource Requirements</h2>
+        {% if operational_feasibility.team_requirements %}
+        <ul class="compact-list">
+          {% for item in operational_feasibility.team_requirements %}
+          <li><strong>{{ item.role }}:</strong> {{ item.quantity or 'TBD' }}{% if item.timing %} | {{ item.timing }}{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty-state">No team requirements supplied.</p>
+        {% endif %}
+      </article>
+      <article class="detail-card">
+        <h2>Scalability Assessment</h2>
+        <p>{{ operational_feasibility.scalability_assessment or 'Scalability assessment not provided.' }}</p>
+      </article>
+    </div>
+    <div class="content-block">
+      <h2>Operations Plan Simulation Results</h2>
+      {{ bullet_list(operational_feasibility.operations_plan_results, 'No operations plan results supplied.') }}
+    </div>
+    {% for table in operational_feasibility.tables %}
+    {{ structured_table(table) }}
+    {% endfor %}
+    <div class="content-block">
+      <h2>Operational Charts</h2>
+      {{ chart_gallery(operational_feasibility.charts) }}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if section_visibility.risk_assessment %}
+  <section id="risk-assessment" class="report-section">
+    <header class="section-header">
+      <p class="section-kicker">{{ section_kickers.risk_assessment }}</p>
+      <h1>{{ section_titles.risk_assessment }}</h1>
+    </header>
+    <div class="content-block">
+      <p>{{ risk_assessment.summary or 'Risk summary not provided.' }}</p>
+    </div>
+    <div class="content-block">
+      <h2>Top Risks Ranked</h2>
+      {{ risk_cards(risk_assessment.top_risks, 'No ranked risks supplied.') }}
+    </div>
+    <div class="section-grid">
+      <article class="detail-card">
+        <h2>Sensitivity Notes</h2>
+        {{ bullet_list(risk_assessment.sensitivity_notes, 'No sensitivity notes supplied.') }}
+      </article>
+      <article class="detail-card">
+        <h2>Mitigation Strategies</h2>
+        {{ bullet_list(risk_assessment.mitigation_strategies, 'No mitigation strategies supplied.') }}
+      </article>
+    </div>
+    {% for table in risk_assessment.tables %}
+    {{ structured_table(table) }}
+    {% endfor %}
+    <div class="content-block">
+      <h2>Tornado / Spider Charts</h2>
+      {{ chart_gallery(risk_assessment.charts, 'No risk analysis charts supplied.') }}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if section_visibility.legal_regulatory %}
+  <section id="legal-regulatory" class="report-section">
+    <header class="section-header">
+      <p class="section-kicker">{{ section_kickers.legal_regulatory }}</p>
+      <h1>{{ section_titles.legal_regulatory }}</h1>
+    </header>
+    <div class="content-block">
+      <p>{{ legal_regulatory.summary or 'Legal, regulatory, and sustainability commentary not provided.' }}</p>
+    </div>
+    <div class="section-grid">
+      <article class="detail-card">
+        <h2>Key Flags</h2>
+        {{ bullet_list(legal_regulatory.key_flags, 'No legal or regulatory flags supplied.') }}
+      </article>
+      <article class="detail-card">
+        <h2>Next Steps</h2>
+        {{ bullet_list(legal_regulatory.next_steps, 'No legal next steps supplied.') }}
+      </article>
+    </div>
+    <div class="content-block">
+      <h2>Sustainability Considerations</h2>
+      {{ bullet_list(legal_regulatory.sustainability_considerations, 'No sustainability considerations supplied.') }}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if section_visibility.conclusions %}
+  <section id="conclusions" class="report-section">
+    <header class="section-header">
+      <p class="section-kicker">{{ section_kickers.conclusions }}</p>
+      <h1>{{ section_titles.conclusions }}</h1>
+    </header>
+    <div class="content-block">
+      <h2>Overall Verdict</h2>
+      <p>{{ conclusions.overall_verdict or 'Overall verdict not provided.' }}</p>
+    </div>
+    <div class="content-block">
+      <h2>Prioritized Next Steps</h2>
+      {% if conclusions.prioritized_next_steps %}
+      <div class="card-grid">
+        {% for item in conclusions.prioritized_next_steps %}
+        <article class="detail-card">
+          <div class="card-header">
+            <h3>{{ item.action }}</h3>
+            <span class="pill">{{ item.priority }}</span>
+          </div>
+          <ul class="compact-list">
+            {% if item.owner %}<li><strong>Owner:</strong> {{ item.owner }}</li>{% endif %}
+            {% if item.timeline %}<li><strong>Timeline:</strong> {{ item.timeline }}</li>{% endif %}
+            {% if item.rationale %}<li><strong>Rationale:</strong> {{ item.rationale }}</li>{% endif %}
+          </ul>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="empty-state">No prioritized next steps supplied.</p>
+      {% endif %}
+    </div>
+    <div class="content-block">
+      <h2>Investor Pitch Summary</h2>
+      {{ bullet_list(conclusions.investor_pitch_summary, 'No investor-facing summary points provided.') }}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if section_visibility.appendices %}
+  <section id="appendices" class="report-section">
+    <header class="section-header">
+      <p class="section-kicker">{{ section_kickers.appendices }}</p>
+      <h1>{{ section_titles.appendices }}</h1>
+    </header>
+    <div class="content-block">
+      <h2>Detailed Simulation Raw Data / Assumptions Table</h2>
+      {% if appendices.raw_data_tables %}
+      {% for table in appendices.raw_data_tables %}
+      {{ structured_table(table) }}
+      {% endfor %}
+      {% else %}
+      <p class="empty-state">No raw appendix tables supplied.</p>
+      {% endif %}
+    </div>
+    <div class="content-block">
+      <h2>All Charts in Larger Format</h2>
+      {{ chart_gallery(appendices.large_format_charts, 'No appendix charts supplied.') }}
+    </div>
+    <div class="content-block">
+      <h2>Glossary</h2>
+      {% if appendices.glossary %}
+      <dl class="glossary-list">
+        {% for item in appendices.glossary %}
+        <dt>{{ item.term }}</dt>
+        <dd>{{ item.definition }}</dd>
+        {% endfor %}
+      </dl>
+      {% else %}
+      <p class="empty-state">No glossary terms supplied.</p>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+</body>
+</html>

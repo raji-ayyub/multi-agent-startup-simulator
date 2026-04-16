@@ -35,6 +35,7 @@ class UserAccessProfile(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
     role = Column(String(32), nullable=False, default="FOUNDER", index=True)
     title = Column(String(120), nullable=False, default="")
+    is_pro = Column(Boolean, nullable=False, default=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -232,14 +233,37 @@ class BusinessInsightReport(Base):
         index=True,
     )
     report_name = Column(String(255), nullable=False, default="Business Insight Report")
+    report_type = Column(String(64), nullable=False, default="viability_report", index=True)
+    template_id = Column(String(64), nullable=False, default="obsidian_board")
     status = Column(String(32), nullable=False, default="READY", index=True)
     summary = Column(Text, nullable=False, default="")
     sections = Column(JSON, nullable=False, default=list)
     key_findings = Column(JSON, nullable=False, default=list)
     recommended_actions = Column(JSON, nullable=False, default=list)
     export_html = Column(Text, nullable=False, default="")
+    published_version_id = Column(String(36), nullable=True, index=True)
+    latest_draft_version_id = Column(String(36), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class BusinessInsightReportVersion(Base):
+    __tablename__ = "business_insight_report_versions"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    report_id = Column(
+        String(36),
+        ForeignKey("business_insight_reports.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    version_number = Column(Integer, nullable=False, default=1)
+    status = Column(String(16), nullable=False, default="DRAFT", index=True)
+    document_json = Column(JSON, nullable=False, default=dict)
+    content_hash = Column(String(128), nullable=False, default="", index=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    published_at = Column(DateTime, nullable=True)
 
 
 class CalendarEvent(Base):

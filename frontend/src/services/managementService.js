@@ -1,5 +1,9 @@
 import api, { getApiErrorMessage } from "../api/axios";
 
+const WORKSPACES_CACHE_TTL_MS = 20000;
+const workspacesCache = new Map();
+const workspacesInFlight = new Map();
+
 const getCurrentUserEmail = () => {
   try {
     const raw = localStorage.getItem("authUser");
@@ -13,19 +17,44 @@ const getCurrentUserEmail = () => {
 export async function listManagementWorkspaces(ownerEmail = null) {
   const email = ownerEmail || getCurrentUserEmail();
   if (!email) return [];
-  try {
-    const { data } = await api.get("/api/v1/management/workspaces", {
-      params: { owner_email: email, limit: 50 },
-    });
-    return Array.isArray(data) ? data : [];
-  } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Unable to load management workspaces."));
+  const cacheKey = `list:${email}`;
+  const now = Date.now();
+  const cached = workspacesCache.get(cacheKey);
+  if (cached && now - cached.ts < WORKSPACES_CACHE_TTL_MS) {
+    return cached.items;
   }
+  if (workspacesInFlight.has(cacheKey)) {
+    return workspacesInFlight.get(cacheKey);
+  }
+
+  const request = (async () => {
+    try {
+      const { data } = await api.get("/api/v1/management/workspaces", {
+        params: { owner_email: email, limit: 50 },
+      });
+      const items = Array.isArray(data) ? data : [];
+      workspacesCache.set(cacheKey, { ts: Date.now(), items });
+      return items;
+    } catch (error) {
+      throw new Error(getApiErrorMessage(error, "Unable to load management workspaces."));
+    } finally {
+      workspacesInFlight.delete(cacheKey);
+    }
+  })();
+
+  workspacesInFlight.set(cacheKey, request);
+  return request;
+}
+
+export function invalidateWorkspacesCache() {
+  workspacesCache.clear();
+  workspacesInFlight.clear();
 }
 
 export async function createManagementWorkspace(payload) {
   try {
     const { data } = await api.post("/api/v1/management/workspaces", payload);
+    invalidateWorkspacesCache();
     return data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to create management workspace."));
@@ -35,6 +64,7 @@ export async function createManagementWorkspace(payload) {
 export async function updateManagementWorkspace(workspaceId, payload) {
   try {
     const { data } = await api.patch(`/api/v1/management/workspaces/${workspaceId}`, payload);
+    invalidateWorkspacesCache();
     return data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to update management workspace."));

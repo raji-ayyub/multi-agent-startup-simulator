@@ -5,6 +5,13 @@ from typing import Any, Dict, List, Literal, Optional
 
 UserRole = Literal["FOUNDER", "OPERATOR", "ADMIN"]
 AgentRequestStatus = Literal["PENDING", "APPROVED", "REJECTED"]
+ReportType = Literal[
+    "viability_report",
+    "feasibility_report",
+    "market_analysis_report",
+    "investment_analysis_report",
+    "business_report",
+]
 
 
 class UserBase(BaseModel):
@@ -33,6 +40,7 @@ class UserResponse(UserBase):
     id: int
     role: UserRole = "FOUNDER"
     title: str = ""
+    is_pro: bool = False
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -123,6 +131,7 @@ class UserAdminUpdate(BaseModel):
     role: Optional[UserRole] = None
     title: Optional[str] = Field(default=None, max_length=120)
     is_active: Optional[bool] = None
+    is_pro: Optional[bool] = None
 
 
 class NotificationResponse(BaseModel):
@@ -150,10 +159,28 @@ class ReportSection(BaseModel):
     body: str
 
 
+class OutlineSection(BaseModel):
+    heading: str = Field(..., min_length=1, max_length=120)
+    description: str = Field(default="", max_length=500)
+
+
+class PlanOutlineRequest(BaseModel):
+    simulation_id: str = Field(..., min_length=3, max_length=64)
+    report_type: ReportType = "viability_report"
+    report_name: str = Field(default="Business Insight Report", min_length=1, max_length=255)
+
+
+class PlanOutlineResponse(BaseModel):
+    outline: List[OutlineSection]
+
+
 class BusinessReportGenerateRequest(BaseModel):
     simulation_id: str = Field(..., min_length=3, max_length=64)
     workspace_id: Optional[str] = Field(default=None, min_length=3, max_length=64)
     report_name: str = Field(default="Business Insight Report", min_length=3, max_length=255)
+    report_type: ReportType = "viability_report"
+    template_id: str = Field(default="obsidian_board", min_length=3, max_length=64)
+    outline: Optional[List[OutlineSection]] = None
 
 
 class BusinessReportResponse(BaseModel):
@@ -161,13 +188,43 @@ class BusinessReportResponse(BaseModel):
     simulation_id: str
     workspace_id: Optional[str] = None
     report_name: str
+    report_type: ReportType = "viability_report"
+    template_id: str = "obsidian_board"
     status: str
     summary: str
     sections: List[ReportSection]
     key_findings: List[str]
     recommended_actions: List[str]
+    published_version_id: Optional[str] = None
+    latest_draft_version_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+
+class BusinessReportListItem(BaseModel):
+    report_id: str
+    simulation_id: str
+    workspace_id: Optional[str] = None
+    report_name: str
+    report_type: ReportType = "viability_report"
+    template_id: str = "obsidian_board"
+    status: str
+    summary: str
+    sections_count: int = 0
+    key_findings_count: int = 0
+    recommended_actions_count: int = 0
+    published_version_id: Optional[str] = None
+    latest_draft_version_id: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class BusinessReportListResponse(BaseModel):
+    items: List[BusinessReportListItem]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
 
 
 class CalendarEventCreate(BaseModel):
@@ -223,3 +280,24 @@ class AgentAccessResponse(BaseModel):
     status: AgentRequestStatus
     approved_at: Optional[datetime] = None
     admin_notes: str
+
+
+class ReportTemplateItem(BaseModel):
+    template_id: str
+    name: str
+    description: str
+    supported_report_types: List[ReportType] = Field(default_factory=list)
+    layout_family: str = "executive"
+    pro_required: bool = False
+    preview_image_url: str = ""
+    default_quality: Literal["standard", "premium"] = "standard"
+    theme_tokens: Dict[str, Any] = Field(default_factory=dict)
+
+
+class BusinessReportUpdateRequest(BaseModel):
+    report_name: Optional[str] = Field(default=None, min_length=3, max_length=255)
+    summary: Optional[str] = Field(default=None, max_length=12000)
+    sections: Optional[List[ReportSection]] = None
+    key_findings: Optional[List[str]] = None
+    recommended_actions: Optional[List[str]] = None
+    template_id: Optional[str] = Field(default=None, min_length=3, max_length=64)

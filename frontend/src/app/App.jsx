@@ -1,9 +1,10 @@
 import React, { Suspense, lazy, useEffect } from "react";
-import { BrowserRouter as Router, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 
 import AdminSidebar from "../components/layout/AdminSidebar";
 import AdminTopbar from "../components/layout/AdminTopbar";
+import LoadingScreen from "../components/feedback/LoadingScreen";
 import ManagementSidebar from "../components/layout/ManagementSidebar";
 import ManagementTopbar from "../components/layout/ManagementTopbar";
 import Navbar from "../components/layout/Navbar";
@@ -12,11 +13,7 @@ import ThemeToggle from "../components/layout/ThemeToggle";
 import { getDefaultRouteForRole, useAuthStore } from "../store/authStore";
 import useUIStore from "../store/uiStore";
 
-const LoadingSpinner = () => (
-  <div className="flex min-h-[70vh] items-center justify-center">
-    <p className="text-lg text-slate-400">Loading...</p>
-  </div>
-);
+const LoadingSpinner = () => <LoadingScreen message="Loading workspace..." mode="full" />;
 
 const Login = lazy(() => import("../pages/auth/Login"));
 const Signup = lazy(() => import("../pages/auth/Signup"));
@@ -33,13 +30,19 @@ const Settings = lazy(() => import("../pages/Settings"));
 const AgentHub = lazy(() => import("../pages/AgentHub"));
 const NotificationsPage = lazy(() => import("../pages/Notifications"));
 const ReportsPage = lazy(() => import("../pages/Reports"));
+const ReportDetailPage = lazy(() => import("../pages/ReportDetail"));
+const ReportEditPage = lazy(() => import("../pages/ReportEdit"));
 const CalendarPage = lazy(() => import("../pages/Calendar"));
 const AdminDashboard = lazy(() => import("../pages/admin/AdminDashboard"));
 const AdminSetup = lazy(() => import("../pages/admin/AdminSetup"));
+const PrivacyPolicyPage = lazy(() => import("../pages/PrivacyPolicy"));
+const TermsOfUsePage = lazy(() => import("../pages/TermsOfUse"));
 
 const ProtectedRoute = ({ children, allowRoles = [] }) => {
-  const { isAuthenticated, user } = useAuthStore();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const { isAuthenticated, user, hasHydrated } = useAuthStore();
+  const location = useLocation();
+  if (!hasHydrated) return <LoadingSpinner />;
+  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location }} />;
   if (allowRoles.length && !allowRoles.includes(user?.role)) {
     return <Navigate to={getDefaultRouteForRole(user?.role)} replace />;
   }
@@ -47,8 +50,13 @@ const ProtectedRoute = ({ children, allowRoles = [] }) => {
 };
 
 const PublicRoute = ({ children }) => {
-  const { isAuthenticated, user } = useAuthStore();
-  if (isAuthenticated) return <Navigate to={getDefaultRouteForRole(user?.role)} replace />;
+  const { isAuthenticated, user, hasHydrated } = useAuthStore();
+  const location = useLocation();
+  if (!hasHydrated) return <LoadingSpinner />;
+  const fromPath = location.state?.from?.pathname
+    ? `${location.state.from.pathname}${location.state.from.search || ""}${location.state.from.hash || ""}`
+    : "";
+  if (isAuthenticated) return <Navigate to={fromPath || getDefaultRouteForRole(user?.role)} replace />;
   return children;
 };
 
@@ -118,6 +126,8 @@ export default function App() {
           <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
           <Route path="/reset-password/:token" element={<PublicRoute><ResetPassword /></PublicRoute>} />
           <Route path="/admin/setup" element={<PublicRoute><AdminSetup /></PublicRoute>} />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms-of-use" element={<TermsOfUsePage />} />
 
           <Route path="/" element={<Landing />} />
           <Route path="/about" element={<About />} />
@@ -209,6 +219,24 @@ export default function App() {
                 <RoleAwareLayout>
                   <ReportsPage />
                 </RoleAwareLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/:reportId"
+            element={
+              <ProtectedRoute>
+                <RoleAwareLayout>
+                  <ReportDetailPage />
+                </RoleAwareLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/:reportId/edit"
+            element={
+              <ProtectedRoute>
+                <ReportEditPage />
               </ProtectedRoute>
             }
           />

@@ -20,7 +20,7 @@ export default function Sidebar() {
   const { user } = useAuthStore();
 
   return (
-    <aside className="app-sidebar flex h-screen w-[248px] flex-col justify-between border-r border-slate-800 bg-[#070b11] px-4 py-5 text-slate-300">
+    <aside className="app-sidebar flex h-screen w-[248px] flex-col justify-between border-r border-slate-800 bg-[#070b11] px-4 py-5 text-slate-300 overflow-y-auto scrollbar-none">
       <div>
         <div className="px-2">
           <div className="flex items-center gap-2">

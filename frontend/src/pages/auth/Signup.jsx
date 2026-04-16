@@ -1,13 +1,14 @@
 // src/pages/auth/Signup.jsx
 import { useState } from "react";
 import { useAuthStore } from "../../store/authStore";
-import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Eye, EyeOff, ShieldCheck, X } from "lucide-react";
 import AuthLayout from "../../components/layout/AuthLayout";
 
 export default function Signup() {
   const { signup, isLoading, error } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [formData, setFormData] = useState({
@@ -18,6 +19,9 @@ export default function Signup() {
   });
   const [emailValid, setEmailValid] = useState(true);
   const [passwordStrength, setPasswordStrength] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTermsSummary, setShowTermsSummary] = useState(false);
+  const [termsPromptReason, setTermsPromptReason] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -57,13 +61,22 @@ export default function Signup() {
       setSubmitError("Password must be at least 8 characters.");
       return;
     }
+    if (!acceptedTerms) {
+      setSubmitError("Please accept Terms of Use and Privacy Policy before continuing.");
+      setTermsPromptReason("To create an account, please review and accept these terms.");
+      setShowTermsSummary(true);
+      return;
+    }
 
     const result = await signup(formData);
     if (!result?.ok) {
       setSubmitError("Unable to create account.");
       return;
     }
-    navigate(result.route);
+    const fromPath = location.state?.from?.pathname
+      ? `${location.state.from.pathname}${location.state.from.search || ""}${location.state.from.hash || ""}`
+      : "";
+    navigate(fromPath || result.route, { replace: true });
   };
 
   const strengthColor = {
@@ -197,6 +210,34 @@ export default function Signup() {
               <p className="text-xs text-red-400">{submitError || error}</p>
             )}
 
+            <div className="app-card-subtle rounded-lg border p-3">
+              <label className="flex items-start gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(event) => {
+                    setAcceptedTerms(event.target.checked);
+                    if (event.target.checked) setSubmitError("");
+                  }}
+                  className="mt-0.5 h-4 w-4"
+                />
+                <span className="app-copy leading-relaxed">
+                  I agree to PentraAI{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTermsPromptReason("Quick highlights before account creation.");
+                      setShowTermsSummary(true);
+                    }}
+                    className="auth-link underline"
+                  >
+                    Terms & Privacy highlights
+                  </button>
+                  .
+                </span>
+              </label>
+            </div>
+
             <button
               type="submit"
               disabled={isLoading}
@@ -213,6 +254,63 @@ export default function Signup() {
             </Link>
           </div>
         </div>
+
+      {showTermsSummary ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <article className="auth-screen auth-form-panel w-full max-w-md rounded-2xl border p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="app-badge inline-flex rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.15em]">
+                  Before You Continue
+                </p>
+                <h3 className="auth-deep-title mt-3 text-lg font-semibold">Terms & Privacy Highlights</h3>
+                {termsPromptReason ? <p className="auth-deep-subtitle mt-1 text-xs">{termsPromptReason}</p> : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTermsSummary(false)}
+                className="app-ghost-btn rounded-full border p-1.5"
+                aria-label="Close"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2.5 text-xs leading-relaxed">
+              <p className="app-copy">
+                PentraAI is built for founders sharing sensitive strategy plans. Your simulation and report content is
+                handled under strict access controls.
+              </p>
+              <p className="app-copy inline-flex items-center gap-2">
+                <ShieldCheck size={14} className="text-emerald-400" />
+                End-to-end encryption pathways in transport, plus encryption at rest for stored data.
+              </p>
+              <p className="app-copy">Outputs are decision-support intelligence, not legal or investment advice.</p>
+              <p className="app-copy">You own your source content and can request report/content deletion where supported.</p>
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <Link to="/terms-of-use" className="app-ghost-btn rounded-lg border px-3 py-2 text-xs font-semibold">
+                View Full Terms
+              </Link>
+              <Link to="/privacy-policy" className="app-ghost-btn rounded-lg border px-3 py-2 text-xs font-semibold">
+                View Full Privacy Policy
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setAcceptedTerms(true);
+                  setShowTermsSummary(false);
+                  setSubmitError("");
+                }}
+                className="app-primary-btn ml-auto rounded-lg px-3 py-2 text-xs font-semibold"
+              >
+                Accept and Continue
+              </button>
+            </div>
+          </article>
+        </div>
+      ) : null}
     </AuthLayout>
   );
 }
