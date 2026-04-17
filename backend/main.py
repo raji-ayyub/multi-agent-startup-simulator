@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import os
+import sys
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -17,6 +19,15 @@ from routes import router as auth_router
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+
+# Playwright PDF rendering requires subprocess-capable asyncio loops on Windows.
+if sys.platform.startswith("win"):
+    try:
+        current_policy = asyncio.get_event_loop_policy()
+        if not isinstance(current_policy, asyncio.WindowsProactorEventLoopPolicy):
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except Exception:
+        pass
 
 
 def get_cors_origins():

@@ -113,6 +113,79 @@ export async function getReport(reportId) {
   }
 }
 
+export async function getReportEditor(reportId) {
+  try {
+    const { data } = await api.get(`/api/v1/reports/${reportId}/editor`);
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to load report editor."));
+  }
+}
+
+export async function listReportVersions(reportId) {
+  try {
+    const { data } = await api.get(`/api/v1/reports/${reportId}/versions`);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to load report versions."));
+  }
+}
+
+export async function saveReportDraft(reportId, documentJson) {
+  try {
+    const { data } = await api.post(`/api/v1/reports/${reportId}/drafts`, {
+      document_json: documentJson || {},
+    });
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to save report draft."));
+  }
+}
+
+export async function publishReportVersion(reportId, versionId = "") {
+  try {
+    const { data } = await api.post(`/api/v1/reports/${reportId}/publish`, {
+      ...(versionId ? { version_id: versionId } : {}),
+    });
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to publish report version."));
+  }
+}
+
+export async function getReportPreview(reportId, options = {}) {
+  try {
+    const { data } = await api.get(`/api/v1/reports/${reportId}/preview`, {
+      params: {
+        ...(options?.templateId ? { template_id: options.templateId } : {}),
+        ...(options?.quality ? { quality: options.quality } : {}),
+        ...(options?.versionId ? { version_id: options.versionId } : {}),
+      },
+      headers: { Accept: "text/html" },
+      responseType: "text",
+    });
+    return typeof data === "string" ? data : "";
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to load report preview."));
+  }
+}
+
+export async function getReportDraftPreview(reportId, draftPayload = {}, options = {}) {
+  try {
+    const { data } = await api.post(`/api/v1/reports/${reportId}/preview`, draftPayload, {
+      params: {
+        ...(options?.templateId ? { template_id: options.templateId } : {}),
+        ...(options?.quality ? { quality: options.quality } : {}),
+      },
+      headers: { Accept: "text/html" },
+      responseType: "text",
+    });
+    return typeof data === "string" ? data : "";
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to render draft preview."));
+  }
+}
+
 export async function updateReport(reportId, payload) {
   try {
     const { data } = await api.patch(`/api/v1/reports/${reportId}`, payload);
@@ -207,12 +280,14 @@ export async function exportReport(reportId, format = "pdf", fallbackTitle = "",
     const reportType = options?.reportType || "";
     const quality = options?.quality || "standard";
     const templateId = options?.templateId || "";
+    const versionId = options?.versionId || "";
     const response = await api.get(`/api/v1/reports/${reportId}/export`, {
       params: {
         format,
         ...(reportType ? { report_type: reportType } : {}),
         ...(quality ? { quality } : {}),
         ...(templateId ? { template_id: templateId } : {}),
+        ...(versionId ? { version_id: versionId } : {}),
       },
       responseType: "blob",
     });

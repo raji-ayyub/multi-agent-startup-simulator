@@ -301,3 +301,49 @@ class BusinessReportUpdateRequest(BaseModel):
     key_findings: Optional[List[str]] = None
     recommended_actions: Optional[List[str]] = None
     template_id: Optional[str] = Field(default=None, min_length=3, max_length=64)
+
+
+class BusinessReportPreviewRequest(BaseModel):
+    report_name: Optional[str] = Field(default=None, max_length=255)
+    report_type: Optional[ReportType] = None
+    summary: Optional[str] = Field(default=None, max_length=12000)
+    sections: Optional[List[ReportSection]] = None
+    key_findings: Optional[List[str]] = None
+    recommended_actions: Optional[List[str]] = None
+    template_id: Optional[str] = Field(default=None, min_length=3, max_length=64)
+
+
+class BusinessReportVersionResponse(BaseModel):
+    version_id: str
+    report_id: str
+    version_number: int
+    status: Literal["DRAFT", "PUBLISHED"]
+    content_hash: str
+    created_by_user_id: Optional[int] = None
+    created_at: datetime
+    published_at: Optional[datetime] = None
+
+
+class BusinessReportEditorResponse(BaseModel):
+    report: BusinessReportResponse
+    active_version_id: Optional[str] = None
+    document_json: Dict[str, Any] = Field(default_factory=dict)
+
+
+class BusinessReportDraftSaveRequest(BaseModel):
+    document_json: Dict[str, Any] = Field(default_factory=dict)
+
+
+class BusinessReportDraftSaveResponse(BaseModel):
+    report: BusinessReportResponse
+    version: BusinessReportVersionResponse
+    deduplicated: bool = False
+
+
+class BusinessReportPublishRequest(BaseModel):
+    version_id: Optional[str] = Field(default=None, min_length=3, max_length=64)
+
+
+class BusinessReportPublishResponse(BaseModel):
+    report: BusinessReportResponse
+    version: BusinessReportVersionResponse
