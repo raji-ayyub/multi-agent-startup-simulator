@@ -28,24 +28,38 @@ from models import (
 from platform_service import (
     build_calendar_suggestions,
     build_report_html,
+    build_report_html_from_document,
     build_report_pdf,
     build_report_pdf_from_html,
     create_notification,
+    ensure_report_versions_initialized,
+    enrich_document_with_generated_visuals,
     generate_business_report,
     list_report_templates,
     plan_report_outline,
+    publish_report_version,
+    report_payload_to_document_json,
     resolve_template_for_report_type,
+    save_report_draft_version,
     serialize_calendar_event,
     serialize_notification,
     serialize_report,
+    serialize_report_version,
     serialize_report_list_item,
     suggest_report_name,
 )
 from schemas import (
+    BusinessReportDraftSaveRequest,
+    BusinessReportDraftSaveResponse,
+    BusinessReportEditorResponse,
     BusinessReportGenerateRequest,
     BusinessReportListItem,
     BusinessReportListResponse,
+    BusinessReportPublishRequest,
+    BusinessReportPublishResponse,
+    BusinessReportPreviewRequest,
     BusinessReportUpdateRequest,
+    BusinessReportVersionResponse,
     PlanOutlineRequest,
     PlanOutlineResponse,
     ReportTemplateItem,
@@ -131,6 +145,117 @@ def _load_report_with_context(
     if report.workspace_id:
         workspace = db.query(ManagementWorkspace).filter(ManagementWorkspace.id == report.workspace_id).first()
     return report, simulation, workspace
+
+
+def _select_report_document_json(
+    db: Session,
+    report: BusinessInsightReport,
+    *,
+    version_id: str | None = None,
+) -> dict | None:
+    version = None
+    if version_id:
+        version = (
+            db.query(BusinessInsightReportVersion)
+            .filter(
+                BusinessInsightReportVersion.id == version_id,
+                BusinessInsightReportVersion.report_id == report.id,
+            )
+            .first()
+        )
+    if version is None and report.latest_draft_version_id:
+        version = (
+            db.query(BusinessInsightReportVersion)
+            .filter(
+                BusinessInsightReportVersion.id == report.latest_draft_version_id,
+                BusinessInsightReportVersion.report_id == report.id,
+            )
+            .first()
+        )
+    if version is None and report.published_version_id:
+        version = (
+            db.query(BusinessInsightReportVersion)
+            .filter(
+                BusinessInsightReportVersion.id == report.published_version_id,
+                BusinessInsightReportVersion.report_id == report.id,
+            )
+            .first()
+        )
+    if version is None:
+        return None
+    return version.document_json if isinstance(version.document_json, dict) else None
+
+
+def _select_report_version_row(
+    db: Session,
+    report: BusinessInsightReport,
+    *,
+    version_id: str | None = None,
+) -> BusinessInsightReportVersion | None:
+    version = None
+    if version_id:
+        version = (
+            db.query(BusinessInsightReportVersion)
+            .filter(
+                BusinessInsightReportVersion.id == version_id,
+                BusinessInsightReportVersion.report_id == report.id,
+            )
+            .first()
+        )
+    if version is None and report.latest_draft_version_id:
+        version = (
+            db.query(BusinessInsightReportVersion)
+            .filter(
+                BusinessInsightReportVersion.id == report.latest_draft_version_id,
+                BusinessInsightReportVersion.report_id == report.id,
+            )
+            .first()
+        )
+    if version is None and report.published_version_id:
+        version = (
+            db.query(BusinessInsightReportVersion)
+            .filter(
+                BusinessInsightReportVersion.id == report.published_version_id,
+                BusinessInsightReportVersion.report_id == report.id,
+            )
+            .first()
+        )
+    return version
+
+
+def _document_is_sparse(document_json: dict | None) -> bool:
+    if not isinstance(document_json, dict):
+        return True
+    sections = document_json.get("sections")
+    if not isinstance(sections, list) or not sections:
+        return True
+    chart_count = 0
+    metric_count = 0
+    table_count = 0
+    rich_count = 0
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        blocks = section.get("blocks")
+        if not isinstance(blocks, list):
+            continue
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            block_type = str(block.get("type") or "").strip().lower()
+            if block_type == "chart":
+                chart_count += 1
+            elif block_type == "metric_grid":
+                metric_count += 1
+            elif block_type == "table":
+                table_count += 1
+            elif block_type == "rich_text":
+                rich_count += 1
+    if table_count > 0 or metric_count > 0:
+        return False
+    if chart_count >= 2:
+        return False
+    return rich_count < 6
 
 
 def _notification_query(db: Session, current_user: User, profile: UserAccessProfile):
@@ -372,13 +497,26 @@ def generate_report(
         report_type=payload.report_type,
         outline=approved_outline,
     )
+    document_json = report_payload_to_document_json(
+        report_payload,
+        report_type=payload.report_type,
+        template_id=selected_template["template_id"],
+        simulation=simulation,
+        workspace=workspace,
+        layout_guidance=report_payload.get("layout_guidance"),
+    )
+    document_json = enrich_document_with_generated_visuals(
+        document_json,
+        simulation,
+        report_type=payload.report_type,
+    )
     try:
-        export_html = build_report_html(
-            report_payload,
+        export_html = build_report_html_from_document(
+            document_json,
             simulation,
             workspace,
-            report_type=payload.report_type,
             template_id=selected_template["template_id"],
+            quality="standard",
         )
     except Exception:
         raise HTTPException(
@@ -404,6 +542,12 @@ def generate_report(
     )
     db.add(row)
     db.flush()
+    ensure_report_versions_initialized(
+        db,
+        row,
+        created_by_user_id=current_user.id,
+        initial_document_json=document_json,
+    )
     create_notification(
         db,
         category="REPORT",
@@ -426,6 +570,168 @@ def get_report(
 ):
     row, _, _ = _load_report_with_context(db, current_user, report_id)
     return BusinessReportResponse(**serialize_report(row))
+
+
+@platform_router.get("/reports/{report_id}/editor", response_model=BusinessReportEditorResponse)
+def get_report_editor(
+    report_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    row, simulation, workspace = _load_report_with_context(db, current_user, report_id)
+    ensure_report_versions_initialized(db, row, created_by_user_id=current_user.id)
+
+    version = _select_report_version_row(db, row)
+    document_json = (
+        version.document_json
+        if version and isinstance(version.document_json, dict)
+        else report_payload_to_document_json(
+            serialize_report(row),
+            report_type=getattr(row, "report_type", "business_report"),
+            template_id=getattr(row, "template_id", "obsidian_board"),
+            simulation=simulation,
+            workspace=workspace,
+        )
+    )
+    if _document_is_sparse(document_json):
+        generated_document = report_payload_to_document_json(
+            serialize_report(row),
+            report_type=getattr(row, "report_type", "business_report"),
+            template_id=getattr(row, "template_id", "obsidian_board"),
+            simulation=simulation,
+            workspace=workspace,
+        )
+        if isinstance(generated_document, dict) and generated_document.get("sections"):
+            document_json = generated_document
+    document_json = enrich_document_with_generated_visuals(
+        document_json,
+        simulation,
+        report_type=getattr(row, "report_type", "business_report"),
+    )
+
+    return BusinessReportEditorResponse(
+        report=BusinessReportResponse(**serialize_report(row)),
+        active_version_id=version.id if version else row.published_version_id,
+        document_json=document_json,
+    )
+
+
+@platform_router.get("/reports/{report_id}/versions", response_model=list[BusinessReportVersionResponse])
+def list_report_versions(
+    report_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    row, _, _ = _load_report_with_context(db, current_user, report_id)
+    rows = (
+        db.query(BusinessInsightReportVersion)
+        .filter(BusinessInsightReportVersion.report_id == row.id)
+        .order_by(BusinessInsightReportVersion.version_number.desc())
+        .all()
+    )
+    return [BusinessReportVersionResponse(**serialize_report_version(item)) for item in rows]
+
+
+@platform_router.post("/reports/{report_id}/drafts", response_model=BusinessReportDraftSaveResponse)
+def save_report_draft(
+    report_id: str,
+    payload: BusinessReportDraftSaveRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    row, simulation, workspace = _load_report_with_context(db, current_user, report_id)
+    ensure_report_versions_initialized(db, row, created_by_user_id=current_user.id)
+
+    working_document = payload.document_json if isinstance(payload.document_json, dict) else {}
+    if not working_document:
+        working_document = report_payload_to_document_json(
+            serialize_report(row),
+            report_type=getattr(row, "report_type", "business_report"),
+            template_id=getattr(row, "template_id", "obsidian_board"),
+            simulation=simulation,
+            workspace=workspace,
+        )
+
+    meta = working_document.get("meta")
+    if not isinstance(meta, dict):
+        meta = {}
+        working_document["meta"] = meta
+    meta.setdefault("report_name", row.report_name or "Business Insight Report")
+    meta.setdefault("report_type", getattr(row, "report_type", "business_report"))
+    meta.setdefault("template_id", getattr(row, "template_id", "obsidian_board"))
+    meta.setdefault(
+        "page_setup",
+        {
+            "size": "A4",
+            "margins": {"top": 40, "right": 40, "bottom": 40, "left": 40},
+            "background": "#ffffff",
+            "font_scale": 100,
+            "font_family": "Source Serif 4",
+        },
+    )
+
+    working_document = enrich_document_with_generated_visuals(
+        working_document,
+        simulation,
+        report_type=str(meta.get("report_type") or getattr(row, "report_type", "business_report")),
+    )
+
+    version, deduplicated = save_report_draft_version(
+        db,
+        row,
+        working_document,
+        created_by_user_id=current_user.id,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+
+    return BusinessReportDraftSaveResponse(
+        report=BusinessReportResponse(**serialize_report(row)),
+        version=BusinessReportVersionResponse(**serialize_report_version(version)),
+        deduplicated=deduplicated,
+    )
+
+
+@platform_router.post("/reports/{report_id}/publish", response_model=BusinessReportPublishResponse)
+def publish_report(
+    report_id: str,
+    payload: BusinessReportPublishRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    row, simulation, workspace = _load_report_with_context(db, current_user, report_id)
+    ensure_report_versions_initialized(db, row, created_by_user_id=current_user.id)
+
+    source_version = _select_report_version_row(db, row, version_id=payload.version_id)
+    if source_version is None:
+        raise HTTPException(status_code=404, detail="No report version available to publish.")
+
+    published = publish_report_version(
+        db,
+        row,
+        source_version,
+        created_by_user_id=current_user.id,
+    )
+    try:
+        row.export_html = build_report_html_from_document(
+            published.document_json if isinstance(published.document_json, dict) else {},
+            simulation,
+            workspace,
+            template_id=getattr(row, "template_id", "obsidian_board"),
+            quality="standard",
+        )
+    except Exception:
+        pass
+
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+
+    return BusinessReportPublishResponse(
+        report=BusinessReportResponse(**serialize_report(row)),
+        version=BusinessReportVersionResponse(**serialize_report_version(published)),
+    )
 
 
 @platform_router.delete("/reports/{report_id}")
@@ -497,6 +803,7 @@ def export_report(
     report_type: str | None = Query(default=None),
     quality: str = Query(default="standard"),
     template_id: str | None = Query(default=None),
+    version_id: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -514,22 +821,38 @@ def export_report(
     if normalized_report_type and normalized_report_type != "viability_report":
         export_base_name = f"{export_base_name}-{_slugify_filename(normalized_report_type)}"
 
+    document_json = _select_report_document_json(db, row, version_id=version_id)
+    if version_id and document_json is None:
+        raise HTTPException(status_code=404, detail="Report version not found.")
+    doc_meta = document_json.get("meta") if isinstance(document_json, dict) and isinstance(document_json.get("meta"), dict) else {}
+    if document_json is not None and not (report_type or "").strip():
+        normalized_report_type = str(doc_meta.get("report_type") or normalized_report_type).strip().lower() or normalized_report_type
+
     selected_template = resolve_template_for_report_type(
         normalized_report_type,
-        (template_id or "").strip().lower() or payload.get("template_id"),
+        (template_id or "").strip().lower() or str(doc_meta.get("template_id") or payload.get("template_id") or ""),
     )
     final_template_id = selected_template["template_id"]
 
     if format.lower() == "gdocs":
         try:
-            html_source = build_report_html(
-                payload,
-                simulation,
-                workspace,
-                report_type=normalized_report_type,
-                template_id=final_template_id,
-                quality=normalized_quality,
-            )
+            if document_json is not None:
+                html_source = build_report_html_from_document(
+                    document_json,
+                    simulation,
+                    workspace,
+                    template_id=final_template_id,
+                    quality=normalized_quality,
+                )
+            else:
+                html_source = build_report_html(
+                    payload,
+                    simulation,
+                    workspace,
+                    report_type=normalized_report_type,
+                    template_id=final_template_id,
+                    quality=normalized_quality,
+                )
         except Exception:
             raise HTTPException(
                 status_code=503,
@@ -550,14 +873,23 @@ def export_report(
         )
 
     try:
-        html_source = build_report_html(
-            payload,
-            simulation,
-            workspace,
-            report_type=normalized_report_type,
-            template_id=final_template_id,
-            quality=normalized_quality,
-        )
+        if document_json is not None:
+            html_source = build_report_html_from_document(
+                document_json,
+                simulation,
+                workspace,
+                template_id=final_template_id,
+                quality=normalized_quality,
+            )
+        else:
+            html_source = build_report_html(
+                payload,
+                simulation,
+                workspace,
+                report_type=normalized_report_type,
+                template_id=final_template_id,
+                quality=normalized_quality,
+            )
         pdf_bytes = build_report_pdf_from_html(html_source)
     except Exception:
         try:
@@ -584,6 +916,124 @@ def export_report(
         media_type="application/pdf",
         headers={"Content-Disposition": _content_disposition_attachment(f"{export_base_name}.pdf")},
     )
+
+
+@platform_router.get("/reports/{report_id}/preview")
+def preview_report(
+    report_id: str,
+    quality: str = Query(default="standard"),
+    template_id: str | None = Query(default=None),
+    version_id: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    row, simulation, workspace = _load_report_with_context(db, current_user, report_id)
+
+    normalized_quality = str(quality or "standard").strip().lower()
+    if normalized_quality not in {"standard", "premium"}:
+        normalized_quality = "standard"
+
+    payload = serialize_report(row)
+    normalized_report_type = (payload.get("report_type") or "business_report").strip().lower()
+    document_json = _select_report_document_json(db, row, version_id=version_id)
+    if version_id and document_json is None:
+        raise HTTPException(status_code=404, detail="Report version not found.")
+    doc_meta = document_json.get("meta") if isinstance(document_json, dict) and isinstance(document_json.get("meta"), dict) else {}
+    if document_json is not None:
+        normalized_report_type = str(doc_meta.get("report_type") or normalized_report_type).strip().lower() or normalized_report_type
+
+    selected_template = resolve_template_for_report_type(
+        normalized_report_type,
+        (template_id or "").strip().lower() or str(doc_meta.get("template_id") or payload.get("template_id") or ""),
+    )
+    final_template_id = selected_template["template_id"]
+
+    html_source = ""
+    try:
+        if document_json is not None:
+            html_source = build_report_html_from_document(
+                document_json,
+                simulation,
+                workspace,
+                template_id=final_template_id,
+                quality=normalized_quality,
+            )
+        else:
+            html_source = build_report_html(
+                payload,
+                simulation,
+                workspace,
+                report_type=normalized_report_type,
+                template_id=final_template_id,
+                quality=normalized_quality,
+            )
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Report renderer is unavailable on the backend. "
+                "Cannot produce HTML preview until renderer dependencies are fixed."
+            ),
+        )
+
+    return Response(content=html_source, media_type="text/html; charset=utf-8")
+
+
+@platform_router.post("/reports/{report_id}/preview")
+def preview_report_draft(
+    report_id: str,
+    payload: BusinessReportPreviewRequest,
+    quality: str = Query(default="standard"),
+    template_id: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    row, simulation, workspace = _load_report_with_context(db, current_user, report_id)
+    normalized_quality = str(quality or "standard").strip().lower()
+    if normalized_quality not in {"standard", "premium"}:
+        normalized_quality = "standard"
+
+    working_payload = serialize_report(row)
+    updates = payload.model_dump(exclude_none=True)
+
+    if "report_name" in updates:
+        working_payload["report_name"] = str(updates["report_name"] or "").strip() or working_payload["report_name"]
+    if "report_type" in updates:
+        working_payload["report_type"] = str(updates["report_type"] or "").strip().lower() or working_payload["report_type"]
+    if "summary" in updates:
+        working_payload["summary"] = str(updates["summary"] or "").strip()
+    if payload.sections is not None:
+        working_payload["sections"] = [section.model_dump(mode="json") for section in (payload.sections or [])]
+    if payload.key_findings is not None:
+        working_payload["key_findings"] = [str(item).strip() for item in (payload.key_findings or []) if str(item).strip()]
+    if payload.recommended_actions is not None:
+        working_payload["recommended_actions"] = [str(item).strip() for item in (payload.recommended_actions or []) if str(item).strip()]
+
+    selected_template = resolve_template_for_report_type(
+        working_payload.get("report_type"),
+        (template_id or "").strip().lower() or updates.get("template_id") or working_payload.get("template_id"),
+    )
+    final_template_id = selected_template["template_id"]
+
+    try:
+        html_source = build_report_html(
+            working_payload,
+            simulation,
+            workspace,
+            report_type=working_payload.get("report_type"),
+            template_id=final_template_id,
+            quality=normalized_quality,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Report renderer is unavailable on the backend. "
+                "Cannot produce HTML preview until renderer dependencies are fixed."
+            ),
+        )
+
+    return Response(content=html_source, media_type="text/html; charset=utf-8")
 
 
 @platform_router.get("/calendar/events", response_model=list[CalendarEventResponse])

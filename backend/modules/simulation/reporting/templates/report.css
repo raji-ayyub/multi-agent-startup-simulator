@@ -27,8 +27,11 @@ h1,
 h2,
 h3 {
   break-after: avoid;
+  break-inside: avoid;
+  page-break-after: avoid;
   color: var(--primary-color);
   font-family: Georgia, "Times New Roman", serif;
+  overflow-wrap: anywhere;
 }
 
 h1 {
@@ -196,13 +199,16 @@ p + p {
 
 .section-header {
   border-bottom: 2px solid rgba(18, 59, 93, 0.16);
+  break-inside: avoid;
   margin-bottom: 0.22in;
+  page-break-after: avoid;
   padding-bottom: 0.14in;
 }
 
 .content-block,
 .data-table-block {
   break-inside: auto;
+  page-break-inside: auto;
   margin-bottom: 0.22in;
 }
 
@@ -230,7 +236,8 @@ p + p {
   background: #ffffff;
   border: 1px solid rgba(18, 59, 93, 0.1);
   border-radius: 12px;
-  break-inside: auto;
+  break-inside: avoid;
+  page-break-inside: avoid;
   box-shadow: 0 8px 24px rgba(24, 37, 50, 0.04);
   padding: 0.18in;
 }

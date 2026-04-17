@@ -1,32 +1,34 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft,
   ChartColumn,
-  Download,
   Loader2,
-  Minus,
   PanelTop,
-  Plus,
-  Save,
   SeparatorHorizontal,
   SquareDashedBottom,
   TextCursorInput,
-  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { exportReport, getReport, listReportTemplates, updateReport } from "../services/platformService";
+import ReportEditCanvas from "../components/reports/editor/ReportEditCanvas";
+import ReportEditSidebar from "../components/reports/editor/ReportEditSidebar";
+import ReportEditToolbar from "../components/reports/editor/ReportEditToolbar";
+import {
+  exportReport,
+  getReportEditor,
+  listReportTemplates,
+  saveReportDraft,
+} from "../services/platformService";
 
 const PAGE_SIZE_OPTIONS = [
-  { value: "a4", label: "A4", width: 794, minHeight: 1123 },
-  { value: "letter", label: "Letter", width: 816, minHeight: 1056 },
+  { value: "a4", label: "A4", width: 794, minHeight: 1123, exportSize: "A4" },
+  { value: "letter", label: "Letter", width: 816, minHeight: 1056, exportSize: "LETTER" },
 ];
 
 const MARGIN_OPTIONS = [
-  { value: "narrow", label: "Narrow", px: 44 },
-  { value: "normal", label: "Normal", px: 64 },
-  { value: "wide", label: "Wide", px: 84 },
+  { value: "narrow", label: "Narrow", px: 36 },
+  { value: "normal", label: "Normal", px: 52 },
+  { value: "wide", label: "Wide", px: 68 },
 ];
 
 const TOOL_ITEMS = [
@@ -36,206 +38,517 @@ const TOOL_ITEMS = [
   { key: "chart", label: "Chart", icon: ChartColumn },
   { key: "divider", label: "Divider", icon: SeparatorHorizontal },
 ];
+const REPORT_TYPE_SUBTITLES = {
+  viability_report: "Commercial viability snapshot and execution confidence",
+  feasibility_report: "Execution feasibility across market, operations, and delivery",
+  market_analysis_report: "Market structure, demand signals, and positioning pressure",
+  investment_analysis_report: "Capital thesis, return profile, risk bands, and funding readiness",
+  business_report: "Integrated founder brief across viability, feasibility, market, and capital",
+};
 
-// Helper to normalize sections from API
-function normalizeSections(sections) {
-  if (!Array.isArray(sections)) return [];
-  return sections
-    .map((section) => ({
-      heading: String(section?.heading || "").trim() || "Section",
-      body: String(section?.body || ""),
-    }))
-    .filter((section) => section.heading || section.body);
+function safeText(value, fallback = "") {
+  const normalized = String(value || "").trim();
+  return normalized || fallback;
 }
 
-// Longer snippet for better preview, with ellipsis only when truncated
-function readSectionSnippet(value = "", maxLength = 150) {
-  const text = String(value).replace(/\s+/g, " ").trim();
-  if (!text) return "No content yet";
-  return text.length > maxLength ? text.slice(0, maxLength) + "…" : text;
+function toDocText(value = "") {
+  const blocks = String(value || "")
+    .split(/\n{2,}/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return {
+    type: "doc",
+    content: blocks.length
+      ? blocks.map((line) => ({
+          type: "paragraph",
+          content: [{ type: "text", text: line }],
+        }))
+      : [{ type: "paragraph", content: [{ type: "text", text: "" }] }],
+  };
+}
+
+function readDocText(data) {
+  if (!data) return "";
+  if (typeof data === "string") return data;
+  if (typeof data.text === "string") return data.text;
+  const content = Array.isArray(data.content) ? data.content : [];
+  const paragraphs = content
+    .map((paragraph) => {
+      const nodes = Array.isArray(paragraph?.content) ? paragraph.content : [];
+      return nodes
+        .map((node) => (typeof node?.text === "string" ? node.text : ""))
+        .join("")
+        .trim();
+    })
+    .filter(Boolean);
+  return paragraphs.join("\n\n");
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function newId(prefix = "id") {
+  const random = Math.random().toString(36).slice(2, 10);
+  return `${prefix}-${Date.now().toString(36)}-${random}`;
+}
+
+function normalizeDocument(documentJson, report) {
+  const base = documentJson && typeof documentJson === "object" ? clone(documentJson) : {};
+  if (!base.meta || typeof base.meta !== "object") base.meta = {};
+  if (!Array.isArray(base.sections)) base.sections = [];
+
+  base.meta.report_name = safeText(base.meta.report_name, report?.report_name || "Business Insight Report");
+  base.meta.report_type = safeText(base.meta.report_type, report?.report_type || "business_report");
+  base.meta.template_id = safeText(base.meta.template_id, report?.template_id || "obsidian_board");
+
+  if (!base.meta.page_setup || typeof base.meta.page_setup !== "object") {
+    base.meta.page_setup = {};
+  }
+  if (!base.meta.page_setup.margins || typeof base.meta.page_setup.margins !== "object") {
+    base.meta.page_setup.margins = { top: 52, right: 52, bottom: 52, left: 52 };
+  }
+  base.meta.page_setup.size = safeText(base.meta.page_setup.size, "A4");
+  base.meta.page_setup.background = safeText(base.meta.page_setup.background, "#ffffff");
+  if (!base.meta.cover || typeof base.meta.cover !== "object") {
+    base.meta.cover = {};
+  }
+  base.meta.cover.kicker = safeText(base.meta.cover.kicker, "Professional Startup Simulation Report");
+  base.meta.cover.title = safeText(base.meta.cover.title, base.meta.report_name);
+  base.meta.cover.subtitle = safeText(
+    base.meta.cover.subtitle,
+    REPORT_TYPE_SUBTITLES[base.meta.report_type] || REPORT_TYPE_SUBTITLES.business_report
+  );
+  base.meta.cover.startup_name = safeText(base.meta.cover.startup_name, "");
+  base.meta.cover.generated_on = safeText(
+    base.meta.cover.generated_on,
+    new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+  );
+  base.meta.cover.prepared_by = safeText(base.meta.cover.prepared_by, "PetraAI");
+  base.meta.cover.report_id = safeText(base.meta.cover.report_id, report?.report_id || "");
+
+  base.sections = base.sections
+    .filter((section) => section && typeof section === "object")
+    .map((section, sectionIndex) => {
+      const blocks = Array.isArray(section.blocks) ? section.blocks : [];
+      return {
+        section_id: safeText(section.section_id, newId("section")),
+        title: safeText(section.title, `Section ${sectionIndex + 1}`),
+        order: Number.isFinite(Number(section.order)) ? Number(section.order) : sectionIndex,
+        blocks: blocks
+          .filter((block) => block && typeof block === "object")
+          .map((block, blockIndex) => ({
+            block_id: safeText(block.block_id, newId("block")),
+            type: safeText(block.type, "rich_text"),
+            order: Number.isFinite(Number(block.order)) ? Number(block.order) : blockIndex,
+            layout: block.layout && typeof block.layout === "object" ? block.layout : { span: 12, align: "left", flow: "full-width" },
+            data: block.data && typeof block.data === "object" ? block.data : {},
+          })),
+      };
+    })
+    .sort((a, b) => a.order - b.order);
+
+  if (base.sections.length === 0) {
+    base.sections = [
+      {
+        section_id: newId("section"),
+        title: "Executive Summary",
+        order: 0,
+        blocks: [
+          {
+            block_id: newId("block"),
+            type: "rich_text",
+            order: 0,
+            layout: { span: 12, align: "left", flow: "full-width" },
+            data: toDocText(report?.summary || ""),
+          },
+        ],
+      },
+    ];
+  }
+
+  return base;
+}
+
+function estimateBlockHeight(block) {
+  const type = String(block?.type || "rich_text").toLowerCase();
+  if (type === "divider") return 32;
+  if (type === "chart") return 360;
+  if (type === "metric_grid") return 280;
+  if (type === "table") {
+    const rows = Array.isArray(block?.data?.rows) ? block.data.rows.length : 3;
+    return 160 + Math.max(3, rows) * 36;
+  }
+  if (type === "card") {
+    const items = Array.isArray(block?.data?.items) ? block.data.items.length : 2;
+    return 110 + Math.max(2, items) * 28;
+  }
+  const text = readDocText(block?.data);
+  const characters = text.length || 120;
+  const lineEstimate = Math.ceil(characters / 92);
+  return Math.max(140, 76 + lineEstimate * 28);
+}
+
+function composePages(sections, pageSpec, marginPx, includeCoverPage = true) {
+  const availableHeight = Math.max(520, pageSpec.minHeight - marginPx * 2 - 28);
+  const leadingPages = includeCoverPage
+    ? [{ pageIndex: 0, items: [{ kind: "cover", itemKey: "cover-page" }], usedHeight: availableHeight }]
+    : [];
+  const flowItems = [];
+  for (const section of sections) {
+    flowItems.push({
+      kind: "section",
+      itemKey: `${section.section_id}-heading`,
+      section_id: section.section_id,
+      title: section.title,
+      estimatedHeight: 74,
+    });
+    const blocks = Array.isArray(section.blocks) ? [...section.blocks].sort((a, b) => a.order - b.order) : [];
+    for (const block of blocks) {
+      flowItems.push({
+        kind: "block",
+        itemKey: `${section.section_id}-${block.block_id}`,
+        section_id: section.section_id,
+        block,
+        estimatedHeight: estimateBlockHeight(block),
+      });
+    }
+  }
+
+  const pages = [];
+  let currentPage = { pageIndex: 0, items: [], usedHeight: 0 };
+
+  for (const item of flowItems) {
+    const nextHeight = currentPage.usedHeight + item.estimatedHeight;
+    if (nextHeight > availableHeight && currentPage.items.length > 0) {
+      pages.push({ ...currentPage });
+      currentPage = { pageIndex: pages.length, items: [], usedHeight: 0 };
+    }
+    currentPage.items.push(item);
+    currentPage.usedHeight += item.estimatedHeight;
+  }
+
+  if (currentPage.items.length > 0) {
+    pages.push(currentPage);
+  }
+  if (pages.length === 0) {
+    pages.push({ pageIndex: 0, items: [], usedHeight: 0 });
+  }
+  const contentPages = pages.map((page, index) => ({
+    ...page,
+    pageIndex: index + leadingPages.length,
+  }));
+  return [...leadingPages, ...contentPages];
+}
+
+function createBlockForTool(toolKey, order) {
+  if (toolKey === "divider") {
+    return {
+      block_id: newId("block"),
+      type: "divider",
+      order,
+      layout: { span: 12, align: "left", flow: "full-width" },
+      data: {},
+    };
+  }
+  if (toolKey === "chart") {
+    return {
+      block_id: newId("block"),
+      type: "chart",
+      order,
+      layout: { span: 12, align: "left", flow: "full-width" },
+      data: {
+        title: "New Chart",
+        chart_type: "bar",
+        labels: ["Signal A", "Signal B", "Signal C"],
+        series: [{ name: "Score", values: [55, 72, 64] }],
+        legend: true,
+        notes: "",
+        colors: ["#0ea5e9", "#22c55e", "#f59e0b"],
+      },
+    };
+  }
+  if (toolKey === "metric") {
+    return {
+      block_id: newId("block"),
+      type: "metric_grid",
+      order,
+      layout: { span: 12, align: "left", flow: "full-width" },
+      data: {
+        title: "Metrics",
+        metrics: [
+          { label: "North Star", value: "0", delta: "+0%" },
+          { label: "Risk Index", value: "0.00", delta: "stable" },
+          { label: "Momentum", value: "0", delta: "+0" },
+        ],
+      },
+    };
+  }
+  const starter = toolKey === "bullet" ? "- Bullet point one\n- Bullet point two" : "New heading";
+  return {
+    block_id: newId("block"),
+    type: "rich_text",
+    order,
+    layout: { span: 12, align: "left", flow: "full-width" },
+    data: toDocText(starter),
+  };
 }
 
 export default function ReportEditPage() {
   const { reportId } = useParams();
   const navigate = useNavigate();
 
-  // State
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [report, setReport] = useState(null);
-  const [title, setTitle] = useState("");
-  const [summary, setSummary] = useState("");
-  const [sections, setSections] = useState([]);
-  const [activeKey, setActiveKey] = useState("cover");
+  const [documentState, setDocumentState] = useState(null);
+  const [activeSectionId, setActiveSectionId] = useState("");
+  const [activePageIndex, setActivePageIndex] = useState(0);
+  const [activeVersionId, setActiveVersionId] = useState("");
   const [quality, setQuality] = useState("standard");
   const [pageSize, setPageSize] = useState("a4");
   const [marginPreset, setMarginPreset] = useState("normal");
   const [paperTone, setPaperTone] = useState("white");
 
-  // Track unsaved changes
-  const initialDataRef = useRef(null);
+  const initialSnapshotRef = useRef("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-
-  // Refs for multi-page navigation
   const paperRefs = useRef({});
   const scrollContainerRef = useRef(null);
 
-  // Derived values
-  const activeIndex = activeKey === "cover" ? null : parseInt(activeKey, 10);
-  const canSave = useMemo(
-    () => Boolean(report && title.trim() && sections.length),
-    [report, title, sections.length]
-  );
   const pageSpec = PAGE_SIZE_OPTIONS.find((item) => item.value === pageSize) || PAGE_SIZE_OPTIONS[0];
   const marginSpec = MARGIN_OPTIONS.find((item) => item.value === marginPreset) || MARGIN_OPTIONS[1];
-
-  // Load report and template data
-  const load = async () => {
-    setIsLoading(true);
-    try {
-      const [payload, templateList] = await Promise.all([
-        getReport(reportId),
-        listReportTemplates(),
-      ]);
-      setReport(payload);
-      setTitle(payload.report_name || "Business Report");
-      setSummary(payload.summary || "");
-      const nextSections = normalizeSections(payload.sections);
-      setSections(nextSections);
-      setActiveKey("cover");
-      const matchedTemplate = (templateList || []).find(
-        (item) => item.template_id === payload.template_id
-      );
-      setQuality(matchedTemplate?.default_quality || "standard");
-
-      // Store initial data for change detection
-      initialDataRef.current = {
-        title: payload.report_name || "Business Report",
-        summary: payload.summary || "",
-        sections: nextSections,
-      };
-      setHasUnsavedChanges(false);
-    } catch (error) {
-      toast.error(error.message);
-      navigate("/reports");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const sections = useMemo(() => {
+    if (!documentState?.sections || !Array.isArray(documentState.sections)) return [];
+    return [...documentState.sections].sort((a, b) => a.order - b.order);
+  }, [documentState]);
+  const pages = useMemo(
+    () => composePages(sections, pageSpec, marginSpec.px, true),
+    [sections, pageSpec, marginSpec.px]
+  );
+  const canSave = Boolean(report && documentState);
 
   useEffect(() => {
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        const [editorPayload, templates] = await Promise.all([
+          getReportEditor(reportId),
+          listReportTemplates(),
+        ]);
+        const reportPayload = editorPayload?.report || null;
+        const normalized = normalizeDocument(editorPayload?.document_json || {}, reportPayload);
+        setReport(reportPayload);
+        setDocumentState(normalized);
+        setActiveSectionId(normalized.sections[0]?.section_id || "");
+        setActivePageIndex(0);
+        setActiveVersionId(editorPayload?.active_version_id || reportPayload?.latest_draft_version_id || reportPayload?.published_version_id || "");
+
+        const sizeToken = String(normalized?.meta?.page_setup?.size || "").toLowerCase();
+        setPageSize(sizeToken === "letter" ? "letter" : "a4");
+
+        const marginValue = Number(normalized?.meta?.page_setup?.margins?.left || 52);
+        if (marginValue <= 40) setMarginPreset("narrow");
+        else if (marginValue >= 64) setMarginPreset("wide");
+        else setMarginPreset("normal");
+
+        const backgroundToken = String(normalized?.meta?.page_setup?.background || "").toLowerCase();
+        if (backgroundToken === "#f7f3ec") setPaperTone("warm");
+        else if (backgroundToken === "#f3f7fb") setPaperTone("cool");
+        else setPaperTone("white");
+
+        const matchedTemplate = (templates || []).find(
+          (item) => item.template_id === reportPayload?.template_id
+        );
+        setQuality(matchedTemplate?.default_quality || "standard");
+
+        initialSnapshotRef.current = JSON.stringify(normalized);
+        setHasUnsavedChanges(false);
+      } catch (error) {
+        toast.error(error.message);
+        navigate("/reports");
+      } finally {
+        setIsLoading(false);
+      }
+    };
     load();
-  }, [reportId]);
+  }, [reportId, navigate]);
 
-  // Detect unsaved changes
   useEffect(() => {
-    if (!initialDataRef.current) return;
-    const current = { title, summary, sections };
-    const initial = initialDataRef.current;
-    const changed =
-      current.title !== initial.title ||
-      current.summary !== initial.summary ||
-      JSON.stringify(current.sections) !== JSON.stringify(initial.sections);
-    setHasUnsavedChanges(changed);
-  }, [title, summary, sections]);
+    if (!documentState) return;
+    setHasUnsavedChanges(JSON.stringify(documentState) !== initialSnapshotRef.current);
+  }, [documentState]);
 
-  // Warn on browser close/refresh if there are unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e) => {
+    const handleBeforeUnload = (event) => {
       if (!hasUnsavedChanges) return;
-      e.preventDefault();
+      event.preventDefault();
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // Keyboard shortcut: Ctrl/Cmd + S to save
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        if (canSave && !isSaving) doSave();
+    const handleKeyDown = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "s") {
+        event.preventDefault();
+        if (canSave && !isSaving) void handleSave();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [canSave, isSaving]);
+  }, [canSave, isSaving, documentState]);
 
-  const updateSection = (index, changes) => {
-    setSections((current) =>
-      current.map((section, i) => (i === index ? { ...section, ...changes } : section))
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const top = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!top) return;
+        const indexValue = Number.parseInt(top.target.dataset.pageIndex || "0", 10);
+        if (Number.isFinite(indexValue)) setActivePageIndex(indexValue);
+      },
+      { root: container, threshold: 0.35 }
     );
+    Object.values(paperRefs.current).forEach((element) => {
+      if (element) observer.observe(element);
+    });
+    return () => observer.disconnect();
+  }, [pages.length]);
+
+  const updateDocument = (updater) => {
+    setDocumentState((current) => {
+      if (!current) return current;
+      const draft = clone(current);
+      updater(draft);
+      return draft;
+    });
   };
 
-  const insertBlock = (kind) => {
-    if (activeIndex === null || activeIndex < 0 || activeIndex >= sections.length) return;
-    const snippets = {
-      heading: "\n\n## New Heading",
-      bullet: "\n- New bullet point",
-      metric:
-        "\n\n[Metric Card]\nLabel: Growth Rate\nValue: 24%\nContext: Quarter-over-quarter acceleration",
-      chart:
-        "\n\n[Chart Block]\nType: line\nLabels: Jan, Feb, Mar\nSeries: 12, 18, 24\nInsight: Momentum is increasing",
-      divider: "\n\n----------------",
-    };
-    updateSection(activeIndex, { body: `${sections[activeIndex].body || ""}${snippets[kind] || ""}` });
+  const syncPageSetup = (nextPageSize, nextMarginPreset, nextPaperTone) => {
+    updateDocument((draft) => {
+      draft.meta = draft.meta || {};
+      draft.meta.page_setup = draft.meta.page_setup || {};
+      const pageSizeItem = PAGE_SIZE_OPTIONS.find((item) => item.value === nextPageSize) || PAGE_SIZE_OPTIONS[0];
+      const marginItem = MARGIN_OPTIONS.find((item) => item.value === nextMarginPreset) || MARGIN_OPTIONS[1];
+      const background =
+        nextPaperTone === "warm" ? "#f7f3ec" : nextPaperTone === "cool" ? "#f3f7fb" : "#ffffff";
+
+      draft.meta.page_setup.size = pageSizeItem.exportSize;
+      draft.meta.page_setup.background = background;
+      draft.meta.page_setup.margins = {
+        top: marginItem.px,
+        right: marginItem.px,
+        bottom: marginItem.px,
+        left: marginItem.px,
+      };
+    });
   };
 
-  const deleteSection = (index) => {
-    if (sections.length <= 1) { toast.error("A report needs at least one page."); return; }
-    setSections((current) => current.filter((_, i) => i !== index));
+  const updateSectionTitle = (sectionId, title) => {
+    updateDocument((draft) => {
+      const section = draft.sections.find((item) => item.section_id === sectionId);
+      if (!section) return;
+      section.title = title;
+    });
+  };
+
+  const updateCoverField = (field, value) => {
+    updateDocument((draft) => {
+      draft.meta = draft.meta || {};
+      draft.meta.cover = draft.meta.cover || {};
+      draft.meta.cover[field] = value;
+      if (field === "title") {
+        draft.meta.report_name = value || draft.meta.report_name;
+      }
+    });
   };
 
   const addSection = () => {
-    const newIdx = sections.length;
-    setSections((current) => [...current, { heading: "New Page", body: "" }]);
-    setTimeout(() => {
-      paperRefs.current[String(newIdx)]?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 150);
+    updateDocument((draft) => {
+      const nextOrder = draft.sections.length;
+      const section = {
+        section_id: newId("section"),
+        title: `Section ${nextOrder + 1}`,
+        order: nextOrder,
+        blocks: [
+          {
+            block_id: newId("block"),
+            type: "rich_text",
+            order: 0,
+            layout: { span: 12, align: "left", flow: "full-width" },
+            data: toDocText("Write section content..."),
+          },
+        ],
+      };
+      draft.sections.push(section);
+      setActiveSectionId(section.section_id);
+    });
   };
 
-  const scrollToPaper = (key) => {
-    paperRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const updateBlock = (sectionId, blockId, nextBlock) => {
+    updateDocument((draft) => {
+      const section = draft.sections.find((item) => item.section_id === sectionId);
+      if (!section || !Array.isArray(section.blocks)) return;
+      section.blocks = section.blocks.map((block) => (block.block_id === blockId ? nextBlock : block));
+      section.blocks.forEach((block, index) => {
+        block.order = index;
+      });
+    });
   };
 
-  const doSave = async () => {
-    if (!canSave) return;
+  const insertBlock = (toolKey) => {
+    const targetSectionId = activeSectionId || sections[0]?.section_id;
+    if (!targetSectionId) return;
+    updateDocument((draft) => {
+      const section = draft.sections.find((item) => item.section_id === targetSectionId);
+      if (!section) return;
+      const blocks = Array.isArray(section.blocks) ? section.blocks : [];
+      const block = createBlockForTool(toolKey, blocks.length);
+      section.blocks = [...blocks, block];
+    });
+  };
+
+  const handleSave = async () => {
+    if (!report || !documentState) return "";
     setIsSaving(true);
     try {
-      const payload = await updateReport(reportId, {
-        report_name: title.trim(),
-        summary: summary.trim(),
-        sections: sections.map((section) => ({
-          heading: section.heading,
-          body: section.body,
-        })),
-      });
-      setReport(payload);
-      // Update initial data to reflect saved state
-      initialDataRef.current = {
-        title: title.trim(),
-        summary: summary.trim(),
-        sections: sections.map((s) => ({ ...s })),
-      };
+      const payload = await saveReportDraft(report.report_id, documentState);
+      if (payload?.report) {
+        setReport(payload.report);
+      }
+      if (payload?.version?.version_id) {
+        setActiveVersionId(payload.version.version_id);
+      }
+      initialSnapshotRef.current = JSON.stringify(documentState);
       setHasUnsavedChanges(false);
-      toast.success("Report saved.");
+      toast.success(payload?.deduplicated ? "No content changes to save." : "Draft saved.");
+      return payload?.version?.version_id || activeVersionId || "";
     } catch (error) {
       toast.error(error.message);
+      return "";
     } finally {
       setIsSaving(false);
     }
   };
 
-  const doExport = async () => {
-    if (!report) return;
+  const handleExport = async () => {
+    if (!report || !documentState) return;
     setIsExporting(true);
     try {
-      await exportReport(report.report_id, "pdf", title, {
+      let versionId = activeVersionId;
+      if (hasUnsavedChanges) {
+        versionId = await handleSave();
+      }
+      await exportReport(report.report_id, "pdf", documentState.meta?.report_name || report.report_name, {
         reportType: report.report_type,
-        templateId: report.template_id,
+        templateId: documentState.meta?.template_id || report.template_id,
         quality,
+        versionId: versionId || activeVersionId || "",
       });
       toast.success("PDF downloaded.");
     } catch (error) {
@@ -245,27 +558,27 @@ export default function ReportEditPage() {
     }
   };
 
-  // Track which paper is most visible to highlight the matching sidebar item
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const top = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (top) setActiveKey(top.target.dataset.sectionKey ?? "cover");
-      },
-      { root: container, threshold: 0.25 }
-    );
-    Object.values(paperRefs.current).forEach((el) => { if (el) observer.observe(el); });
-    return () => observer.disconnect();
-  }, [sections.length]);
+  const scrollToPage = (pageIndex) => {
+    paperRefs.current[String(pageIndex)]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const paperBackground =
     paperTone === "warm" ? "#f7f3ec" : paperTone === "cool" ? "#f3f7fb" : "#ffffff";
 
-  if (isLoading) {
+  const sectionPageMap = useMemo(() => {
+    const map = new Map();
+    for (const page of pages) {
+      for (const item of page.items) {
+        if (item.kind !== "section" || !item.section_id) continue;
+        if (!map.has(item.section_id)) {
+          map.set(item.section_id, page.pageIndex);
+        }
+      }
+    }
+    return map;
+  }, [pages]);
+
+  if (isLoading || !documentState) {
     return (
       <section className="min-h-[100dvh] bg-[#0b0f14] px-6 py-24 text-slate-200">
         <p className="inline-flex items-center gap-2 text-sm text-slate-300">
@@ -279,181 +592,76 @@ export default function ReportEditPage() {
   return (
     <section className="min-h-[100dvh] bg-[#0b0f14] text-slate-100">
       <div className="flex h-[100dvh] flex-col">
-        {/* Header */}
-        <header className="border-b border-slate-800 bg-[#0f141c] px-4 py-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={() => navigate(`/reports/${reportId}`)}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold text-slate-100 transition hover:bg-slate-800"
-              >
-                <ArrowLeft size={13} />
-                Back
-              </button>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">
-                  {title || "Untitled Report"}
-                  {hasUnsavedChanges && <span className="ml-1 text-amber-400">●</span>}
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  {isSaving ? "Saving..." : hasUnsavedChanges ? "Unsaved changes" : "Ready"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900/80 px-1 py-1">
-              <button type="button" onClick={() => setZoom((z) => Math.max(70, z - 5))} className="rounded px-1.5 py-1 text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                <Minus size={13} />
-              </button>
-              <span className="min-w-11 text-center text-xs font-semibold">{zoom}%</span>
-              <button type="button" onClick={() => setZoom((z) => Math.min(150, z + 5))} className="rounded px-1.5 py-1 text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                <Plus size={13} />
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={doSave} disabled={!canSave || isSaving}
-                className="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-900/80 px-2.5 py-1.5 text-xs font-semibold transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">
-                {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                Save
-              </button>
-              <button type="button" onClick={doExport} disabled={isExporting}
-                className="inline-flex items-center gap-1 rounded-md bg-cyan-500 px-2.5 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50">
-                {isExporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                Export PDF
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-800 pt-2 text-xs">
-            <select value={pageSize} onChange={(e) => setPageSize(e.target.value)} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs">
-              {PAGE_SIZE_OPTIONS.map((item) => <option key={item.value} value={item.value}>Page: {item.label}</option>)}
-            </select>
-            <select value={marginPreset} onChange={(e) => setMarginPreset(e.target.value)} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs">
-              {MARGIN_OPTIONS.map((item) => <option key={item.value} value={item.value}>Margin: {item.label}</option>)}
-            </select>
-            <select value={paperTone} onChange={(e) => setPaperTone(e.target.value)} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs">
-              <option value="white">Paper: White</option>
-              <option value="warm">Paper: Warm</option>
-              <option value="cool">Paper: Cool</option>
-            </select>
-            <select value={quality} onChange={(e) => setQuality(e.target.value)} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs">
-              <option value="standard">PDF: Standard</option>
-              <option value="premium">PDF: Premium</option>
-            </select>
-            <span className="ml-auto text-slate-500">{sections.length} page{sections.length !== 1 ? "s" : ""}</span>
-          </div>
-        </header>
+        <ReportEditToolbar
+          title={documentState?.meta?.report_name || report?.report_name || "Untitled Report"}
+          hasUnsavedChanges={hasUnsavedChanges}
+          isSaving={isSaving}
+          canSave={canSave}
+          isExporting={isExporting}
+          zoom={zoom}
+          onZoomOut={() => setZoom((current) => Math.max(70, current - 5))}
+          onZoomIn={() => setZoom((current) => Math.min(140, current + 5))}
+          onBack={() => navigate("/reports")}
+          onSave={handleSave}
+          onExport={handleExport}
+          pageSize={pageSize}
+          onPageSizeChange={(value) => {
+            setPageSize(value);
+            syncPageSetup(value, marginPreset, paperTone);
+          }}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+          marginPreset={marginPreset}
+          onMarginPresetChange={(value) => {
+            setMarginPreset(value);
+            syncPageSetup(pageSize, value, paperTone);
+          }}
+          marginOptions={MARGIN_OPTIONS}
+          paperTone={paperTone}
+          onPaperToneChange={(value) => {
+            setPaperTone(value);
+            syncPageSetup(pageSize, marginPreset, value);
+          }}
+          quality={quality}
+          onQualityChange={setQuality}
+          pageCount={pages.length}
+        />
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* Sidebar — tools + page navigator */}
-          <aside className="w-[220px] shrink-0 border-r border-slate-800 bg-[#0d1218]">
-            <div className="h-full overflow-y-auto px-3 py-3">
-              <section>
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Tools</p>
-                <div className="space-y-1.5">
-                  {TOOL_ITEMS.map((item) => (
-                    <button key={item.key} type="button" onClick={() => insertBlock(item.key)}
-                      disabled={activeKey === "cover"}
-                      className="flex w-full items-center gap-2 rounded-md border border-slate-700 bg-slate-900/70 px-2.5 py-2 text-left text-xs font-semibold transition hover:border-cyan-500/80 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40">
-                      <item.icon size={14} />
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </section>
+          <ReportEditSidebar
+            toolItems={TOOL_ITEMS}
+            activeSectionId={activeSectionId}
+            onInsertBlock={insertBlock}
+            sections={sections}
+            onSelectSection={(sectionId) => {
+              setActiveSectionId(sectionId);
+              const pageIndex = sectionPageMap.get(sectionId);
+              if (Number.isFinite(pageIndex)) {
+                scrollToPage(pageIndex);
+              }
+            }}
+            onAddSection={addSection}
+            pages={pages}
+            activePageIndex={activePageIndex}
+            onScrollToPage={scrollToPage}
+          />
 
-              <section className="mt-5">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Pages</p>
-                <div className="space-y-1.5">
-                  {/* Cover */}
-                  <button type="button" onClick={() => scrollToPaper("cover")}
-                    className={`w-full rounded-md border px-2.5 py-2 text-left transition ${
-                      activeKey === "cover"
-                        ? "border-cyan-500 bg-cyan-500/15 text-cyan-100"
-                        : "border-slate-700 bg-slate-900/70 text-slate-200 hover:bg-slate-800"
-                    }`}>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Cover</p>
-                    <p className="mt-0.5 truncate text-xs font-semibold">{title || "Untitled Report"}</p>
-                  </button>
-                  {/* Sections */}
-                  {sections.map((section, index) => (
-                    <button key={`nav-${index}`} type="button" onClick={() => scrollToPaper(String(index))}
-                      className={`w-full rounded-md border px-2.5 py-2 text-left transition ${
-                        activeKey === String(index)
-                          ? "border-cyan-500 bg-cyan-500/15 text-cyan-100"
-                          : "border-slate-700 bg-slate-900/70 text-slate-200 hover:bg-slate-800"
-                      }`}>
-                      <p className="text-[11px] font-semibold">Page {index + 1}</p>
-                      <p className="mt-0.5 truncate text-xs font-semibold">{section.heading || "Untitled"}</p>
-                      <p className="mt-1 line-clamp-2 text-[11px] text-slate-400">{readSectionSnippet(section.body)}</p>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            </div>
-          </aside>
-
-          {/* Scrollable multi-page canvas */}
-          <main ref={scrollContainerRef} className="min-w-0 flex-1 overflow-auto bg-[#1a1f27] px-6 py-10">
-            <div className="mx-auto flex flex-col items-center gap-8" style={{ width: pageSpec.width * (zoom / 100) }}>
-
-              {/* Cover paper — title + summary */}
-              <article
-                ref={(el) => { paperRefs.current["cover"] = el; }}
-                data-section-key="cover"
-                onClick={() => setActiveKey("cover")}
-                className={`w-full cursor-text rounded-sm border border-slate-300/80 text-slate-900 shadow-[0_20px_50px_rgba(2,6,23,0.55)] transition ${
-                  activeKey === "cover" ? "ring-2 ring-cyan-500/50" : "hover:shadow-[0_24px_60px_rgba(2,6,23,0.7)]"
-                }`}
-                style={{ minHeight: pageSpec.minHeight * 0.4, background: paperBackground, padding: marginSpec.px, zoom: zoom / 100 }}
-              >
-                <input value={title} onChange={(e) => setTitle(e.target.value)}
-                  className="w-full border-none bg-transparent text-[42px] font-semibold leading-tight text-inherit focus:outline-none"
-                  placeholder="Report title" />
-                <textarea value={summary} onChange={(e) => setSummary(e.target.value)} rows={7}
-                  className="mt-5 w-full resize-none border-none bg-transparent text-base leading-7 text-slate-700 focus:outline-none"
-                  placeholder="Executive summary..." />
-              </article>
-
-              {/* One paper per section */}
-              {sections.map((section, index) => (
-                <article
-                  key={index}
-                  ref={(el) => { paperRefs.current[String(index)] = el; }}
-                  data-section-key={String(index)}
-                  onClick={() => setActiveKey(String(index))}
-                  className={`w-full cursor-text rounded-sm border border-slate-300/80 text-slate-900 shadow-[0_20px_50px_rgba(2,6,23,0.55)] transition ${
-                    activeKey === String(index) ? "ring-2 ring-cyan-500/50" : "hover:shadow-[0_24px_60px_rgba(2,6,23,0.7)]"
-                  }`}
-                  style={{ minHeight: pageSpec.minHeight, background: paperBackground, padding: marginSpec.px, zoom: zoom / 100 }}
-                >
-                  <div className="mb-5 flex items-center justify-between border-b border-slate-200 pb-3">
-                    <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Page {index + 1}</span>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); deleteSection(index); }}
-                      className="rounded p-1 text-slate-400 transition hover:bg-red-50 hover:text-red-500" title="Delete page">
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                  <input value={section.heading} onChange={(e) => updateSection(index, { heading: e.target.value })}
-                    className="w-full border-none bg-transparent text-[30px] font-semibold leading-tight text-inherit focus:outline-none"
-                    placeholder="Section heading" />
-                  <textarea value={section.body} onChange={(e) => updateSection(index, { body: e.target.value })} rows={28}
-                    className="mt-4 w-full resize-y border-none bg-transparent text-[16px] leading-8 text-slate-800 focus:outline-none"
-                    placeholder="Write the section content..." />
-                </article>
-              ))}
-
-              {/* Add page */}
-              <button type="button" onClick={addSection}
-                className="inline-flex items-center gap-2 rounded-xl border border-dashed border-slate-600 bg-slate-800/40 px-6 py-3 text-sm font-semibold text-slate-400 transition hover:border-cyan-500/60 hover:text-cyan-400">
-                <Plus size={15} />
-                Add Page
-              </button>
-
-            </div>
-          </main>
+          <ReportEditCanvas
+            scrollContainerRef={scrollContainerRef}
+            paperRefs={paperRefs}
+            pages={pages}
+            pageSpec={pageSpec}
+            marginSpec={marginSpec}
+            paperBackground={paperBackground}
+            zoom={zoom}
+            activePageIndex={activePageIndex}
+            activeSectionId={activeSectionId}
+            cover={documentState?.meta?.cover || {}}
+            onSetActivePage={setActivePageIndex}
+            onSetActiveSection={setActiveSectionId}
+            onUpdateCoverField={updateCoverField}
+            onUpdateSectionTitle={updateSectionTitle}
+            onUpdateBlock={updateBlock}
+          />
         </div>
       </div>
     </section>

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Download, Loader2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
-import { exportReport, getReport, listReportTemplates } from "../services/platformService";
+import { exportReport, getReportEditor, getReportPreview, listReportTemplates } from "../services/platformService";
 
 const REPORT_TYPE_LABELS = {
   viability_report: "Viability Report",
@@ -23,7 +23,73 @@ function formatDate(value) {
 
 function readSectionValue(section) {
   if (!section) return "";
-  return String(section.body || "").trim();
+  return String(section.body || section.excerpt || "").trim();
+}
+
+function richDataToText(data) {
+  if (!data) return "";
+  if (typeof data === "string") return data;
+  if (typeof data.text === "string") return data.text;
+  const paragraphs = Array.isArray(data.content) ? data.content : [];
+  const lines = [];
+  for (const paragraph of paragraphs) {
+    const nodes = Array.isArray(paragraph?.content) ? paragraph.content : [];
+    const text = nodes
+      .map((node) => (typeof node?.text === "string" ? node.text : ""))
+      .join("")
+      .trim();
+    if (text) lines.push(text);
+  }
+  return lines.join("\n\n");
+}
+
+function blockToText(block) {
+  if (!block || typeof block !== "object") return "";
+  const type = String(block.type || "").toLowerCase();
+  const data = block.data && typeof block.data === "object" ? block.data : {};
+
+  if (type === "card") {
+    const items = Array.isArray(data.items) ? data.items : [];
+    return items.map((item) => String(item || "").trim()).filter(Boolean).join("\n");
+  }
+  if (type === "metric_grid") {
+    const metrics = Array.isArray(data.metrics) ? data.metrics : [];
+    return metrics
+      .map((item) => `${item?.label || ""}: ${item?.value || ""}`.trim())
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (type === "table") {
+    return String(data.title || "Table").trim();
+  }
+  if (type === "chart") {
+    return String(data.title || "Chart").trim();
+  }
+
+  return richDataToText(data);
+}
+
+function sectionsFromDocument(documentJson, fallbackSections = []) {
+  const docSections = Array.isArray(documentJson?.sections) ? documentJson.sections : [];
+  if (!docSections.length) {
+    return (Array.isArray(fallbackSections) ? fallbackSections : []).map((section) => ({
+      heading: String(section?.heading || "Section").trim(),
+      excerpt: String(section?.body || "").trim(),
+    }));
+  }
+
+  return docSections.map((section, index) => {
+    const title = String(section?.title || `Section ${index + 1}`).trim();
+    const blocks = Array.isArray(section?.blocks) ? section.blocks : [];
+    const excerpt = blocks
+      .slice()
+      .sort((a, b) => Number(a?.order || 0) - Number(b?.order || 0))
+      .map(blockToText)
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 600);
+    return { heading: title, excerpt };
+  });
 }
 
 export default function ReportDetailPage() {
@@ -31,17 +97,30 @@ export default function ReportDetailPage() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [report, setReport] = useState(null);
+  const [documentJson, setDocumentJson] = useState(null);
+  const [activeVersionId, setActiveVersionId] = useState("");
   const [templates, setTemplates] = useState([]);
   const [selectedSectionIndex, setSelectedSectionIndex] = useState(0);
   const [selectedTemplateId, setSelectedTemplateId] = useState("obsidian_board");
   const [quality, setQuality] = useState("standard");
   const [isExporting, setIsExporting] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewError, setPreviewError] = useState("");
 
   const load = async () => {
     setIsLoading(true);
     try {
-      const [reportPayload, templateList] = await Promise.all([getReport(reportId), listReportTemplates()]);
+      const [editorPayload, templateList] = await Promise.all([getReportEditor(reportId), listReportTemplates()]);
+      const reportPayload = editorPayload?.report || null;
       setReport(reportPayload);
+      setDocumentJson(editorPayload?.document_json || null);
+      setActiveVersionId(
+        editorPayload?.active_version_id ||
+          reportPayload?.latest_draft_version_id ||
+          reportPayload?.published_version_id ||
+          ""
+      );
       setTemplates(templateList || []);
       setSelectedSectionIndex(0);
       const nextTemplateId = reportPayload?.template_id || templateList?.[0]?.template_id || "obsidian_board";
@@ -60,7 +139,37 @@ export default function ReportDetailPage() {
     load();
   }, [reportId]);
 
-  const sections = Array.isArray(report?.sections) ? report.sections : [];
+  useEffect(() => {
+    if (!report?.report_id) return;
+    let canceled = false;
+    setIsPreviewLoading(true);
+    setPreviewError("");
+    getReportPreview(report.report_id, {
+      templateId: selectedTemplateId,
+      quality,
+      versionId: activeVersionId || "",
+    })
+      .then((html) => {
+        if (canceled) return;
+        setPreviewHtml(html || "");
+      })
+      .catch((error) => {
+        if (canceled) return;
+        setPreviewHtml("");
+        setPreviewError(error.message);
+      })
+      .finally(() => {
+        if (!canceled) setIsPreviewLoading(false);
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [report?.report_id, selectedTemplateId, quality, activeVersionId]);
+
+  const sections = useMemo(
+    () => sectionsFromDocument(documentJson, report?.sections || []),
+    [documentJson, report?.sections]
+  );
   const activeSection = sections[selectedSectionIndex] || sections[0] || null;
   const activeTemplate = templates.find((item) => item.template_id === selectedTemplateId) || null;
   const templateDescription = activeTemplate?.description || "Template configuration";
@@ -85,6 +194,7 @@ export default function ReportDetailPage() {
         reportType: report.report_type,
         quality,
         templateId: selectedTemplateId,
+        versionId: activeVersionId || "",
       });
       toast.success("PDF downloaded.");
     } catch (error) {
@@ -160,15 +270,38 @@ export default function ReportDetailPage() {
 
           <article className="app-card rounded-2xl border p-5">
             <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Executive Strategy Document</p>
-              <h1 className="mt-3 text-4xl font-semibold leading-tight text-slate-100">{report.report_name}</h1>
-              <p className="mt-3 max-w-3xl text-lg text-slate-300">{report.summary}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300">Rendered Preview</p>
+              <h1 className="mt-3 text-3xl font-semibold leading-tight text-slate-100">{report.report_name}</h1>
+              <p className="mt-2 text-sm text-slate-300">
+                Live HTML preview uses the same report renderer + template configuration as PDF export.
+              </p>
             </div>
 
-            <section className="mt-5 rounded-2xl border border-cyan-500/60 bg-slate-950/70 p-5">
-              <p className="text-xl font-semibold text-slate-100">{activeSection?.heading || "Section"}</p>
-              <p className="mt-3 whitespace-pre-line text-base leading-8 text-slate-300">{readSectionValue(activeSection)}</p>
-            </section>
+            <div className="relative mt-5 overflow-hidden rounded-2xl border border-slate-700 bg-white">
+              {isPreviewLoading ? (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/40 backdrop-blur-[1px]">
+                  <p className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-950/80 px-3 py-2 text-xs text-slate-200">
+                    <Loader2 size={13} className="animate-spin" />
+                    Rendering preview...
+                  </p>
+                </div>
+              ) : null}
+              {previewError ? (
+                <div className="flex h-[72vh] items-center justify-center p-6">
+                  <p className="text-sm text-rose-300">{previewError}</p>
+                </div>
+              ) : previewHtml ? (
+                <iframe
+                  title="Report preview"
+                  srcDoc={previewHtml}
+                  className="h-[72vh] w-full border-0"
+                />
+              ) : (
+                <div className="flex h-[72vh] items-center justify-center p-6">
+                  <p className="text-sm text-slate-500">No preview available yet.</p>
+                </div>
+              )}
+            </div>
 
             <div className="mt-5 grid gap-4 md:grid-cols-2">
               <article className="app-card-subtle rounded-2xl border p-4">

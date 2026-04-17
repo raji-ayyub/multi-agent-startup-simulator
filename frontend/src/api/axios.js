@@ -6,7 +6,9 @@ const normalizeBaseUrl = (value) =>
     .replace(/^http:\/\/localhost(?=[:/]|$)/i, "http://127.0.0.1")
     .replace(/^https:\/\/localhost(?=[:/]|$)/i, "https://127.0.0.1")
     .replace(/\/+$/, "");
-const API_BASE_URL =  "https://multi-agent-startup-simulator.onrender.com";
+// const API_BASE_URL =  "https://multi-agent-startup-simulator.onrender.com";
+const API_BASE_URL =  "http://localhost:8000";
+
 
 const api = axios.create({
   baseURL: API_BASE_URL,

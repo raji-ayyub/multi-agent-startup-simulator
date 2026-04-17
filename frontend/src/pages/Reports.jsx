@@ -346,7 +346,7 @@ export default function ReportsPage() {
       });
       toast.success(approvedOutline ? "Report generated from your outline." : "Report generated.");
       await loadReportsPage(1);
-      navigate(`/reports/${created.report_id}`);
+      navigate(`/reports/${created.report_id}/edit`);
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -615,11 +615,11 @@ export default function ReportsPage() {
                         <div className="flex flex-col md:flex-row gap-2">
                           <button
                             type="button"
-                            onClick={() => navigate(`/reports/${report.report_id}`)}
+                            onClick={() => navigate(`/reports/${report.report_id}/edit`)}
                             className="app-primary-btn inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold"
                           >
                             <PencilRuler size={13} />
-                            Open Report
+                            Open Editor
                           </button>
                           <button
                             type="button"

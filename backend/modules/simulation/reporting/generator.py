@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
+import sys
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -388,7 +390,20 @@ class StartupSimulationReportGenerator:
             except TypeError:
                 return document.write_pdf()
         if renderer == "playwright":
-            return self._render_pdf_bytes_with_playwright(html)
+            try:
+                return self._render_pdf_bytes_with_playwright(html)
+            except RuntimeError as exc:
+                if HTML is not None:
+                    self.logger.warning(
+                        "Playwright PDF rendering failed; falling back to WeasyPrint. reason=%s",
+                        exc,
+                    )
+                    document = HTML(string=html, base_url=str(self.template_dir))
+                    try:
+                        return document.write_pdf(optimize_images=True, presentational_hints=True)
+                    except TypeError:
+                        return document.write_pdf()
+                raise
         raise RuntimeError(f"Unsupported PDF renderer selected: {renderer}")
 
     def _select_pdf_renderer(self) -> str:
@@ -434,6 +449,19 @@ class StartupSimulationReportGenerator:
 
         temp_path: Path | None = None
         try:
+            # On Windows, Playwright needs an asyncio policy that supports subprocess.
+            if sys.platform.startswith("win"):
+                try:
+                    current_policy = asyncio.get_event_loop_policy()
+                except Exception:
+                    current_policy = None
+                if current_policy is not None and not isinstance(
+                    current_policy, asyncio.WindowsProactorEventLoopPolicy
+                ):
+                    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+            self._assert_asyncio_subprocess_supported_for_playwright()
+
             with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as handle:
                 handle.write(html)
                 temp_path = Path(handle.name)
@@ -452,11 +480,54 @@ class StartupSimulationReportGenerator:
                 )
                 browser.close()
                 return pdf_bytes
+        except NotImplementedError as exc:
+            raise RuntimeError(
+                "Playwright PDF rendering is unavailable in this runtime loop configuration. "
+                "Use Windows ProactorEventLoopPolicy (default), run via Docker, "
+                "or install/fix WeasyPrint dependencies."
+            ) from exc
         except Exception as exc:
             raise RuntimeError(f"Playwright PDF rendering failed: {exc}")
         finally:
             if temp_path is not None and temp_path.exists():
                 temp_path.unlink(missing_ok=True)
+
+    def _assert_asyncio_subprocess_supported_for_playwright(self) -> None:
+        async def _probe() -> int:
+            process = await asyncio.create_subprocess_exec(
+                sys.executable,
+                "-c",
+                "print('ok')",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await process.communicate()
+            if process.returncode != 0:
+                stderr_text = (stderr or b"").decode("utf-8", errors="ignore").strip()
+                raise RuntimeError(
+                    "Async subprocess preflight returned non-zero status. "
+                    f"stderr={stderr_text}"
+                )
+            return process.returncode
+
+        try:
+            asyncio.run(_probe())
+        except RuntimeError as exc:
+            if "asyncio.run() cannot be called" not in str(exc):
+                raise RuntimeError(f"Playwright async-subprocess preflight failed: {exc}") from exc
+            loop = asyncio.new_event_loop()
+            try:
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(_probe())
+            except Exception as nested_exc:
+                raise RuntimeError(
+                    f"Playwright async-subprocess preflight failed: {nested_exc}"
+                ) from nested_exc
+            finally:
+                loop.close()
+                asyncio.set_event_loop(None)
+        except Exception as exc:
+            raise RuntimeError(f"Playwright async-subprocess preflight failed: {exc}") from exc
 
     def _load_css(self) -> str:
         return (self.template_dir / "report.css").read_text(encoding="utf-8")
