@@ -85,8 +85,7 @@ def _extract_name(text: str, file_name: str) -> str:
     first_line = next((line.strip() for line in text.splitlines() if line.strip()), "")
     if 2 <= len(first_line) <= 80 and not any(char.isdigit() for char in first_line):
         return first_line
-    base = os.path.splitext(file_name)[0]
-    return re.sub(r"[_\-]+", " ", base).strip()[:80]
+    return ""
 
 
 def _extract_role(text: str) -> str:
@@ -125,9 +124,9 @@ def _extract_qualifications(text: str) -> List[str]:
     return _clean_values(candidates)
 
 
-def _infer_name_and_role_with_llm(text: str, fallback_name: str, fallback_role: str) -> Tuple[str, str]:
+def _infer_name_and_role_with_llm(text: str) -> Tuple[str, str]:
     if client is None or not text.strip():
-        return fallback_name, fallback_role
+        return "", ""
     try:
         system_prompt = (
             "You extract profile details from CV text. "
@@ -153,25 +152,21 @@ def _infer_name_and_role_with_llm(text: str, fallback_name: str, fallback_role: 
             parsed = json.loads(raw)
         llm_name = str(parsed.get("name") or "").strip() if isinstance(parsed, dict) else ""
         llm_role = str(parsed.get("role") or "").strip() if isinstance(parsed, dict) else ""
-        return llm_name or fallback_name, llm_role or fallback_role
+        return llm_name, llm_role
     except Exception:
-        return fallback_name, fallback_role
+        return "", ""
 
 
 def parse_cv_profile(file_name: str, text: str) -> Dict[str, object]:
     normalized_text = str(text or "").strip()
-    fallback_name = _extract_name(normalized_text, file_name)
-    fallback_role = _extract_role(normalized_text)
-    inferred_name, inferred_role = _infer_name_and_role_with_llm(
-        text=normalized_text,
-        fallback_name=fallback_name,
-        fallback_role=fallback_role,
-    )
+    extracted_name = _extract_name(normalized_text, file_name)
+    extracted_role = _extract_role(normalized_text)
+    llm_name, llm_role = _infer_name_and_role_with_llm(text=normalized_text)
     qualifications = _extract_qualifications(normalized_text)
     return {
         "source_file_name": file_name,
-        "name": inferred_name,
-        "role": inferred_role,
+        "name": llm_name or extracted_name,
+        "role": llm_role or extracted_role,
         "qualifications": qualifications,
         "qualification_notes": normalized_text[:20000],
     }

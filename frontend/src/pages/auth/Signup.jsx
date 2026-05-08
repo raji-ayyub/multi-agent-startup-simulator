@@ -231,7 +231,7 @@ export default function Signup() {
                     }}
                     className="auth-link underline"
                   >
-                    Terms & Privacy highlights
+                    Terms & Privacy
                   </button>
                   .
                 </span>

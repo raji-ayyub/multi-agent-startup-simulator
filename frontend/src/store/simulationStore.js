@@ -60,6 +60,7 @@ const useSimulationStore = create((set, get) => ({
   overallScore: null,
   recommendations: [],
   simulationError: null,
+  runningActivity: null,
   lastSimulationResult: null,
   recentSimulations: [],
   activeSimulation: null,
@@ -150,11 +151,28 @@ const useSimulationStore = create((set, get) => ({
   },
 
   rerunSimulationFromExisting: async ({ simulationId, overrides = {}, runAsNewVersion = false }) => {
-    set({ isRunning: true, simulationError: null });
+    set({
+      isRunning: true,
+      simulationError: null,
+      runningActivity: {
+        phase: "rerun_request",
+        message: runAsNewVersion
+          ? "Submitting a new-version rerun to the backend simulation engine."
+          : "Submitting rerun changes to the backend simulation engine.",
+        status: "running",
+      },
+    });
     try {
       const response = await rerunSimulation(simulationId, {
         ...overrides,
         run_as_new_version: Boolean(runAsNewVersion),
+      });
+      set({
+        runningActivity: {
+          phase: "loading_result",
+          message: "Backend rerun completed. Loading the persisted score, advisor outputs, and event log.",
+          status: "running",
+        },
       });
       let detail = null;
       try {
@@ -176,6 +194,11 @@ const useSimulationStore = create((set, get) => ({
         overallScore: response.overall_score,
         recommendations: response.recommendations || [],
         simulationError: null,
+        runningActivity: {
+          phase: "completed",
+          message: "Simulation rerun completed and backend log set loaded.",
+          status: "done",
+        },
         lastSimulationResult: detail || response,
         activeSimulation: detail || response,
         dashboardMetrics: response.metrics || { ...DEFAULT_METRICS },
@@ -186,6 +209,11 @@ const useSimulationStore = create((set, get) => ({
       set({
         isRunning: false,
         simulationError: error?.message || "Simulation rerun failed.",
+        runningActivity: {
+          phase: "error",
+          message: error?.message || "Simulation rerun failed.",
+          status: "error",
+        },
       });
       throw error;
     }
@@ -219,7 +247,15 @@ const useSimulationStore = create((set, get) => ({
   },
 
   launchSimulationFromBrief: async (brief) => {
-    set({ isRunning: true, simulationError: null });
+    set({
+      isRunning: true,
+      simulationError: null,
+      runningActivity: {
+        phase: "preparing_payload",
+        message: "Preparing the founder brief for the backend simulation engine.",
+        status: "running",
+      },
+    });
     try {
       set((state) => ({
         startupIdea: {
@@ -233,7 +269,21 @@ const useSimulationStore = create((set, get) => ({
         },
       }));
 
+      set({
+        runningActivity: {
+          phase: "backend_simulation",
+          message: "Backend simulation request is active. Waiting for validated advisor outputs, score, and event log.",
+          status: "running",
+        },
+      });
       const response = await runSimulation(get().startupIdea);
+      set({
+        runningActivity: {
+          phase: "loading_result",
+          message: "Simulation completed on the backend. Loading the persisted reportable result.",
+          status: "running",
+        },
+      });
       let detail = null;
       try {
         detail = await getSimulation(response.simulation_id);
@@ -254,6 +304,11 @@ const useSimulationStore = create((set, get) => ({
         overallScore: response.overall_score,
         recommendations: response.recommendations || [],
         simulationError: null,
+        runningActivity: {
+          phase: "completed",
+          message: "Simulation completed and backend log set loaded.",
+          status: "done",
+        },
         lastSimulationResult: detail || response,
         activeSimulation: detail || response,
         dashboardMetrics: response.metrics || { ...DEFAULT_METRICS },
@@ -265,6 +320,11 @@ const useSimulationStore = create((set, get) => ({
       set({
         isRunning: false,
         simulationError: error?.message || "Simulation failed.",
+        runningActivity: {
+          phase: "error",
+          message: error?.message || "Simulation failed.",
+          status: "error",
+        },
       });
       throw error;
     }
@@ -335,6 +395,7 @@ const useSimulationStore = create((set, get) => ({
       overallScore: null,
       recommendations: [],
       simulationError: null,
+      runningActivity: null,
       lastSimulationResult: null,
       activeSimulation: null,
       dashboardMetrics: { ...DEFAULT_METRICS },

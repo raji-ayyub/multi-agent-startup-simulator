@@ -100,6 +100,16 @@ def get_db():
         db.close()
 
 
+def check_database_health() -> dict:
+    """Return a lightweight, non-secret database connectivity status."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"ready": True, "error": ""}
+    except Exception as exc:
+        return {"ready": False, "error": str(exc)}
+
+
 def create_tables():
     """Create all database tables with retries for transient pooler saturation."""
     attempts = max(1, int(os.getenv("DATABASE_STARTUP_RETRIES", "3")))

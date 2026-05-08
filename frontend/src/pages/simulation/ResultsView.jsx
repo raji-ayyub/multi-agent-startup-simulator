@@ -48,6 +48,7 @@ export default function ResultsView() {
     activeSimulation,
     isLoadingHistory,
     isRunning,
+    runningActivity,
     simulationError,
   } = useSimulationStore();
 
@@ -135,15 +136,20 @@ export default function ResultsView() {
       return;
     }
     try {
+      toast.loading(runAsNewVersion ? "Running new version pressure test..." : "Rerunning simulation pressure test...", {
+        id: "simulation-rerun",
+      });
       await rerunSimulationFromExisting({
         simulationId: activeSimulation.simulation_id,
         overrides: rerunDraft,
         runAsNewVersion,
       });
       setShowRerunModal(false);
-      toast.success(runAsNewVersion ? "New version simulation completed." : "Simulation rerun completed.");
+      toast.success(runAsNewVersion ? "New version simulation completed." : "Simulation rerun completed.", {
+        id: "simulation-rerun",
+      });
     } catch (error) {
-      toast.error(error?.message || "Simulation rerun failed.");
+      toast.error(error?.message || "Simulation rerun failed.", { id: "simulation-rerun" });
     }
   };
 
@@ -264,9 +270,15 @@ export default function ResultsView() {
                   <p className="app-copy text-sm">Confidence {agent.confidence}%</p>
                 </div>
                 <p className="app-copy text-sm">{agent.summary}</p>
+                {agent.confidence_rationale ? (
+                  <p className="app-muted mt-2 text-xs">{agent.confidence_rationale}</p>
+                ) : null}
                 <div className="mt-3 space-y-1">
                   {(agent.opportunities || []).slice(0, 2).map((op) => (
                     <p key={op} className="text-xs text-emerald-300">+ {op}</p>
+                  ))}
+                  {(agent.pressure_points || []).slice(0, 2).map((point) => (
+                    <p key={point} className="text-xs text-amber-300">! {point}</p>
                   ))}
                 </div>
               </article>
@@ -334,6 +346,14 @@ export default function ResultsView() {
               </button>
             </header>
             <div className="overflow-y-auto px-5 py-4">
+              {isRunning ? (
+                <div className="app-status-warning mb-4 rounded-xl border px-3 py-2 text-sm">
+                  <p className="font-semibold">{runningActivity?.message || "Backend rerun is active."}</p>
+                  <p className="mt-1 text-xs">
+                    Current operation: {String(runningActivity?.phase || "rerun_request").replaceAll("_", " ")}
+                  </p>
+                </div>
+              ) : null}
               <div className="grid gap-3 md:grid-cols-2">
                 <Field label="Startup Name">
                   <input value={rerunDraft.startup_name || ""} onChange={(e) => setRerunDraft((d) => ({ ...d, startup_name: e.target.value }))} className="theme-input w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-amber-300" />
@@ -388,7 +408,9 @@ export default function ResultsView() {
                 </button>
               </div>
               <p className="app-copy text-xs">
-                Current chain: v{versionState.currentVersion} of max v{MAX_SIMULATION_VERSION}.
+                {isRunning
+                  ? "Rebuilding assumptions, evidence checks, advisor critiques, and board synthesis."
+                  : `Current chain: v${versionState.currentVersion} of max v${MAX_SIMULATION_VERSION}.`}
               </p>
             </footer>
           </section>

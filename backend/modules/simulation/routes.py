@@ -25,12 +25,17 @@ MAX_SIMULATION_VERSION = 3
 
 
 def _persist_simulation_run(db: Session, payload: SimulationRunRequest, result: SimulationRunResponse) -> SimulationRun:
+    analysis_bundle = {
+        "assumptions": result.assumptions,
+        "deterministic_signals": result.deterministic_signals,
+        "uncertainty": result.uncertainty,
+    }
     record = SimulationRun(
         id=result.simulation_id,
         owner_email=payload.owner_email,
         startup_name=result.startup_name,
         status=result.status,
-        input_payload=payload.model_dump(),
+        input_payload={**payload.model_dump(), "_simulation_analysis": analysis_bundle},
         metrics=result.metrics,
         overall_score=result.overall_score,
         recommendations=result.recommendations,
@@ -200,6 +205,9 @@ def get_simulation(
         logs=row.logs or [],
         created_at=row.created_at,
         input_payload=row.input_payload or {},
+        assumptions=((row.input_payload or {}).get("_simulation_analysis") or {}).get("assumptions", []),
+        deterministic_signals=((row.input_payload or {}).get("_simulation_analysis") or {}).get("deterministic_signals", {}),
+        uncertainty=((row.input_payload or {}).get("_simulation_analysis") or {}).get("uncertainty", {}),
     )
 
 

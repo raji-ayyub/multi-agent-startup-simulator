@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect } from "react";
-import { BrowserRouter as Router, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 
 import AdminSidebar from "../components/layout/AdminSidebar";
@@ -100,11 +100,6 @@ const RoleAwareLayout = ({ children }) => {
   if (user?.role === "OPERATOR") return <ManagementLayout>{children}</ManagementLayout>;
   if (user?.role === "ADMIN") return <AdminLayout>{children}</AdminLayout>;
   return <SimulationLayout>{children}</SimulationLayout>;
-};
-
-const ReportDetailRedirect = () => {
-  const { reportId } = useParams();
-  return <Navigate to={`/reports/${reportId}/edit`} replace />;
 };
 
 export default function App() {
@@ -230,7 +225,7 @@ export default function App() {
             path="/reports/:reportId"
             element={
               <ProtectedRoute>
-                <ReportDetailRedirect />
+                <ReportEditPage />
               </ProtectedRoute>
             }
           />

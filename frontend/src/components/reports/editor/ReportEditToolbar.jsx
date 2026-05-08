@@ -1,8 +1,10 @@
 import {
   ArrowLeft,
   Download,
+  Eye,
   Loader2,
   Minus,
+  Pencil,
   Plus,
   Save,
 } from "lucide-react";
@@ -19,6 +21,10 @@ export default function ReportEditToolbar({
   onBack,
   onSave,
   onExport,
+  viewMode,
+  onViewModeChange,
+  previewStatus,
+  onRefreshPreview,
   pageSize,
   onPageSizeChange,
   pageSizeOptions,
@@ -73,6 +79,28 @@ export default function ReportEditToolbar({
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-md border border-slate-700 bg-slate-900/80 p-1">
+            <button
+              type="button"
+              onClick={() => onViewModeChange("edit")}
+              className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold transition ${
+                viewMode === "edit" ? "bg-slate-700 text-white" : "text-slate-300 hover:bg-slate-800"
+              }`}
+            >
+              <Pencil size={13} />
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange("preview")}
+              className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold transition ${
+                viewMode === "preview" ? "bg-cyan-500 text-slate-950" : "text-slate-300 hover:bg-slate-800"
+              }`}
+            >
+              <Eye size={13} />
+              Preview
+            </button>
+          </div>
           <button
             type="button"
             onClick={onSave}
@@ -134,8 +162,15 @@ export default function ReportEditToolbar({
           <option value="standard">PDF: Standard</option>
           <option value="premium">PDF: Premium</option>
         </select>
+        <button
+          type="button"
+          onClick={onRefreshPreview}
+          className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs font-semibold text-slate-200 transition hover:bg-slate-800"
+        >
+          Refresh preview
+        </button>
         <span className="ml-auto text-slate-500">
-          {pageCount} page{pageCount !== 1 ? "s" : ""}
+          {viewMode === "preview" ? previewStatus : `${pageCount} page${pageCount !== 1 ? "s" : ""}`}
         </span>
       </div>
     </header>

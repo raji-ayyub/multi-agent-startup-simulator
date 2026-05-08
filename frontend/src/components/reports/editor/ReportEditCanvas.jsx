@@ -683,7 +683,7 @@ export default function ReportEditCanvas({
                 boxSizing: "border-box",
               }}
             >
-              <div style={{ fontFamily: "Source Serif 4, Georgia, 'Times New Roman', serif" }}>
+              <div style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
                 {page.items.map((item) => {
                   if (item.kind === "cover") {
                     return (

@@ -49,12 +49,19 @@ class AgentFeedback(BaseModel):
     risks: List[str]
     opportunities: List[str]
     confidence: int = Field(..., ge=0, le=100)
+    pressure_points: List[str] = Field(default_factory=list)
+    evidence_notes: List[str] = Field(default_factory=list)
+    rubric_scores: Dict[str, int] = Field(default_factory=dict)
+    confidence_rationale: str = ""
 
 
 class SimulationLog(BaseModel):
     role: str
     message: str
-    status: Literal["pending", "running", "done"] = "done"
+    status: Literal["pending", "running", "done", "error"] = "done"
+    phase: str = ""
+    sequence: int = 0
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class SimulationRunResponse(BaseModel):
@@ -67,6 +74,9 @@ class SimulationRunResponse(BaseModel):
     agents: List[AgentFeedback]
     synthesis: str
     logs: List[SimulationLog]
+    assumptions: List[Dict[str, Any]] = Field(default_factory=list)
+    deterministic_signals: Dict[str, Any] = Field(default_factory=dict)
+    uncertainty: Dict[str, Any] = Field(default_factory=dict)
 
 
 class SimulationRunSummary(BaseModel):

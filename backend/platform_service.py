@@ -57,6 +57,82 @@ _REPORT_TYPE_DISPLAY_NAMES = {
     "investment_analysis_report": "Investment Analysis Report",
     "business_report": "Business Report",
 }
+_SUPPORTED_REPORT_SCOPES = {"targeted", "full"}
+_DOCUMENT_SECTION_KEYS = [
+    "executive_summary",
+    "business_idea",
+    "methodology",
+    "market_feasibility",
+    "technical_feasibility",
+    "financial_viability",
+    "operational_feasibility",
+    "risk_assessment",
+    "legal_regulatory",
+    "conclusions",
+    "appendices",
+]
+_DOCUMENT_SECTION_DEFAULT_TITLES: Dict[str, str] = {
+    "executive_summary": "Executive Summary",
+    "business_idea": "Business Idea Overview",
+    "methodology": "Simulation Methodology",
+    "market_feasibility": "Market Feasibility",
+    "technical_feasibility": "Technical Feasibility",
+    "financial_viability": "Financial Viability",
+    "operational_feasibility": "Operational Feasibility",
+    "risk_assessment": "Risk Assessment",
+    "legal_regulatory": "Legal & Regulatory",
+    "conclusions": "Conclusions",
+    "appendices": "Appendices",
+}
+_TARGETED_REPORT_SECTION_POLICY: Dict[str, List[str]] = {
+    "viability_report": [
+        "executive_summary",
+        "business_idea",
+        "market_feasibility",
+        "financial_viability",
+        "risk_assessment",
+        "conclusions",
+    ],
+    "feasibility_report": [
+        "executive_summary",
+        "business_idea",
+        "methodology",
+        "technical_feasibility",
+        "operational_feasibility",
+        "risk_assessment",
+        "conclusions",
+    ],
+    "market_analysis_report": [
+        "executive_summary",
+        "business_idea",
+        "market_feasibility",
+        "risk_assessment",
+        "conclusions",
+    ],
+    "investment_analysis_report": [
+        "executive_summary",
+        "business_idea",
+        "financial_viability",
+        "risk_assessment",
+        "conclusions",
+    ],
+    "business_report": [
+        "executive_summary",
+        "business_idea",
+        "market_feasibility",
+        "financial_viability",
+        "operational_feasibility",
+        "risk_assessment",
+        "conclusions",
+    ],
+}
+_TARGETED_CHART_LIMITS: Dict[str, Dict[str, int]] = {
+    "viability_report": {"market_feasibility": 1, "financial_viability": 1, "risk_assessment": 1},
+    "feasibility_report": {"technical_feasibility": 1, "operational_feasibility": 1, "risk_assessment": 1},
+    "market_analysis_report": {"market_feasibility": 2, "risk_assessment": 1},
+    "investment_analysis_report": {"financial_viability": 2, "market_feasibility": 1, "risk_assessment": 1},
+    "business_report": {"market_feasibility": 1, "financial_viability": 1, "operational_feasibility": 1, "risk_assessment": 1},
+}
 _DOCUMENT_FONT_FAMILIES = {
     "Source Serif 4",
     "Inter",
@@ -173,6 +249,13 @@ def _normalize_report_type(report_type: str | None) -> str:
     normalized = _REPORT_TYPE_ALIASES.get(normalized, normalized)
     if normalized not in _SUPPORTED_REPORT_TYPES:
         return "business_report"
+    return normalized
+
+
+def _normalize_report_scope(report_scope: str | None) -> str:
+    normalized = (report_scope or "").strip().lower()
+    if normalized not in _SUPPORTED_REPORT_SCOPES:
+        return "targeted"
     return normalized
 
 
@@ -428,7 +511,7 @@ def _legacy_report_payload_to_document_json(
                 "footer": "",
                 "background": "#ffffff",
                 "font_scale": 100,
-                "font_family": "Source Serif 4",
+                "font_family": "Georgia",
             },
             "theme_tokens": dict(template.get("theme_tokens") or {}),
         },
@@ -973,15 +1056,15 @@ def plan_report_outline(
     simulation: SimulationRun,
     report_name: str,
     report_type: str,
+    report_scope: str = "targeted",
 ) -> List[Dict[str, str]]:
-    """Lightweight LLM call that returns a 4-page outline: [{heading, description}].
-    Falls back to blueprint headings with empty descriptions when LLM is unavailable."""
+    """Lightweight LLM call that returns a type-aligned outline: [{heading, description}]."""
     normalized = _normalize_report_type(report_type)
-    fallback_headings = _report_section_blueprint(normalized)
-    fallback = [{"heading": h, "description": ""} for h in fallback_headings]
+    normalized_scope = _normalize_report_scope(report_scope)
+    expected_count = 4 if normalized_scope == "targeted" else 6
 
     if client is None:
-        return fallback
+        raise RuntimeError("Report outline planning is unavailable because the OpenAI client is not configured.")
 
     try:
         response = client.chat.completions.create(
@@ -993,7 +1076,7 @@ def plan_report_outline(
                     "role": "system",
                     "content": (
                         "You are a strategic report architect. "
-                        "Return strict JSON with key 'outline': an array of exactly 4 objects, each with "
+                        f"Return strict JSON with key 'outline': an array of exactly {expected_count} objects, each with "
                         "'heading' (max 80 chars — specific to this startup, not generic) and "
                         "'description' (1-2 sentences about what this page will cover, max 200 chars). "
                         "Headings must feel tailored to the startup context, not generic section titles."
@@ -1003,9 +1086,10 @@ def plan_report_outline(
                     "role": "user",
                     "content": (
                         f"Report type: {normalized}\n"
+                        f"Report scope: {normalized_scope}\n"
                         f"Report title: {report_name}\n\n"
                         f"Startup context:\n{_simulation_context(simulation)}\n\n"
-                        "Generate a 4-page report outline with specific, insight-driven headings "
+                        f"Generate a {expected_count}-page report outline with specific, insight-driven headings "
                         "and brief descriptions of what each page will cover."
                     ),
                 },
@@ -1015,77 +1099,20 @@ def plan_report_outline(
         parsed = json.loads(raw) if raw else {}
         outline = parsed.get("outline")
         if not isinstance(outline, list) or len(outline) < 2:
-            return fallback
+            raise RuntimeError("Report outline planning returned an invalid outline.")
         result = []
-        for item in outline[:6]:
+        for item in outline[:expected_count]:
             if not isinstance(item, dict):
                 continue
             heading = str(item.get("heading") or "").strip()[:120]
             description = str(item.get("description") or "").strip()[:500]
             if heading:
                 result.append({"heading": heading, "description": description})
-        return result if len(result) >= 2 else fallback
-    except Exception:
-        return fallback
-
-
-def _fallback_report(
-    simulation: SimulationRun,
-    workspace: ManagementWorkspace | None,
-    report_name: str,
-    report_type: str,
-) -> Dict[str, Any]:
-    metrics = simulation.metrics or {}
-    agents = simulation.agents if isinstance(simulation.agents, list) else []
-    opportunities = []
-    risks = []
-    for agent in agents:
-        if not isinstance(agent, dict):
-            continue
-        opportunities.extend(str(item) for item in (agent.get("opportunities") or [])[:2])
-        risks.extend(str(item) for item in (agent.get("risks") or [])[:2])
-
-    section_titles = _report_section_blueprint(report_type)
-    strongest_metric = max(metrics, key=metrics.get) if metrics else "core execution"
-    sections = []
-    for index, heading in enumerate(section_titles):
-        if index == 0:
-            body = (
-                f"{simulation.startup_name} currently scores {simulation.overall_score}/100 with strongest momentum in {strongest_metric}. "
-                "The current profile suggests a focused execution window where a few disciplined decisions can materially improve founder confidence."
-            )
-        elif index == 1:
-            body = (
-                "Signal analysis shows demand and positioning momentum, but outcome quality will depend on how tightly the team prioritizes "
-                "one high-confidence segment and converts signals into measurable weekly movement."
-            )
-        elif index == 2:
-            body = (
-                f"{workspace.workspace_name if workspace else 'The operating team'} should convert strategy into accountable ownership, "
-                "explicit milestones, and short feedback loops to reduce wasted cycles."
-            )
-        else:
-            body = (
-                "Risk and capital posture improves when downside assumptions are explicit, mitigation owners are named, "
-                "and milestone evidence is linked to each next funding or scaling decision."
-            )
-        sections.append({"heading": heading, "body": body})
-
-    key_findings = list(dict.fromkeys((opportunities + risks)[:6]))
-    recommended_actions = [
-        "Lock one primary objective for this report type and attach weekly measurable targets.",
-        "Assign every top risk and constraint to a named owner with due date and mitigation signal.",
-        "Convert top opportunities into calendar commitments with explicit review checkpoints.",
-    ]
-    summary = sections[0]["body"]
-    return {
-        "report_name": report_name,
-        "report_type": _normalize_report_type(report_type),
-        "summary": summary,
-        "sections": sections,
-        "key_findings": key_findings,
-        "recommended_actions": recommended_actions,
-    }
+        if len(result) < 2:
+            raise RuntimeError("Report outline planning returned too few usable sections.")
+        return result
+    except Exception as exc:
+        raise RuntimeError("Report outline planning failed. No outline was produced.") from exc
 
 
 def _clamp_int(value: Any, *, minimum: int, maximum: int, fallback: int) -> int:
@@ -1193,6 +1220,500 @@ def _sanitize_layout_guidance(layout_guidance: Any) -> Dict[str, Any]:
     return sanitized
 
 
+def _resolve_scope_section_keys(report_type: str, report_scope: str | None) -> tuple[list[str], str]:
+    normalized_type = _normalize_report_type(report_type)
+    normalized_scope = _normalize_report_scope(report_scope)
+    if normalized_scope == "full":
+        return list(_DOCUMENT_SECTION_KEYS), normalized_scope
+    targeted = _TARGETED_REPORT_SECTION_POLICY.get(normalized_type) or _TARGETED_REPORT_SECTION_POLICY["business_report"]
+    return list(targeted), normalized_scope
+
+
+def _is_payload_meaningful(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (int, float, bool)):
+        return True
+    if isinstance(value, list):
+        return any(_is_payload_meaningful(item) for item in value)
+    if isinstance(value, dict):
+        return any(_is_payload_meaningful(item) for item in value.values())
+    return bool(value)
+
+
+def _apply_scope_policy_to_professional_input(
+    report_input: Dict[str, Any],
+    *,
+    report_type: str,
+    report_scope: str | None,
+) -> tuple[Dict[str, Any], list[str], str]:
+    working = json.loads(json.dumps(report_input or {}, default=str))
+    allowed_keys, normalized_scope = _resolve_scope_section_keys(report_type, report_scope)
+    allowed_set = set(allowed_keys)
+    normalized_type = _normalize_report_type(report_type)
+
+    for section_key in _DOCUMENT_SECTION_KEYS:
+        payload = working.get(section_key)
+        if section_key in allowed_set:
+            continue
+        if section_key == "appendices":
+            working[section_key] = {"raw_data_tables": [], "large_format_charts": [], "glossary": []}
+        else:
+            working[section_key] = {}
+
+    if normalized_scope == "targeted":
+        chart_limits = _TARGETED_CHART_LIMITS.get(normalized_type, {})
+        for section_key in allowed_keys:
+            payload = working.get(section_key)
+            if not isinstance(payload, dict):
+                continue
+            charts = payload.get("charts")
+            if isinstance(charts, list):
+                max_charts = max(0, int(chart_limits.get(section_key, 0)))
+                payload["charts"] = charts[:max_charts] if max_charts else []
+            large_charts = payload.get("large_format_charts")
+            if isinstance(large_charts, list):
+                payload["large_format_charts"] = []
+            tables = payload.get("tables")
+            if isinstance(tables, list) and len(tables) > 2:
+                payload["tables"] = tables[:2]
+        working["appendices"] = {"raw_data_tables": [], "large_format_charts": [], "glossary": []}
+    else:
+        for section_key in _DOCUMENT_SECTION_KEYS:
+            payload = working.get(section_key)
+            if not isinstance(payload, dict):
+                continue
+            charts = payload.get("charts")
+            if isinstance(charts, list) and len(charts) > 3:
+                payload["charts"] = charts[:3]
+
+    return working, allowed_keys, normalized_scope
+
+
+def _planner_agent_plan(
+    *,
+    report_type: str,
+    report_scope: str,
+    allowed_section_keys: list[str],
+) -> Dict[str, Any]:
+    preferred_orders: Dict[str, list[str]] = {
+        "viability_report": [
+            "executive_summary",
+            "business_idea",
+            "market_feasibility",
+            "financial_viability",
+            "risk_assessment",
+            "conclusions",
+        ],
+        "feasibility_report": [
+            "executive_summary",
+            "business_idea",
+            "methodology",
+            "technical_feasibility",
+            "operational_feasibility",
+            "risk_assessment",
+            "conclusions",
+        ],
+        "market_analysis_report": [
+            "executive_summary",
+            "business_idea",
+            "market_feasibility",
+            "risk_assessment",
+            "conclusions",
+        ],
+        "investment_analysis_report": [
+            "executive_summary",
+            "business_idea",
+            "financial_viability",
+            "market_feasibility",
+            "risk_assessment",
+            "conclusions",
+        ],
+        "business_report": [
+            "executive_summary",
+            "business_idea",
+            "methodology",
+            "market_feasibility",
+            "technical_feasibility",
+            "financial_viability",
+            "operational_feasibility",
+            "risk_assessment",
+            "conclusions",
+            "legal_regulatory",
+            "appendices",
+        ],
+    }
+    allowed_set = set(allowed_section_keys)
+    seed_order = preferred_orders.get(_normalize_report_type(report_type), preferred_orders["business_report"])
+    ordered = [key for key in seed_order if key in allowed_set]
+    ordered.extend([key for key in allowed_section_keys if key not in ordered])
+    return {
+        "section_order_keys": ordered,
+        "page_budget": 12 if report_scope == "full" else 6,
+    }
+
+
+def _narrative_agent_plan(
+    *,
+    report_type: str,
+    allowed_section_keys: list[str],
+) -> Dict[str, Any]:
+    blueprint = _report_section_blueprint(report_type)
+    narrative_keys = [
+        key for key in allowed_section_keys if key not in {"executive_summary", "conclusions", "appendices"}
+    ]
+    overrides: Dict[str, str] = {}
+    for index, section_key in enumerate(narrative_keys[: len(blueprint)]):
+        overrides[section_key] = blueprint[index]
+    if "conclusions" in allowed_section_keys:
+        overrides["conclusions"] = "Founder Action Plan"
+    return {"section_title_overrides": overrides}
+
+
+def _visual_designer_agent_plan(
+    *,
+    report_type: str,
+    report_scope: str,
+) -> Dict[str, Any]:
+    theme_by_type = {
+        "viability_report": {"primary_color": "#0f766e", "secondary_color": "#134e4a", "accent_color": "#22d3ee"},
+        "feasibility_report": {"primary_color": "#0b3a5d", "secondary_color": "#1e293b", "accent_color": "#f59e0b"},
+        "market_analysis_report": {"primary_color": "#1d4ed8", "secondary_color": "#1f2937", "accent_color": "#06b6d4"},
+        "investment_analysis_report": {"primary_color": "#1d4ed8", "secondary_color": "#1f2937", "accent_color": "#f97316"},
+        "business_report": {"primary_color": "#0f172a", "secondary_color": "#334155", "accent_color": "#0ea5e9"},
+    }
+    normalized_type = _normalize_report_type(report_type)
+    if report_scope == "full":
+        chart_limits = {key: 2 for key in _DOCUMENT_SECTION_KEYS}
+        chart_limits["appendices"] = 3
+    else:
+        chart_limits = dict(_TARGETED_CHART_LIMITS.get(normalized_type, {}))
+    return {
+        "theme_tokens": theme_by_type.get(normalized_type, theme_by_type["business_report"]),
+        "chart_limits": chart_limits,
+    }
+
+
+def _layout_agent_plan(
+    *,
+    report_name: str,
+    simulation: SimulationRun,
+    report_type: str,
+    report_scope: str,
+) -> Dict[str, Any]:
+    display_type = _REPORT_TYPE_DISPLAY_NAMES.get(_normalize_report_type(report_type), "Business Report")
+    page_margins = {"top": 44, "right": 44, "bottom": 44, "left": 44}
+    if report_scope == "targeted":
+        page_margins = {"top": 52, "right": 52, "bottom": 52, "left": 52}
+    return {
+        "page_setup": {
+            "size": "A4",
+            "font_family": "Georgia",
+            "font_scale": 100 if report_scope == "targeted" else 98,
+            "background": "#ffffff",
+            "margins": page_margins,
+            "header": f"{display_type}",
+            "footer": "Generated by PetraAI",
+        },
+        "cover": {
+            "kicker": "Professional Startup Simulation Report",
+            "title": report_name,
+            "subtitle": _report_title_profile(report_type).get("subtitle") or display_type,
+            "startup_name": str(getattr(simulation, "startup_name", "") or "").strip(),
+            "generated_on": datetime.now(timezone.utc).strftime("%B %d, %Y"),
+            "prepared_by": "PetraAI",
+        },
+    }
+
+
+def _qa_agent_validate_plan(
+    *,
+    allowed_section_keys: list[str],
+    planner_plan: Dict[str, Any],
+    narrative_plan: Dict[str, Any],
+) -> Dict[str, Any]:
+    allowed_set = set(allowed_section_keys)
+    ordered = planner_plan.get("section_order_keys") if isinstance(planner_plan.get("section_order_keys"), list) else []
+    deduped = []
+    seen: set[str] = set()
+    for key in ordered:
+        token = str(key or "").strip()
+        if not token or token in seen or token not in allowed_set:
+            continue
+        seen.add(token)
+        deduped.append(token)
+    for token in allowed_section_keys:
+        if token not in seen:
+            deduped.append(token)
+
+    title_overrides = narrative_plan.get("section_title_overrides")
+    if not isinstance(title_overrides, dict):
+        title_overrides = {}
+    sanitized_overrides = {
+        str(key): str(value).strip()[:120]
+        for key, value in title_overrides.items()
+        if str(key) in allowed_set and str(value).strip()
+    }
+    return {
+        "section_order_keys": deduped,
+        "section_title_overrides": sanitized_overrides,
+    }
+
+
+def _resolve_section_order_indices(
+    document_json: Dict[str, Any],
+    section_key_order: list[str],
+) -> list[int]:
+    sections = document_json.get("sections") if isinstance(document_json.get("sections"), list) else []
+    if not sections:
+        return []
+    title_to_key = {
+        str(title).strip().lower(): key for key, title in _DOCUMENT_SECTION_DEFAULT_TITLES.items() if str(title).strip()
+    }
+    key_to_index: Dict[str, int] = {}
+    for index, section in enumerate(sections):
+        if not isinstance(section, dict):
+            continue
+        title = str(section.get("title") or "").strip().lower()
+        mapped_key = title_to_key.get(title)
+        if mapped_key and mapped_key not in key_to_index:
+            key_to_index[mapped_key] = index
+
+    ordered_indices: list[int] = []
+    seen_indices: set[int] = set()
+    for section_key in section_key_order:
+        index = key_to_index.get(section_key)
+        if index is None or index in seen_indices:
+            continue
+        ordered_indices.append(index)
+        seen_indices.add(index)
+    for index in range(len(sections)):
+        if index not in seen_indices:
+            ordered_indices.append(index)
+    return ordered_indices
+
+
+def _merge_layout_guidance_layers(*layers: Dict[str, Any] | None) -> Dict[str, Any]:
+    merged: Dict[str, Any] = {}
+    for layer in layers:
+        if not isinstance(layer, dict):
+            continue
+        if isinstance(layer.get("page_setup"), dict):
+            merged.setdefault("page_setup", {})
+            merged["page_setup"].update(layer["page_setup"])
+            if isinstance(layer["page_setup"].get("margins"), dict):
+                merged["page_setup"].setdefault("margins", {})
+                merged["page_setup"]["margins"].update(layer["page_setup"]["margins"])
+        if isinstance(layer.get("theme_tokens"), dict):
+            merged.setdefault("theme_tokens", {})
+            merged["theme_tokens"].update(layer["theme_tokens"])
+        if isinstance(layer.get("cover"), dict):
+            merged.setdefault("cover", {})
+            merged["cover"].update(layer["cover"])
+        if isinstance(layer.get("section_titles"), list) and layer.get("section_titles"):
+            merged["section_titles"] = layer["section_titles"]
+        if isinstance(layer.get("section_order"), list) and layer.get("section_order"):
+            merged["section_order"] = layer["section_order"]
+    return _sanitize_layout_guidance(merged)
+
+
+def _optional_llm_orchestration_override(
+    *,
+    report_name: str,
+    report_type: str,
+    report_scope: str,
+    simulation: SimulationRun,
+    allowed_section_keys: list[str],
+) -> Dict[str, Any]:
+    if client is None:
+        return {}
+    try:
+        response = client.chat.completions.create(
+            model=os.getenv("SIMULATION_MODEL", "gpt-4o-mini"),
+            temperature=0.2,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are the report orchestration board. Return strict JSON with key layout_guidance only. "
+                        "layout_guidance may include page_setup, theme_tokens, and cover. Keep it print-safe and concise."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Report name: {report_name}\n"
+                        f"Report type: {_normalize_report_type(report_type)}\n"
+                        f"Report scope: {_normalize_report_scope(report_scope)}\n"
+                        f"Startup: {simulation.startup_name}\n"
+                        f"Allowed sections: {json.dumps(allowed_section_keys)}\n"
+                        "Propose a professional layout guidance payload."
+                    ),
+                },
+            ],
+        )
+        raw = (response.choices[0].message.content or "").strip()
+        parsed = json.loads(raw) if raw else {}
+        if not isinstance(parsed, dict):
+            return {}
+        return _sanitize_layout_guidance(parsed.get("layout_guidance"))
+    except Exception:
+        return {}
+
+
+def generate_agentic_report_artifacts(
+    *,
+    simulation: SimulationRun,
+    workspace: ManagementWorkspace | None,
+    report_name: str,
+    report_type: str,
+    report_scope: str = "targeted",
+    template_id: str = "obsidian_board",
+    outline: List[Dict[str, str]] | None = None,
+) -> Dict[str, Any]:
+    normalized_type = _normalize_report_type(report_type)
+    normalized_scope = _normalize_report_scope(report_scope)
+    selected_template = resolve_template_for_report_type(normalized_type, template_id)
+    report_payload = generate_business_report(
+        simulation=simulation,
+        workspace=workspace,
+        report_name=report_name,
+        report_type=normalized_type,
+        outline=outline,
+    )
+
+    report_input = _build_professional_report_input(
+        report_payload,
+        simulation,
+        workspace,
+        report_type=normalized_type,
+    )
+    scoped_input, allowed_section_keys, normalized_scope = _apply_scope_policy_to_professional_input(
+        report_input,
+        report_type=normalized_type,
+        report_scope=normalized_scope,
+    )
+
+    planner_plan = _planner_agent_plan(
+        report_type=normalized_type,
+        report_scope=normalized_scope,
+        allowed_section_keys=allowed_section_keys,
+    )
+    narrative_plan = _narrative_agent_plan(
+        report_type=normalized_type,
+        allowed_section_keys=allowed_section_keys,
+    )
+    visual_plan = _visual_designer_agent_plan(
+        report_type=normalized_type,
+        report_scope=normalized_scope,
+    )
+    layout_plan = _layout_agent_plan(
+        report_name=report_name,
+        simulation=simulation,
+        report_type=normalized_type,
+        report_scope=normalized_scope,
+    )
+    qa_plan = _qa_agent_validate_plan(
+        allowed_section_keys=allowed_section_keys,
+        planner_plan=planner_plan,
+        narrative_plan=narrative_plan,
+    )
+    llm_override = _optional_llm_orchestration_override(
+        report_name=report_name,
+        report_type=normalized_type,
+        report_scope=normalized_scope,
+        simulation=simulation,
+        allowed_section_keys=allowed_section_keys,
+    )
+
+    generated_document = _build_document_from_professional_input(
+        report_input=scoped_input,
+        report=report_payload,
+        report_type=normalized_type,
+        template_id=selected_template["template_id"],
+        include_narrative_sections=(normalized_scope == "full" and normalized_type == "business_report"),
+    )
+    if not isinstance(generated_document, dict) or not generated_document.get("sections"):
+        raise RuntimeError("Report document generation failed. No report document was produced.")
+
+    section_title_overrides = qa_plan.get("section_title_overrides", {})
+    if section_title_overrides:
+        sections = generated_document.get("sections") if isinstance(generated_document.get("sections"), list) else []
+        title_to_key = {
+            str(title).strip().lower(): key
+            for key, title in _DOCUMENT_SECTION_DEFAULT_TITLES.items()
+            if str(title).strip()
+        }
+        requested_titles: List[str] = []
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            current_title = str(section.get("title") or "").strip()
+            mapped_key = title_to_key.get(current_title.lower())
+            requested_titles.append(section_title_overrides.get(mapped_key, current_title))
+    else:
+        requested_titles = []
+
+    section_order_indices = _resolve_section_order_indices(
+        generated_document,
+        qa_plan.get("section_order_keys", []),
+    )
+    orchestration_guidance = _merge_layout_guidance_layers(
+        report_payload.get("layout_guidance"),
+        {
+            "page_setup": layout_plan.get("page_setup"),
+            "theme_tokens": visual_plan.get("theme_tokens"),
+            "cover": layout_plan.get("cover"),
+            "section_titles": requested_titles or None,
+            "section_order": section_order_indices or None,
+        },
+        llm_override,
+    )
+
+    with_layout = _apply_layout_guidance_to_document(generated_document, orchestration_guidance)
+    with_cover = _ensure_document_cover_meta(
+        with_layout,
+        report=report_payload,
+        report_type=normalized_type,
+        simulation=simulation,
+    )
+    document_json = enrich_document_with_generated_visuals(
+        with_cover,
+        simulation,
+        report_type=normalized_type,
+    )
+
+    meta = document_json.get("meta")
+    if not isinstance(meta, dict):
+        meta = {}
+        document_json["meta"] = meta
+    meta["report_type"] = normalized_type
+    meta["template_id"] = selected_template["template_id"]
+    meta["report_scope"] = normalized_scope
+    meta["generation_mode"] = "agentic_orchestrated_v2"
+    meta["orchestration_trace"] = {
+        "planner": planner_plan,
+        "narrative": narrative_plan,
+        "visual": visual_plan,
+        "layout": layout_plan,
+        "qa": qa_plan,
+        "llm_override_applied": bool(llm_override),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    report_payload["report_scope"] = normalized_scope
+    report_payload["layout_guidance"] = orchestration_guidance
+
+    return {
+        "report_payload": report_payload,
+        "document_json": document_json,
+        "report_scope": normalized_scope,
+    }
+
+
 def _apply_layout_guidance_to_document(document_json: Dict[str, Any], layout_guidance: Dict[str, Any] | None) -> Dict[str, Any]:
     if not isinstance(document_json, dict) or not isinstance(layout_guidance, dict) or not layout_guidance:
         return document_json
@@ -1276,15 +1797,8 @@ def generate_business_report(
     else:
         section_titles = _report_section_blueprint(normalized_report_type)
 
-    fallback = _fallback_report(simulation, workspace, report_name, normalized_report_type)
-    # Override fallback headings with outline titles when provided
-    if outline and len(outline) >= 2:
-        for i, item in enumerate(outline[:len(fallback["sections"])]):
-            if i < len(fallback["sections"]):
-                fallback["sections"][i]["heading"] = item["heading"]
-
     if client is None:
-        return fallback
+        raise RuntimeError("Report generation is unavailable because the OpenAI client is not configured.")
 
     try:
         # Build outline context string for the LLM when an approved outline exists
@@ -1329,10 +1843,10 @@ def generate_business_report(
         raw = (response.choices[0].message.content or "").strip()
         parsed = json.loads(raw) if raw else {}
         if not isinstance(parsed, dict):
-            return fallback
+            raise RuntimeError("Report generation returned invalid JSON.")
         sections = parsed.get("sections")
         if not isinstance(sections, list) or len(sections) < 4:
-            return fallback
+            raise RuntimeError("Report generation returned too few sections.")
         normalized_sections = []
         for item in sections[:4]:
             if not isinstance(item, dict):
@@ -1342,23 +1856,30 @@ def generate_business_report(
             if heading and body:
                 normalized_sections.append({"heading": heading[:120], "body": body[:4000]})
         if len(normalized_sections) < 4:
-            return fallback
+            raise RuntimeError("Report generation returned incomplete sections.")
+        summary = str(parsed.get("summary") or "").strip()
+        if not summary:
+            raise RuntimeError("Report generation did not return a summary.")
+        key_findings = [str(item).strip() for item in parsed.get("key_findings", []) if str(item).strip()][:8]
+        recommended_actions = [
+            str(item).strip() for item in parsed.get("recommended_actions", []) if str(item).strip()
+        ][:6]
+        if not key_findings:
+            raise RuntimeError("Report generation did not return key findings.")
+        if not recommended_actions:
+            raise RuntimeError("Report generation did not return recommended actions.")
         layout_guidance = _sanitize_layout_guidance(parsed.get("layout_guidance"))
         return {
             "report_name": report_name,
             "report_type": normalized_report_type,
-            "summary": str(parsed.get("summary") or fallback["summary"])[:4000],
+            "summary": summary[:4000],
             "sections": normalized_sections,
-            "key_findings": [str(item) for item in parsed.get("key_findings", []) if str(item).strip()][:8]
-            or fallback["key_findings"],
-            "recommended_actions": [
-                str(item) for item in parsed.get("recommended_actions", []) if str(item).strip()
-            ][:6]
-            or fallback["recommended_actions"],
+            "key_findings": key_findings,
+            "recommended_actions": recommended_actions,
             "layout_guidance": layout_guidance,
         }
-    except Exception:
-        return fallback
+    except Exception as exc:
+        raise RuntimeError("Report generation failed. No report was produced.") from exc
 
 
 def _split_text_points(value: str | None, *, max_items: int = 6) -> List[str]:
@@ -1909,8 +2430,6 @@ def _build_professional_report_input(
             financial_inputs_rows.append([label, str(value)])
 
     methodology_notes = ["Current simulation combines multi-agent market, customer, and investor reviews."]
-    if not report.get("sections"):
-        methodology_notes.append("Narrative report sections were generated from fallback report logic.")
     if not payload.get("market_size_estimate"):
         methodology_notes.append("No numeric market size model was provided in the current input payload.")
 
@@ -2158,6 +2677,7 @@ def _build_document_from_professional_input(
     report: Dict[str, Any],
     report_type: str,
     template_id: str,
+    include_narrative_sections: bool = True,
 ) -> Dict[str, Any]:
     template = get_report_template(template_id)
     page_setup = {
@@ -2167,7 +2687,7 @@ def _build_document_from_professional_input(
         "footer": "",
         "background": "#ffffff",
         "font_scale": 100,
-        "font_family": "Source Serif 4",
+        "font_family": "Georgia",
     }
     sections: List[Dict[str, Any]] = []
 
@@ -2312,22 +2832,23 @@ def _build_document_from_professional_input(
             }
         )
 
-    narrative_sections = report.get("sections") if isinstance(report.get("sections"), list) else []
-    for item in narrative_sections:
-        if not isinstance(item, dict):
-            continue
-        heading = str(item.get("heading") or "").strip()
-        body = str(item.get("body") or "").strip()
-        if not heading or not body:
-            continue
-        sections.append(
-            {
-                "section_id": str(uuid4()),
-                "title": heading,
-                "order": len(sections),
-                "blocks": [_doc_block_from_text(body, 0)],
-            }
-        )
+    if include_narrative_sections:
+        narrative_sections = report.get("sections") if isinstance(report.get("sections"), list) else []
+        for item in narrative_sections:
+            if not isinstance(item, dict):
+                continue
+            heading = str(item.get("heading") or "").strip()
+            body = str(item.get("body") or "").strip()
+            if not heading or not body:
+                continue
+            sections.append(
+                {
+                    "section_id": str(uuid4()),
+                    "title": heading,
+                    "order": len(sections),
+                    "blocks": [_doc_block_from_text(body, 0)],
+                }
+            )
 
     if not sections:
         return {}
@@ -2807,9 +3328,9 @@ def build_report_html_from_document(
     margin_bottom = _clamp_int(margins.get("bottom"), minimum=16, maximum=120, fallback=40)
     margin_left = _clamp_int(margins.get("left"), minimum=16, maximum=120, fallback=40)
     font_scale = _clamp_int(page_setup.get("font_scale"), minimum=85, maximum=130, fallback=100)
-    font_family = str(page_setup.get("font_family") or "Source Serif 4").strip()
+    font_family = str(page_setup.get("font_family") or "Georgia").strip()
     if font_family not in _DOCUMENT_FONT_FAMILIES:
-        font_family = "Source Serif 4"
+        font_family = "Georgia"
     page_size = str(page_setup.get("size") or "A4").strip().upper()
     if page_size not in _DOCUMENT_PAGE_SIZES:
         page_size = "A4"

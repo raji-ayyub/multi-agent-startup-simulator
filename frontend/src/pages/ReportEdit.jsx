@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChartColumn,
@@ -17,6 +17,7 @@ import {
   exportReport,
   getReportEditor,
   listReportTemplates,
+  renderReportDraftPdfPreview,
   saveReportDraft,
 } from "../services/platformService";
 
@@ -110,6 +111,10 @@ function normalizeDocument(documentJson, report) {
   }
   base.meta.page_setup.size = safeText(base.meta.page_setup.size, "A4");
   base.meta.page_setup.background = safeText(base.meta.page_setup.background, "#ffffff");
+  base.meta.page_setup.font_family = safeText(base.meta.page_setup.font_family, "Georgia");
+  if (!Number.isFinite(Number(base.meta.page_setup.font_scale))) {
+    base.meta.page_setup.font_scale = 100;
+  }
   if (!base.meta.cover || typeof base.meta.cover !== "object") {
     base.meta.cover = {};
   }
@@ -241,6 +246,51 @@ function composePages(sections, pageSpec, marginPx, includeCoverPage = true) {
   return [...leadingPages, ...contentPages];
 }
 
+function ExactReportPreview({ pdfUrl, status, error, zoom, onRefresh }) {
+  const scale = zoom / 100;
+  return (
+    <main className="min-w-0 flex-1 overflow-auto bg-[#1a1f27] px-6 py-10">
+      <div className="mx-auto min-h-full" style={{ width: `${Math.max(760, 980 * scale)}px` }}>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+          <span>{status}</span>
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-800"
+          >
+            Render exact preview
+          </button>
+        </div>
+        <div
+          className="overflow-hidden rounded-md border border-slate-700 bg-white shadow-[0_20px_50px_rgba(2,6,23,0.55)]"
+          style={{ height: "calc(100dvh - 178px)" }}
+        >
+          {error ? (
+            <div className="flex h-full items-center justify-center bg-slate-950 p-6 text-center">
+              <div className="max-w-md">
+                <p className="text-sm font-semibold text-rose-200">Exact preview failed</p>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{error}</p>
+              </div>
+            </div>
+          ) : pdfUrl ? (
+            <iframe
+              title="Exact report export preview"
+              src={pdfUrl}
+              className="h-full w-full border-0 bg-white"
+              style={{ transform: `scale(${scale})`, transformOrigin: "top center", width: `${100 / scale}%` }}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center bg-slate-950 text-sm text-slate-300">
+              <Loader2 size={16} className="mr-2 animate-spin" />
+              Rendering exact export preview...
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
+
 function createBlockForTool(toolKey, order) {
   if (toolKey === "divider") {
     return {
@@ -308,11 +358,17 @@ export default function ReportEditPage() {
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [activeVersionId, setActiveVersionId] = useState("");
   const [quality, setQuality] = useState("standard");
+  const [viewMode, setViewMode] = useState("preview");
+  const [previewPdfUrl, setPreviewPdfUrl] = useState("");
+  const [previewStatus, setPreviewStatus] = useState("Preview not rendered yet");
+  const [previewError, setPreviewError] = useState("");
   const [pageSize, setPageSize] = useState("a4");
   const [marginPreset, setMarginPreset] = useState("normal");
   const [paperTone, setPaperTone] = useState("white");
 
   const initialSnapshotRef = useRef("");
+  const previewRequestRef = useRef(0);
+  const previewPdfUrlRef = useRef("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const paperRefs = useRef({});
   const scrollContainerRef = useRef(null);
@@ -381,6 +437,14 @@ export default function ReportEditPage() {
   }, [documentState]);
 
   useEffect(() => {
+    return () => {
+      if (previewPdfUrlRef.current) {
+        window.URL.revokeObjectURL(previewPdfUrlRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const handleBeforeUnload = (event) => {
       if (!hasUnsavedChanges) return;
       event.preventDefault();
@@ -428,6 +492,48 @@ export default function ReportEditPage() {
       return draft;
     });
   };
+
+  const refreshPreview = useCallback(async ({ quiet = false } = {}) => {
+    if (!report || !documentState) return;
+    const requestId = previewRequestRef.current + 1;
+    previewRequestRef.current = requestId;
+    if (!quiet) {
+      setViewMode("preview");
+    }
+    setPreviewStatus("Rendering exact export preview...");
+    setPreviewError("");
+    try {
+      const pdfBlob = await renderReportDraftPdfPreview(report.report_id, documentState, {
+        quality,
+        templateId: documentState.meta?.template_id || report.template_id,
+      });
+      if (previewRequestRef.current !== requestId) return;
+      const nextUrl = window.URL.createObjectURL(pdfBlob);
+      if (previewPdfUrlRef.current) {
+        window.URL.revokeObjectURL(previewPdfUrlRef.current);
+      }
+      previewPdfUrlRef.current = nextUrl;
+      setPreviewPdfUrl(nextUrl);
+      setPreviewStatus(`Exact ${quality} PDF preview synced`);
+    } catch (error) {
+      if (previewRequestRef.current !== requestId) return;
+      setPreviewError(error.message);
+      setPreviewStatus("Preview needs attention");
+    }
+  }, [documentState, quality, report]);
+
+  useEffect(() => {
+    if (!report || !documentState) return;
+    if (viewMode !== "preview") {
+      setPreviewStatus("Preview will refresh when opened");
+      return;
+    }
+    setPreviewStatus("Preview waiting for latest edits...");
+    const timer = window.setTimeout(() => {
+      void refreshPreview({ quiet: true });
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [documentState, quality, report, refreshPreview, viewMode]);
 
   const syncPageSetup = (nextPageSize, nextMarginPreset, nextPaperTone) => {
     updateDocument((draft) => {
@@ -502,6 +608,7 @@ export default function ReportEditPage() {
   };
 
   const insertBlock = (toolKey) => {
+    setViewMode("edit");
     const targetSectionId = activeSectionId || sections[0]?.section_id;
     if (!targetSectionId) return;
     updateDocument((draft) => {
@@ -543,6 +650,9 @@ export default function ReportEditPage() {
       let versionId = activeVersionId;
       if (hasUnsavedChanges) {
         versionId = await handleSave();
+        if (!versionId) {
+          throw new Error("Save failed, so the PDF was not exported. Fix the draft save issue and try again.");
+        }
       }
       await exportReport(report.report_id, "pdf", documentState.meta?.report_name || report.report_name, {
         reportType: report.report_type,
@@ -604,6 +714,10 @@ export default function ReportEditPage() {
           onBack={() => navigate("/reports")}
           onSave={handleSave}
           onExport={handleExport}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          previewStatus={previewStatus}
+          onRefreshPreview={() => void refreshPreview({ quiet: false })}
           pageSize={pageSize}
           onPageSizeChange={(value) => {
             setPageSize(value);
@@ -633,6 +747,7 @@ export default function ReportEditPage() {
             onInsertBlock={insertBlock}
             sections={sections}
             onSelectSection={(sectionId) => {
+              setViewMode("edit");
               setActiveSectionId(sectionId);
               const pageIndex = sectionPageMap.get(sectionId);
               if (Number.isFinite(pageIndex)) {
@@ -645,23 +760,33 @@ export default function ReportEditPage() {
             onScrollToPage={scrollToPage}
           />
 
-          <ReportEditCanvas
-            scrollContainerRef={scrollContainerRef}
-            paperRefs={paperRefs}
-            pages={pages}
-            pageSpec={pageSpec}
-            marginSpec={marginSpec}
-            paperBackground={paperBackground}
-            zoom={zoom}
-            activePageIndex={activePageIndex}
-            activeSectionId={activeSectionId}
-            cover={documentState?.meta?.cover || {}}
-            onSetActivePage={setActivePageIndex}
-            onSetActiveSection={setActiveSectionId}
-            onUpdateCoverField={updateCoverField}
-            onUpdateSectionTitle={updateSectionTitle}
-            onUpdateBlock={updateBlock}
-          />
+          {viewMode === "preview" ? (
+            <ExactReportPreview
+              pdfUrl={previewPdfUrl}
+              status={previewStatus}
+              error={previewError}
+              zoom={zoom}
+              onRefresh={() => void refreshPreview({ quiet: false })}
+            />
+          ) : (
+            <ReportEditCanvas
+              scrollContainerRef={scrollContainerRef}
+              paperRefs={paperRefs}
+              pages={pages}
+              pageSpec={pageSpec}
+              marginSpec={marginSpec}
+              paperBackground={paperBackground}
+              zoom={zoom}
+              activePageIndex={activePageIndex}
+              activeSectionId={activeSectionId}
+              cover={documentState?.meta?.cover || {}}
+              onSetActivePage={setActivePageIndex}
+              onSetActiveSection={setActiveSectionId}
+              onUpdateCoverField={updateCoverField}
+              onUpdateSectionTitle={updateSectionTitle}
+              onUpdateBlock={updateBlock}
+            />
+          )}
         </div>
       </div>
     </section>
