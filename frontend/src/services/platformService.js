@@ -155,7 +155,7 @@ export async function renderReportDraftPreview(reportId, documentJson, options =
     );
     return typeof data === "string" ? data : "";
   } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Unable to render exact report preview."));
+    throw new Error(getApiErrorMessage(error, "Unable to prepare report preview."));
   }
 }
 
@@ -172,7 +172,7 @@ export async function renderReportDraftPdfPreview(reportId, documentJson, option
     );
     return response.data;
   } catch (error) {
-    throw new Error(await getBlobAwareApiErrorMessage(error, "Unable to render exact PDF preview."));
+    throw new Error(await getBlobAwareApiErrorMessage(error, "Unable to prepare report preview."));
   }
 }
 
