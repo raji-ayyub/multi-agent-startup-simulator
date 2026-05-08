@@ -246,7 +246,7 @@ function composePages(sections, pageSpec, marginPx, includeCoverPage = true) {
   return [...leadingPages, ...contentPages];
 }
 
-function ExactReportPreview({ pdfUrl, status, error, zoom, onRefresh }) {
+function ReportPreviewPane({ pdfUrl, status, error, zoom, onRefresh }) {
   const scale = zoom / 100;
   return (
     <main className="min-w-0 flex-1 overflow-auto bg-[#1a1f27] px-6 py-10">
@@ -258,7 +258,7 @@ function ExactReportPreview({ pdfUrl, status, error, zoom, onRefresh }) {
             onClick={onRefresh}
             className="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-800"
           >
-            Render exact preview
+            Refresh preview
           </button>
         </div>
         <div
@@ -268,13 +268,13 @@ function ExactReportPreview({ pdfUrl, status, error, zoom, onRefresh }) {
           {error ? (
             <div className="flex h-full items-center justify-center bg-slate-950 p-6 text-center">
               <div className="max-w-md">
-                <p className="text-sm font-semibold text-rose-200">Exact preview failed</p>
+                <p className="text-sm font-semibold text-rose-200">Preview unavailable</p>
                 <p className="mt-2 text-sm leading-6 text-slate-300">{error}</p>
               </div>
             </div>
           ) : pdfUrl ? (
             <iframe
-              title="Exact report export preview"
+              title="Report preview"
               src={pdfUrl}
               className="h-full w-full border-0 bg-white"
               style={{ transform: `scale(${scale})`, transformOrigin: "top center", width: `${100 / scale}%` }}
@@ -282,7 +282,7 @@ function ExactReportPreview({ pdfUrl, status, error, zoom, onRefresh }) {
           ) : (
             <div className="flex h-full items-center justify-center bg-slate-950 text-sm text-slate-300">
               <Loader2 size={16} className="mr-2 animate-spin" />
-              Rendering exact export preview...
+              Preparing preview...
             </div>
           )}
         </div>
@@ -360,7 +360,7 @@ export default function ReportEditPage() {
   const [quality, setQuality] = useState("standard");
   const [viewMode, setViewMode] = useState("preview");
   const [previewPdfUrl, setPreviewPdfUrl] = useState("");
-  const [previewStatus, setPreviewStatus] = useState("Preview not rendered yet");
+  const [previewStatus, setPreviewStatus] = useState("Preview not ready yet");
   const [previewError, setPreviewError] = useState("");
   const [pageSize, setPageSize] = useState("a4");
   const [marginPreset, setMarginPreset] = useState("normal");
@@ -500,7 +500,7 @@ export default function ReportEditPage() {
     if (!quiet) {
       setViewMode("preview");
     }
-    setPreviewStatus("Rendering exact export preview...");
+    setPreviewStatus("Preparing preview...");
     setPreviewError("");
     try {
       const pdfBlob = await renderReportDraftPdfPreview(report.report_id, documentState, {
@@ -514,21 +514,21 @@ export default function ReportEditPage() {
       }
       previewPdfUrlRef.current = nextUrl;
       setPreviewPdfUrl(nextUrl);
-      setPreviewStatus(`Exact ${quality} PDF preview synced`);
+      setPreviewStatus(quality === "premium" ? "Premium preview ready" : "Preview ready");
     } catch (error) {
       if (previewRequestRef.current !== requestId) return;
       setPreviewError(error.message);
-      setPreviewStatus("Preview needs attention");
+      setPreviewStatus("Preview unavailable");
     }
   }, [documentState, quality, report]);
 
   useEffect(() => {
     if (!report || !documentState) return;
     if (viewMode !== "preview") {
-      setPreviewStatus("Preview will refresh when opened");
+      setPreviewStatus("Preview will update when opened");
       return;
     }
-    setPreviewStatus("Preview waiting for latest edits...");
+    setPreviewStatus("Updating preview...");
     const timer = window.setTimeout(() => {
       void refreshPreview({ quiet: true });
     }, 1200);
@@ -761,7 +761,7 @@ export default function ReportEditPage() {
           />
 
           {viewMode === "preview" ? (
-            <ExactReportPreview
+            <ReportPreviewPane
               pdfUrl={previewPdfUrl}
               status={previewStatus}
               error={previewError}
