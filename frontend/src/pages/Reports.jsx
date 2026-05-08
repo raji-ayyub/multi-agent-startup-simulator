@@ -10,6 +10,10 @@ import { listSimulations } from "../services/simulationService";
 import { useAuthStore } from "../store/authStore";
 
 const REPORT_PAGE_SIZE = 3;
+const REPORT_SCOPE_OPTIONS = [
+  { value: "targeted", label: "Targeted Report" },
+  { value: "full", label: "All (Full Report)" },
+];
 const REPORT_FOCUS_OPTIONS = [
   { value: "viability_report", label: "Viability Report" },
   { value: "feasibility_report", label: "Feasibility Report" },
@@ -147,6 +151,12 @@ function inferSuggestedTemplateId(reportType, templates) {
   return typeCompatible?.template_id || templates[0]?.template_id || "obsidian_board";
 }
 
+function inferSuggestedReportScope(simulation, reportType) {
+  if (reportType === "business_report") return "full";
+  const score = Number(simulation?.overall_score || 0);
+  return score >= 82 ? "full" : "targeted";
+}
+
 function buildSuggestedReportTitle(simulation, reportType) {
   const startupName = String(simulation?.startup_name || "Startup").trim();
   const suffix = REPORT_TYPE_CONFIG[reportType]?.title_suffix || "Business Report";
@@ -181,6 +191,7 @@ export default function ReportsPage() {
   const [totalReports, setTotalReports] = useState(0);
   const [manualSelection, setManualSelection] = useState({
     reportType: false,
+    reportScope: false,
     template: false,
     title: false,
   });
@@ -193,6 +204,7 @@ export default function ReportsPage() {
     workspace_id: "",
     report_name: "",
     report_type: "viability_report",
+    report_scope: "targeted",
     template_id: "obsidian_board",
   });
   const selectedSimulation = useMemo(
@@ -202,10 +214,11 @@ export default function ReportsPage() {
   const smartSuggestionText = useMemo(() => {
     if (!selectedSimulation) return "Select a simulation to auto-fill report focus, template, and title.";
     const typeLabel = REPORT_TYPE_LABELS[draft.report_type] || "Business Report";
+    const scopeLabel = REPORT_SCOPE_OPTIONS.find((item) => item.value === draft.report_scope)?.label || "Targeted Report";
     const template = templates.find((item) => item.template_id === draft.template_id);
     const templateName = template?.name || "Template";
-    return `Auto plan: ${typeLabel} using ${templateName}.`;
-  }, [selectedSimulation, draft.report_type, draft.template_id, templates]);
+    return `Auto plan: ${typeLabel} (${scopeLabel}) using ${templateName}.`;
+  }, [selectedSimulation, draft.report_type, draft.report_scope, draft.template_id, templates]);
 
   const loadReportsPage = async (page = 1) => {
     setIsLoadingReports(true);
@@ -245,6 +258,7 @@ export default function ReportsPage() {
       const nextWorkspaceId = workspaceData[0]?.workspace_id || "";
       const nextSimulation = simulationData.find((item) => item.simulation_id === nextSimulationId) || simulationData[0] || null;
       const nextReportType = inferSuggestedReportType(nextSimulation);
+      const nextReportScope = inferSuggestedReportScope(nextSimulation, nextReportType);
       const nextTemplateId = inferSuggestedTemplateId(nextReportType, templateData);
       const nextTitle = buildSuggestedReportTitle(nextSimulation, nextReportType);
       setDraft((current) => ({
@@ -252,10 +266,11 @@ export default function ReportsPage() {
         simulation_id: nextSimulationId,
         workspace_id: current.workspace_id || nextWorkspaceId,
         report_type: nextReportType,
+        report_scope: nextReportScope,
         template_id: nextTemplateId,
         report_name: nextTitle,
       }));
-      setManualSelection({ reportType: false, template: false, title: false });
+      setManualSelection({ reportType: false, reportScope: false, template: false, title: false });
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -271,23 +286,27 @@ export default function ReportsPage() {
   const applySmartDefaults = (simulationId) => {
     const simulation = simulations.find((item) => item.simulation_id === simulationId) || null;
     const nextReportType = inferSuggestedReportType(simulation);
+    const nextReportScope = inferSuggestedReportScope(simulation, nextReportType);
     const nextTemplateId = inferSuggestedTemplateId(nextReportType, templates);
     const nextTitle = buildSuggestedReportTitle(simulation, nextReportType);
     setDraft((current) => ({
       ...current,
       report_type: nextReportType,
+      report_scope: nextReportScope,
       template_id: nextTemplateId,
       report_name: nextTitle,
     }));
-    setManualSelection({ reportType: false, template: false, title: false });
+    setManualSelection({ reportType: false, reportScope: false, template: false, title: false });
   };
 
   const handleSimulationChange = (simulationId) => {
     const simulation = simulations.find((item) => item.simulation_id === simulationId) || null;
     const autoReportType = inferSuggestedReportType(simulation);
+    const autoReportScope = inferSuggestedReportScope(simulation, autoReportType);
     setDraft((current) => {
       const next = { ...current, simulation_id: simulationId };
       next.report_type = manualSelection.reportType ? current.report_type : autoReportType;
+      next.report_scope = manualSelection.reportScope ? current.report_scope : autoReportScope;
       next.template_id = manualSelection.template
         ? current.template_id
         : inferSuggestedTemplateId(next.report_type, templates);
@@ -302,6 +321,9 @@ export default function ReportsPage() {
     setManualSelection((current) => ({ ...current, reportType: true }));
     setDraft((current) => {
       const next = { ...current, report_type: nextReportType };
+      if (!manualSelection.reportScope) {
+        next.report_scope = inferSuggestedReportScope(selectedSimulation, nextReportType);
+      }
       if (!manualSelection.template) {
         next.template_id = inferSuggestedTemplateId(nextReportType, templates);
       }
@@ -310,6 +332,11 @@ export default function ReportsPage() {
       }
       return next;
     });
+  };
+
+  const handleReportScopeChange = (nextReportScope) => {
+    setManualSelection((current) => ({ ...current, reportScope: true }));
+    setDraft((current) => ({ ...current, report_scope: nextReportScope }));
   };
 
   const handleTemplateChange = (nextTemplateId) => {
@@ -324,6 +351,7 @@ export default function ReportsPage() {
 
   const resolvedDraft = () => ({
     reportName: draft.report_name.trim() || buildSuggestedReportTitle(selectedSimulation, draft.report_type),
+    reportScope: draft.report_scope || inferSuggestedReportScope(selectedSimulation, draft.report_type),
     templateId: draft.template_id || inferSuggestedTemplateId(draft.report_type, templates),
   });
 
@@ -333,7 +361,7 @@ export default function ReportsPage() {
       toast.error("Select a simulation first.");
       return;
     }
-    const { reportName, templateId } = resolvedDraft();
+    const { reportName, reportScope, templateId } = resolvedDraft();
     setIsGenerating(true);
     try {
       const created = await generateReport({
@@ -341,6 +369,7 @@ export default function ReportsPage() {
         workspace_id: draft.workspace_id || null,
         report_name: reportName,
         report_type: draft.report_type,
+        report_scope: reportScope,
         template_id: templateId,
         outline: approvedOutline || null,
       });
@@ -359,12 +388,13 @@ export default function ReportsPage() {
       toast.error("Select a simulation first.");
       return;
     }
-    const { reportName } = resolvedDraft();
+    const { reportName, reportScope } = resolvedDraft();
     setOutlineStep("planning");
     try {
       const response = await planReportOutline({
         simulation_id: draft.simulation_id,
         report_type: draft.report_type,
+        report_scope: reportScope,
         report_name: reportName,
       });
       setOutlineItems(response.outline || []);
@@ -503,7 +533,7 @@ export default function ReportsPage() {
                 </Field>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <Field label="Report Focus">
                   <select
                     value={draft.report_type}
@@ -511,6 +541,20 @@ export default function ReportsPage() {
                     className="theme-input w-full rounded-lg border px-3 py-2.5"
                   >
                     {REPORT_FOCUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Scope">
+                  <select
+                    value={draft.report_scope}
+                    onChange={(event) => handleReportScopeChange(event.target.value)}
+                    className="theme-input w-full rounded-lg border px-3 py-2.5"
+                  >
+                    {REPORT_SCOPE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>

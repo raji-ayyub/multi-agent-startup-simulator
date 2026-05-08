@@ -142,6 +142,40 @@ export async function saveReportDraft(reportId, documentJson) {
   }
 }
 
+export async function renderReportDraftPreview(reportId, documentJson, options = {}) {
+  try {
+    const { data } = await api.post(
+      `/api/v1/reports/${reportId}/preview-draft`,
+      {
+        document_json: documentJson || {},
+        quality: options?.quality || "standard",
+        ...(options?.templateId ? { template_id: options.templateId } : {}),
+      },
+      { responseType: "text" }
+    );
+    return typeof data === "string" ? data : "";
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, "Unable to render exact report preview."));
+  }
+}
+
+export async function renderReportDraftPdfPreview(reportId, documentJson, options = {}) {
+  try {
+    const response = await api.post(
+      `/api/v1/reports/${reportId}/preview-draft/pdf`,
+      {
+        document_json: documentJson || {},
+        quality: options?.quality || "standard",
+        ...(options?.templateId ? { template_id: options.templateId } : {}),
+      },
+      { responseType: "blob" }
+    );
+    return response.data;
+  } catch (error) {
+    throw new Error(await getBlobAwareApiErrorMessage(error, "Unable to render exact PDF preview."));
+  }
+}
+
 export async function publishReportVersion(reportId, versionId = "") {
   try {
     const { data } = await api.post(`/api/v1/reports/${reportId}/publish`, {
@@ -150,39 +184,6 @@ export async function publishReportVersion(reportId, versionId = "") {
     return data;
   } catch (error) {
     throw new Error(getApiErrorMessage(error, "Unable to publish report version."));
-  }
-}
-
-export async function getReportPreview(reportId, options = {}) {
-  try {
-    const { data } = await api.get(`/api/v1/reports/${reportId}/preview`, {
-      params: {
-        ...(options?.templateId ? { template_id: options.templateId } : {}),
-        ...(options?.quality ? { quality: options.quality } : {}),
-        ...(options?.versionId ? { version_id: options.versionId } : {}),
-      },
-      headers: { Accept: "text/html" },
-      responseType: "text",
-    });
-    return typeof data === "string" ? data : "";
-  } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Unable to load report preview."));
-  }
-}
-
-export async function getReportDraftPreview(reportId, draftPayload = {}, options = {}) {
-  try {
-    const { data } = await api.post(`/api/v1/reports/${reportId}/preview`, draftPayload, {
-      params: {
-        ...(options?.templateId ? { template_id: options.templateId } : {}),
-        ...(options?.quality ? { quality: options.quality } : {}),
-      },
-      headers: { Accept: "text/html" },
-      responseType: "text",
-    });
-    return typeof data === "string" ? data : "";
-  } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Unable to render draft preview."));
   }
 }
 
@@ -213,11 +214,12 @@ export async function generateReport(payload) {
   }
 }
 
-export async function planReportOutline({ simulation_id, report_type, report_name }) {
+export async function planReportOutline({ simulation_id, report_type, report_scope = "targeted", report_name }) {
   try {
     const { data } = await api.post("/api/v1/reports/plan-outline", {
       simulation_id,
       report_type,
+      report_scope,
       report_name,
     });
     return data;
@@ -275,6 +277,22 @@ function parseContentDispositionFileName(contentDisposition = "") {
   return filenameBasic?.[1] || "";
 }
 
+async function getBlobAwareApiErrorMessage(error, fallback) {
+  const data = error?.response?.data;
+  if (typeof Blob !== "undefined" && data instanceof Blob) {
+    try {
+      const text = await data.text();
+      if (text) {
+        const parsed = JSON.parse(text);
+        return parsed?.detail || parsed?.message || fallback;
+      }
+    } catch {
+      return fallback;
+    }
+  }
+  return getApiErrorMessage(error, fallback);
+}
+
 export async function exportReport(reportId, format = "pdf", fallbackTitle = "", options = {}) {
   try {
     const reportType = options?.reportType || "";
@@ -306,7 +324,7 @@ export async function exportReport(reportId, format = "pdf", fallbackTitle = "",
     window.URL.revokeObjectURL(blobUrl);
     return true;
   } catch (error) {
-    throw new Error(getApiErrorMessage(error, "Unable to export report."));
+    throw new Error(await getBlobAwareApiErrorMessage(error, "Unable to export report."));
   }
 }
 

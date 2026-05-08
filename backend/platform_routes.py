@@ -29,12 +29,11 @@ from platform_service import (
     build_calendar_suggestions,
     build_report_html,
     build_report_html_from_document,
-    build_report_pdf,
     build_report_pdf_from_html,
     create_notification,
     ensure_report_versions_initialized,
     enrich_document_with_generated_visuals,
-    generate_business_report,
+    generate_agentic_report_artifacts,
     list_report_templates,
     plan_report_outline,
     publish_report_version,
@@ -49,6 +48,7 @@ from platform_service import (
     suggest_report_name,
 )
 from schemas import (
+    BusinessReportDraftPreviewRequest,
     BusinessReportDraftSaveRequest,
     BusinessReportDraftSaveResponse,
     BusinessReportEditorResponse,
@@ -57,7 +57,6 @@ from schemas import (
     BusinessReportListResponse,
     BusinessReportPublishRequest,
     BusinessReportPublishResponse,
-    BusinessReportPreviewRequest,
     BusinessReportUpdateRequest,
     BusinessReportVersionResponse,
     PlanOutlineRequest,
@@ -226,6 +225,9 @@ def _select_report_version_row(
 def _document_is_sparse(document_json: dict | None) -> bool:
     if not isinstance(document_json, dict):
         return True
+    meta = document_json.get("meta") if isinstance(document_json.get("meta"), dict) else {}
+    if str(meta.get("generation_mode") or "").strip().lower() == "agentic_orchestrated_v2":
+        return False
     sections = document_json.get("sections")
     if not isinstance(sections, list) or not sections:
         return True
@@ -457,11 +459,15 @@ def plan_report_outline_endpoint(
     if not simulation:
         raise HTTPException(status_code=404, detail="Simulation not found.")
     _ensure_simulation_access(db, current_user, simulation)
-    outline = plan_report_outline(
-        simulation=simulation,
-        report_name=payload.report_name,
-        report_type=payload.report_type,
-    )
+    try:
+        outline = plan_report_outline(
+            simulation=simulation,
+            report_name=payload.report_name,
+            report_type=payload.report_type,
+            report_scope=payload.report_scope,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
     return PlanOutlineResponse(outline=outline)
 
 
@@ -490,26 +496,20 @@ def generate_report(
     )
 
     approved_outline = [s.model_dump() for s in payload.outline] if payload.outline else None
-    report_payload = generate_business_report(
-        simulation=simulation,
-        workspace=workspace,
-        report_name=resolved_report_name,
-        report_type=payload.report_type,
-        outline=approved_outline,
-    )
-    document_json = report_payload_to_document_json(
-        report_payload,
-        report_type=payload.report_type,
-        template_id=selected_template["template_id"],
-        simulation=simulation,
-        workspace=workspace,
-        layout_guidance=report_payload.get("layout_guidance"),
-    )
-    document_json = enrich_document_with_generated_visuals(
-        document_json,
-        simulation,
-        report_type=payload.report_type,
-    )
+    try:
+        artifacts = generate_agentic_report_artifacts(
+            simulation=simulation,
+            workspace=workspace,
+            report_name=resolved_report_name,
+            report_type=payload.report_type,
+            report_scope=payload.report_scope,
+            template_id=selected_template["template_id"],
+            outline=approved_outline,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    report_payload = artifacts["report_payload"]
+    document_json = artifacts["document_json"]
     try:
         export_html = build_report_html_from_document(
             document_json,
@@ -666,7 +666,7 @@ def save_report_draft(
             "margins": {"top": 40, "right": 40, "bottom": 40, "left": 40},
             "background": "#ffffff",
             "font_scale": 100,
-            "font_family": "Source Serif 4",
+            "font_family": "Georgia",
         },
     )
 
@@ -691,6 +691,93 @@ def save_report_draft(
         version=BusinessReportVersionResponse(**serialize_report_version(version)),
         deduplicated=deduplicated,
     )
+
+
+def _build_report_draft_preview_html(
+    *,
+    report_id: str,
+    payload: BusinessReportDraftPreviewRequest,
+    db: Session,
+    current_user: User,
+) -> str:
+    row, simulation, workspace = _load_report_with_context(db, current_user, report_id)
+
+    working_document = payload.document_json if isinstance(payload.document_json, dict) else {}
+    if not working_document:
+        raise HTTPException(status_code=422, detail="Report draft document is required for preview.")
+
+    doc_meta = working_document.get("meta") if isinstance(working_document.get("meta"), dict) else {}
+    normalized_report_type = str(doc_meta.get("report_type") or getattr(row, "report_type", "business_report")).strip().lower()
+    working_document = enrich_document_with_generated_visuals(
+        working_document,
+        simulation,
+        report_type=normalized_report_type,
+    )
+    selected_template = resolve_template_for_report_type(
+        normalized_report_type,
+        (payload.template_id or "").strip().lower() or str(doc_meta.get("template_id") or getattr(row, "template_id", "") or ""),
+    )
+
+    try:
+        html_source = build_report_html_from_document(
+            working_document,
+            simulation,
+            workspace,
+            template_id=selected_template["template_id"],
+            quality=payload.quality,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Report renderer is unavailable on the backend. "
+                "Cannot produce an exact draft preview until renderer dependencies are fixed."
+            ),
+        )
+
+    return html_source
+
+
+@platform_router.post("/reports/{report_id}/preview-draft")
+def preview_report_draft(
+    report_id: str,
+    payload: BusinessReportDraftPreviewRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    html_source = _build_report_draft_preview_html(
+        report_id=report_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,
+    )
+    return Response(content=html_source, media_type="text/html; charset=utf-8")
+
+
+@platform_router.post("/reports/{report_id}/preview-draft/pdf")
+def preview_report_draft_pdf(
+    report_id: str,
+    payload: BusinessReportDraftPreviewRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    html_source = _build_report_draft_preview_html(
+        report_id=report_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,
+    )
+    try:
+        pdf_bytes = build_report_pdf_from_html(html_source)
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "High-quality PDF renderer is unavailable on the backend. "
+                "Cannot produce an exact PDF preview until renderer dependencies are fixed."
+            ),
+        )
+    return Response(content=pdf_bytes, media_type="application/pdf")
 
 
 @platform_router.post("/reports/{report_id}/publish", response_model=BusinessReportPublishResponse)
@@ -808,6 +895,7 @@ def export_report(
     current_user: User = Depends(get_current_user),
 ):
     row, simulation, workspace = _load_report_with_context(db, current_user, report_id)
+    ensure_report_versions_initialized(db, row, created_by_user_id=current_user.id)
 
     normalized_quality = str(quality or "standard").strip().lower()
     if normalized_quality not in {"standard", "premium"}:
@@ -834,33 +922,34 @@ def export_report(
     )
     final_template_id = selected_template["template_id"]
 
+    if document_json is None:
+        document_json = report_payload_to_document_json(
+            payload,
+            report_type=normalized_report_type,
+            template_id=final_template_id,
+            simulation=simulation,
+            workspace=workspace,
+            layout_guidance=payload.get("layout_guidance") if isinstance(payload, dict) else None,
+        )
+
+    try:
+        html_source = build_report_html_from_document(
+            document_json,
+            simulation,
+            workspace,
+            template_id=final_template_id,
+            quality=normalized_quality,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Report HTML renderer is unavailable on the backend. "
+                "Cannot export report output until renderer dependencies are fixed."
+            ),
+        )
+
     if format.lower() == "gdocs":
-        try:
-            if document_json is not None:
-                html_source = build_report_html_from_document(
-                    document_json,
-                    simulation,
-                    workspace,
-                    template_id=final_template_id,
-                    quality=normalized_quality,
-                )
-            else:
-                html_source = build_report_html(
-                    payload,
-                    simulation,
-                    workspace,
-                    report_type=normalized_report_type,
-                    template_id=final_template_id,
-                    quality=normalized_quality,
-                )
-        except Exception:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "Report HTML renderer is unavailable on the backend. "
-                    "Cannot export Google Docs HTML until renderer dependencies are fixed."
-                ),
-            )
         html_bytes = html_source.encode("utf-8")
         return Response(
             content=html_bytes,
@@ -873,43 +962,15 @@ def export_report(
         )
 
     try:
-        if document_json is not None:
-            html_source = build_report_html_from_document(
-                document_json,
-                simulation,
-                workspace,
-                template_id=final_template_id,
-                quality=normalized_quality,
-            )
-        else:
-            html_source = build_report_html(
-                payload,
-                simulation,
-                workspace,
-                report_type=normalized_report_type,
-                template_id=final_template_id,
-                quality=normalized_quality,
-            )
         pdf_bytes = build_report_pdf_from_html(html_source)
     except Exception:
-        try:
-            pdf_bytes = build_report_pdf(
-                payload,
-                simulation,
-                workspace,
-                report_type=normalized_report_type,
-                template_id=final_template_id,
-                quality=normalized_quality,
-                allow_legacy_fallback=False,
-            )
-        except Exception:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "High-quality PDF renderer is unavailable on the backend. "
-                    "Install WeasyPrint in the backend environment or export as Google Docs HTML."
-                ),
-            )
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "High-quality PDF renderer is unavailable on the backend. "
+                "Install WeasyPrint in the backend environment or export as Google Docs HTML."
+            ),
+        )
 
     return Response(
         content=pdf_bytes,
@@ -928,6 +989,7 @@ def preview_report(
     current_user: User = Depends(get_current_user),
 ):
     row, simulation, workspace = _load_report_with_context(db, current_user, report_id)
+    ensure_report_versions_initialized(db, row, created_by_user_id=current_user.id)
 
     normalized_quality = str(quality or "standard").strip().lower()
     if normalized_quality not in {"standard", "premium"}:
@@ -948,79 +1010,21 @@ def preview_report(
     )
     final_template_id = selected_template["template_id"]
 
-    html_source = ""
-    try:
-        if document_json is not None:
-            html_source = build_report_html_from_document(
-                document_json,
-                simulation,
-                workspace,
-                template_id=final_template_id,
-                quality=normalized_quality,
-            )
-        else:
-            html_source = build_report_html(
-                payload,
-                simulation,
-                workspace,
-                report_type=normalized_report_type,
-                template_id=final_template_id,
-                quality=normalized_quality,
-            )
-    except Exception:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Report renderer is unavailable on the backend. "
-                "Cannot produce HTML preview until renderer dependencies are fixed."
-            ),
+    if document_json is None:
+        document_json = report_payload_to_document_json(
+            payload,
+            report_type=normalized_report_type,
+            template_id=final_template_id,
+            simulation=simulation,
+            workspace=workspace,
+            layout_guidance=payload.get("layout_guidance") if isinstance(payload, dict) else None,
         )
 
-    return Response(content=html_source, media_type="text/html; charset=utf-8")
-
-
-@platform_router.post("/reports/{report_id}/preview")
-def preview_report_draft(
-    report_id: str,
-    payload: BusinessReportPreviewRequest,
-    quality: str = Query(default="standard"),
-    template_id: str | None = Query(default=None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    row, simulation, workspace = _load_report_with_context(db, current_user, report_id)
-    normalized_quality = str(quality or "standard").strip().lower()
-    if normalized_quality not in {"standard", "premium"}:
-        normalized_quality = "standard"
-
-    working_payload = serialize_report(row)
-    updates = payload.model_dump(exclude_none=True)
-
-    if "report_name" in updates:
-        working_payload["report_name"] = str(updates["report_name"] or "").strip() or working_payload["report_name"]
-    if "report_type" in updates:
-        working_payload["report_type"] = str(updates["report_type"] or "").strip().lower() or working_payload["report_type"]
-    if "summary" in updates:
-        working_payload["summary"] = str(updates["summary"] or "").strip()
-    if payload.sections is not None:
-        working_payload["sections"] = [section.model_dump(mode="json") for section in (payload.sections or [])]
-    if payload.key_findings is not None:
-        working_payload["key_findings"] = [str(item).strip() for item in (payload.key_findings or []) if str(item).strip()]
-    if payload.recommended_actions is not None:
-        working_payload["recommended_actions"] = [str(item).strip() for item in (payload.recommended_actions or []) if str(item).strip()]
-
-    selected_template = resolve_template_for_report_type(
-        working_payload.get("report_type"),
-        (template_id or "").strip().lower() or updates.get("template_id") or working_payload.get("template_id"),
-    )
-    final_template_id = selected_template["template_id"]
-
     try:
-        html_source = build_report_html(
-            working_payload,
+        html_source = build_report_html_from_document(
+            document_json,
             simulation,
             workspace,
-            report_type=working_payload.get("report_type"),
             template_id=final_template_id,
             quality=normalized_quality,
         )

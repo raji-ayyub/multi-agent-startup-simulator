@@ -33,19 +33,38 @@ const DEFAULT_FORM = {
 };
 
 const URGENCY_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
-
-const AGENTIC_LOGS = [
-  { role: "IDENTITY DETECTED", message: "All agents on board.." },
-  { role: "MARKET ANALYST", message: "Calculating market scenarios..." },
-  { role: "CUSTOMER AGENT", message: "Simulating target persona responses..." },
-  { role: "INVESTOR AGENT", message: "Scoring growth and runway..." },
-];
-const FALLBACK_LOGS = AGENTIC_LOGS;
 const SIMULATION_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 const SIMULATION_UPLOAD_ACCEPT =
   ".pdf,.doc,.docx,.txt,.md,.csv,.json,.log,.rtf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain,text/markdown,text/csv,application/json,text/rtf";
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function intakeFieldsToForm(fields = {}) {
+  return {
+    ...fields,
+    startupName: fields.startupName || fields.startup_name || "",
+    elevatorPitch: fields.elevatorPitch || fields.elevator_pitch || "",
+    problemStatement: fields.problemStatement || fields.problem_statement || "",
+    targetAudience: fields.targetAudience || fields.target_audience || "",
+    problemUrgency: fields.problemUrgency || fields.problem_urgency || "HIGH",
+    primaryTargetSegment: fields.primaryTargetSegment || fields.primary_target_segment || "",
+    marketSizeEstimate: fields.marketSizeEstimate || fields.market_size_estimate || "",
+    customerBehaviorPainPoints: fields.customerBehaviorPainPoints || fields.customer_behavior_pain_points || "",
+    competitorPatterns: fields.competitorPatterns || fields.competitor_patterns || "",
+    monthlyBurn: fields.monthlyBurn || fields.monthly_burn || "",
+    estimatedCac: fields.estimatedCac || fields.estimated_cac || "",
+    currentCashInHand: fields.currentCashInHand || fields.current_cash_in_hand || "",
+    marketingStrategy: fields.marketingStrategy || fields.marketing_strategy || "",
+  };
+}
+
+function displayText(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(displayText).filter(Boolean).join(", ");
+  if (typeof value === "object") return Object.values(value).map(displayText).filter(Boolean).join(", ");
+  return String(value);
+}
 
 export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
   const {
@@ -58,6 +77,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     runIntakeTurn,
     uploadIntakeFile,
     simulationError,
+    runningActivity,
   } = useSimulationStore();
 
   const bootDraft = loadDraft();
@@ -72,7 +92,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
   const [simulationStage, setSimulationStage] = useState(false);
   const [visibleLogCount, setVisibleLogCount] = useState(0);
   const [isSimulationComplete, setIsSimulationComplete] = useState(false);
-  const [runtimeLogs, setRuntimeLogs] = useState(FALLBACK_LOGS);
+  const [runtimeLogs, setRuntimeLogs] = useState([]);
   const [runtimeSynthesis, setRuntimeSynthesis] = useState("");
   const [runtimeRecommendations, setRuntimeRecommendations] = useState([]);
   const [runtimeAgents, setRuntimeAgents] = useState([]);
@@ -126,7 +146,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
           history: [],
         });
         if (!active) return;
-        setForm((prev) => ({ ...prev, ...(response?.collected_fields || {}) }));
+        setForm((prev) => ({ ...prev, ...intakeFieldsToForm(response?.collected_fields || {}) }));
         setMessages([
           {
             role: "assistant",
@@ -166,14 +186,14 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     setVisibleLogCount(1);
     setIsSimulationComplete(false);
     setBannerMessage("");
-    setRuntimeLogs(FALLBACK_LOGS);
+    setRuntimeLogs([]);
     setRuntimeSynthesis("");
     setRuntimeRecommendations([]);
     setRuntimeAgents([]);
 
     try {
       const result = await launchSimulationFromBrief(launchForm);
-      const resultLogs = Array.isArray(result?.logs) && result.logs.length > 0 ? result.logs : FALLBACK_LOGS;
+      const resultLogs = Array.isArray(result?.logs) ? result.logs : [];
       setRuntimeLogs(resultLogs);
       setRuntimeSynthesis(result?.synthesis || "");
       setRuntimeRecommendations(result?.recommendations || []);
@@ -189,7 +209,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
       setIsSimulationComplete(true);
     } catch (error) {
       setSimulationStage(false);
-      setBannerMessage(simulationError || "Unable to launch simulation. Please try again.");
+      setBannerMessage(error?.message || simulationError || "Unable to launch simulation. Please try again.");
     }
   };
 
@@ -208,9 +228,9 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
         history: nextMessages.map((item) => ({ role: item.role, content: item.content })),
       });
 
-      const mergedForm = { ...form, ...(response?.collected_fields || {}) };
+      const mergedForm = { ...form, ...intakeFieldsToForm(response?.collected_fields || {}) };
       setForm(mergedForm);
-      patchIdeaFields(response?.collected_fields || {});
+      patchIdeaFields(intakeFieldsToForm(response?.collected_fields || {}));
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: response?.assistant_message || "Noted. Continue." },
@@ -219,7 +239,12 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
       setCompletion(Number(response?.completion_percent || 0));
       setMissingFields(Array.isArray(response?.missing_fields) ? response.missing_fields : []);
 
-      if (response?.ready_to_run && !simulationStage && !isRunning) {
+      const assistantText = String(response?.assistant_message || "").toLowerCase();
+      const shouldLaunch =
+        Boolean(response?.ready_to_run) ||
+        assistantText.includes("running simulation now") ||
+        assistantText.includes("run simulation now");
+      if (shouldLaunch && !simulationStage && !isRunning) {
         await launchSimulation(mergedForm);
       }
     } catch (error) {
@@ -338,13 +363,24 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
         <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[1.45fr_1fr]">
           <div className="app-modal-section min-h-0 border-r p-4 sm:p-6">
             {simulationStage ? (
-              <div className="flex h-full flex-col items-center justify-center gap-5 text-center">
+              <div className="flex h-full min-h-0 flex-col items-center justify-center gap-4 overflow-hidden py-3 text-center">
                 <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-blue-500/70 bg-blue-500/5">
-                  <div className="absolute -top-1.5 h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.7)]" />
-                  <Monitor size={30} className="text-blue-300" />
+                  {!isSimulationComplete ? (
+                    <>
+                      <div className="absolute inset-[-3px] animate-spin rounded-full border border-transparent border-t-cyan-300 border-r-blue-400" />
+                      <div className="absolute inset-2 animate-[spin_1.8s_linear_infinite_reverse] rounded-full border border-transparent border-b-blue-300 border-l-cyan-400/80" />
+                      <span className="absolute -top-1.5 h-2.5 w-2.5 animate-pulse rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.7)]" />
+                    </>
+                  ) : (
+                    <span className="absolute -top-1.5 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.7)]" />
+                  )}
+                  <Monitor size={30} className={!isSimulationComplete ? "animate-pulse text-blue-300" : "text-emerald-300"} />
                 </div>
 
-                <div className="app-card-subtle w-full max-w-[500px] rounded-xl border p-5 text-left">
+                <div
+                  className="app-card-subtle flex min-h-0 w-full max-w-[560px] flex-col rounded-xl border p-5 text-left"
+                  style={{ maxHeight: "min(420px, calc(100% - 6.5rem))" }}
+                >
                   <div className="mb-4 flex items-center gap-2 text-blue-300">
                     {isSimulationComplete ? (
                       <CheckCircle2 size={16} />
@@ -356,7 +392,23 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                     </span>
                   </div>
 
-                  <div className="space-y-3">
+                  <div
+                    className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-2"
+                    style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(148,163,184,0.55) transparent" }}
+                  >
+                    {visibleLogs.length === 0 && !isSimulationComplete ? (
+                      <article className="flex gap-2.5">
+                        <Cpu size={14} className="mt-0.5 text-blue-300" />
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.16em] text-blue-300">
+                            {String(runningActivity?.phase || "backend_simulation").replaceAll("_", " ")}
+                          </p>
+                          <p className="app-copy text-sm">
+                            {runningActivity?.message || "Backend simulation request is active."}
+                          </p>
+                        </div>
+                      </article>
+                    ) : null}
                     {visibleLogs.map((log, index) => {
                       const isLatest = index === visibleLogs.length - 1 && !isSimulationComplete;
                       return (
@@ -365,8 +417,15 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                           <div>
                             <p className={`text-[11px] uppercase tracking-[0.16em] ${isLatest ? "text-blue-300" : "text-slate-500"}`}>
                               {log.role}
+                              {log.phase ? <span className="app-muted normal-case tracking-normal"> / {String(log.phase).replaceAll("_", " ")}</span> : null}
                             </p>
                             <p className="app-copy text-sm">{log.message}</p>
+                            {log.metadata?.assessment_confidence || log.metadata?.retrieved_items != null ? (
+                              <p className="app-muted mt-1 text-[11px]">
+                                {log.metadata?.assessment_confidence ? `Assessment confidence ${log.metadata.assessment_confidence}/100` : ""}
+                                {log.metadata?.retrieved_items != null ? `Evidence items ${log.metadata.retrieved_items}` : ""}
+                              </p>
+                            ) : null}
                           </div>
                         </article>
                       );
@@ -394,7 +453,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                             : "bg-blue-600 text-white"
                         }`}
                       >
-                        {item.content}
+                        {displayText(item.content)}
                       </div>
                       {item.role === "user" ? (
                         <div className="app-card-subtle app-copy mt-0.5 flex h-[2rem] w-[2rem] items-center justify-center rounded-full border p-1.5">
@@ -527,7 +586,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                 </span>
               </div>
               {!simulationStage && missingFields.length > 0 ? (
-                <p className="app-muted mt-2 text-xs">Missing: {missingFields.join(", ")}</p>
+                <p className="app-muted mt-2 text-xs">Missing: {missingFields.map(displayText).filter(Boolean).join(", ")}</p>
               ) : null}
             </div>
 

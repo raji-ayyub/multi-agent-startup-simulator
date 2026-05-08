@@ -16,20 +16,20 @@ const getCurrentUserEmail = () => {
 
 const toBackendPayload = (brief) => ({
   owner_email: getCurrentUserEmail(),
-  startup_name: brief.startupName || brief.name || "",
-  elevator_pitch: brief.elevatorPitch || "",
-  problem_statement: brief.problemStatement || brief.problem || "",
-  target_audience: brief.targetAudience || brief.targetMarket || "",
-  problem_urgency: brief.problemUrgency || "HIGH",
-  primary_target_segment: brief.primaryTargetSegment || brief.targetMarket || "",
+  startup_name: brief.startupName || brief.startup_name || brief.name || "",
+  elevator_pitch: brief.elevatorPitch || brief.elevator_pitch || "",
+  problem_statement: brief.problemStatement || brief.problem_statement || brief.problem || "",
+  target_audience: brief.targetAudience || brief.target_audience || brief.targetMarket || "",
+  problem_urgency: brief.problemUrgency || brief.problem_urgency || "HIGH",
+  primary_target_segment: brief.primaryTargetSegment || brief.primary_target_segment || brief.targetMarket || "",
   geography: brief.geography || "",
-  market_size_estimate: brief.marketSizeEstimate || "",
-  customer_behavior_pain_points: brief.customerBehaviorPainPoints || brief.problem || "",
-  competitor_patterns: brief.competitorPatterns || "",
-  monthly_burn: brief.monthlyBurn || "",
-  estimated_cac: brief.estimatedCac || "",
-  current_cash_in_hand: brief.currentCashInHand || "",
-  marketing_strategy: brief.marketingStrategy || brief.revenueModel || "",
+  market_size_estimate: brief.marketSizeEstimate || brief.market_size_estimate || "",
+  customer_behavior_pain_points: brief.customerBehaviorPainPoints || brief.customer_behavior_pain_points || brief.problem || "",
+  competitor_patterns: brief.competitorPatterns || brief.competitor_patterns || "",
+  monthly_burn: brief.monthlyBurn || brief.monthly_burn || "",
+  estimated_cac: brief.estimatedCac || brief.estimated_cac || "",
+  current_cash_in_hand: brief.currentCashInHand || brief.current_cash_in_hand || "",
+  marketing_strategy: brief.marketingStrategy || brief.marketing_strategy || brief.revenueModel || "",
 });
 
 export async function runSimulation(brief) {

@@ -24,49 +24,49 @@ AGENT_CATALOG = [
         "display_name": "Simulation Copilot",
         "workspace_mode": "simulation",
         "description": "Helps founders sharpen startup briefs before running a board simulation.",
-        "allowed_roles": ["FOUNDER", "OPERATOR"],
+        "allowed_roles": ["FOUNDER", "OPERATOR", "ADMIN"],
     },
     {
         "agent_type": "market_radar",
         "display_name": "Market Radar",
         "workspace_mode": "simulation",
         "description": "Focuses on market signals, positioning pressure, and category movement.",
-        "allowed_roles": ["FOUNDER", "OPERATOR"],
+        "allowed_roles": ["FOUNDER", "OPERATOR", "ADMIN"],
     },
     {
         "agent_type": "execution_planner",
         "display_name": "Execution Planner",
         "workspace_mode": "management",
         "description": "Turns workspace context into actionable management plans and execution notes.",
-        "allowed_roles": ["FOUNDER", "OPERATOR"],
+        "allowed_roles": ["FOUNDER", "OPERATOR", "ADMIN"],
     },
     {
         "agent_type": "business_report_agent",
         "display_name": "Business Insight Reporter",
         "workspace_mode": "management",
         "description": "Builds board-ready insight reports from simulation outcomes and operating context.",
-        "allowed_roles": ["FOUNDER", "OPERATOR"],
+        "allowed_roles": ["FOUNDER", "OPERATOR", "ADMIN"],
     },
     {
         "agent_type": "ops_calendar_agent",
         "display_name": "Ops Calendar Agent",
         "workspace_mode": "management",
         "description": "Suggests execution checkpoints, review meetings, and due dates from management plans.",
-        "allowed_roles": ["FOUNDER", "OPERATOR"],
+        "allowed_roles": ["FOUNDER", "OPERATOR", "ADMIN"],
     },
     {
         "agent_type": "talent_architect",
         "display_name": "Talent Architect",
         "workspace_mode": "management",
         "description": "Maps team capability, hiring gaps, and role fit from uploaded documents and CV signals.",
-        "allowed_roles": ["FOUNDER", "OPERATOR"],
+        "allowed_roles": ["FOUNDER", "OPERATOR", "ADMIN"],
     },
     {
         "agent_type": "platform_support",
         "display_name": "Platform Support",
         "workspace_mode": "platform",
         "description": "Guides users to the right area of the simulator, management vault, or settings flow.",
-        "allowed_roles": ["FOUNDER", "OPERATOR"],
+        "allowed_roles": ["FOUNDER", "OPERATOR", "ADMIN"],
     },
 ]
 
@@ -100,12 +100,8 @@ def list_agent_catalog(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    profile = get_or_create_access_profile(db, current_user)
-    return [
-        AgentCatalogItem(**item)
-        for item in AGENT_CATALOG
-        if profile.role.upper() == "ADMIN" or profile.role.upper() in item["allowed_roles"]
-    ]
+    # Return all agents - let users discover and request any capability
+    return [AgentCatalogItem(**item) for item in AGENT_CATALOG]
 
 
 @agent_router.get("/agents/requests", response_model=list[AgentRequestResponse])

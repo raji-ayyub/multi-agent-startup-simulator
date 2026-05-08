@@ -5,11 +5,13 @@ import sys
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import OperationalError
 
 from agent_routes import agent_router
-from database import create_tables
+from database import check_database_health, create_tables
 from modules.management.routes import management_router
 from modules.simulation.routes import simulation_router
 from platform_routes import platform_router
@@ -89,6 +91,20 @@ app.include_router(agent_router)
 app.include_router(platform_router)
 
 
+@app.exception_handler(OperationalError)
+async def database_operational_error_handler(request, exc):
+    logger.warning("Database operation failed for %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={
+            "detail": (
+                "Database connection is unavailable. Check DATABASE_URL, Supabase project ref, "
+                "pooler host, port, and database password."
+            )
+        },
+    )
+
+
 @app.get("/", tags=["root"])
 def read_root():
     return {
@@ -100,11 +116,19 @@ def read_root():
 
 
 @app.get("/health", tags=["health"])
-def health_check():
+def health_check(response: Response):
     renderer = get_report_renderer_health()
+    database = check_database_health()
+    ready = bool(renderer["ready"] and database["ready"])
+    if not ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return {
-        "status": "healthy",
+        "status": "healthy" if ready else "degraded",
         "service": "petra-ai-startup-simulator-api",
+        "database": {
+            "ready": database["ready"],
+            "error": database["error"] if not database["ready"] else "",
+        },
         "report_renderer": {
             "ready": renderer["ready"],
             "html_renderer_ready": renderer["html_renderer_ready"],

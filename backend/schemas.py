@@ -12,6 +12,7 @@ ReportType = Literal[
     "investment_analysis_report",
     "business_report",
 ]
+ReportScope = Literal["targeted", "full"]
 
 
 class UserBase(BaseModel):
@@ -167,6 +168,7 @@ class OutlineSection(BaseModel):
 class PlanOutlineRequest(BaseModel):
     simulation_id: str = Field(..., min_length=3, max_length=64)
     report_type: ReportType = "viability_report"
+    report_scope: ReportScope = "targeted"
     report_name: str = Field(default="Business Insight Report", min_length=1, max_length=255)
 
 
@@ -179,6 +181,7 @@ class BusinessReportGenerateRequest(BaseModel):
     workspace_id: Optional[str] = Field(default=None, min_length=3, max_length=64)
     report_name: str = Field(default="Business Insight Report", min_length=3, max_length=255)
     report_type: ReportType = "viability_report"
+    report_scope: ReportScope = "targeted"
     template_id: str = Field(default="obsidian_board", min_length=3, max_length=64)
     outline: Optional[List[OutlineSection]] = None
 
@@ -303,16 +306,6 @@ class BusinessReportUpdateRequest(BaseModel):
     template_id: Optional[str] = Field(default=None, min_length=3, max_length=64)
 
 
-class BusinessReportPreviewRequest(BaseModel):
-    report_name: Optional[str] = Field(default=None, max_length=255)
-    report_type: Optional[ReportType] = None
-    summary: Optional[str] = Field(default=None, max_length=12000)
-    sections: Optional[List[ReportSection]] = None
-    key_findings: Optional[List[str]] = None
-    recommended_actions: Optional[List[str]] = None
-    template_id: Optional[str] = Field(default=None, min_length=3, max_length=64)
-
-
 class BusinessReportVersionResponse(BaseModel):
     version_id: str
     report_id: str
@@ -332,6 +325,12 @@ class BusinessReportEditorResponse(BaseModel):
 
 class BusinessReportDraftSaveRequest(BaseModel):
     document_json: Dict[str, Any] = Field(default_factory=dict)
+
+
+class BusinessReportDraftPreviewRequest(BaseModel):
+    document_json: Dict[str, Any] = Field(default_factory=dict)
+    quality: Literal["standard", "premium"] = "standard"
+    template_id: Optional[str] = Field(default=None, min_length=3, max_length=64)
 
 
 class BusinessReportDraftSaveResponse(BaseModel):
