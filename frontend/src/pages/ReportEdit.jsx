@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import ReportEditCanvas from "../components/reports/editor/ReportEditCanvas";
 import ReportEditSidebar from "../components/reports/editor/ReportEditSidebar";
 import ReportEditToolbar from "../components/reports/editor/ReportEditToolbar";
 import {
@@ -22,8 +21,8 @@ import {
 } from "../services/platformService";
 
 const PAGE_SIZE_OPTIONS = [
-  { value: "a4", label: "A4", width: 794, minHeight: 1123, exportSize: "A4" },
-  { value: "letter", label: "Letter", width: 816, minHeight: 1056, exportSize: "LETTER" },
+  { value: "a4", label: "A4", exportSize: "A4" },
+  { value: "letter", label: "Letter", exportSize: "LETTER" },
 ];
 
 const MARGIN_OPTIONS = [
@@ -33,12 +32,13 @@ const MARGIN_OPTIONS = [
 ];
 
 const TOOL_ITEMS = [
-  { key: "heading", label: "Heading", icon: TextCursorInput },
+  { key: "heading", label: "Text", icon: TextCursorInput },
   { key: "bullet", label: "Bullets", icon: PanelTop },
   { key: "metric", label: "Metric", icon: SquareDashedBottom },
   { key: "chart", label: "Chart", icon: ChartColumn },
   { key: "divider", label: "Divider", icon: SeparatorHorizontal },
 ];
+
 const REPORT_TYPE_SUBTITLES = {
   viability_report: "Commercial viability snapshot and execution confidence",
   feasibility_report: "Execution feasibility across market, operations, and delivery",
@@ -52,18 +52,24 @@ function safeText(value, fallback = "") {
   return normalized || fallback;
 }
 
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function newId(prefix = "id") {
+  const random = Math.random().toString(36).slice(2, 10);
+  return `${prefix}-${Date.now().toString(36)}-${random}`;
+}
+
 function toDocText(value = "") {
-  const blocks = String(value || "")
+  const paragraphs = String(value || "")
     .split(/\n{2,}/)
-    .map((line) => line.trim())
+    .map((item) => item.trim())
     .filter(Boolean);
   return {
     type: "doc",
-    content: blocks.length
-      ? blocks.map((line) => ({
-          type: "paragraph",
-          content: [{ type: "text", text: line }],
-        }))
+    content: paragraphs.length
+      ? paragraphs.map((text) => ({ type: "paragraph", content: [{ type: "text", text }] }))
       : [{ type: "paragraph", content: [{ type: "text", text: "" }] }],
   };
 }
@@ -73,25 +79,26 @@ function readDocText(data) {
   if (typeof data === "string") return data;
   if (typeof data.text === "string") return data.text;
   const content = Array.isArray(data.content) ? data.content : [];
-  const paragraphs = content
+  return content
     .map((paragraph) => {
       const nodes = Array.isArray(paragraph?.content) ? paragraph.content : [];
-      return nodes
-        .map((node) => (typeof node?.text === "string" ? node.text : ""))
-        .join("")
-        .trim();
+      return nodes.map((node) => (typeof node?.text === "string" ? node.text : "")).join("").trim();
     })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function csvValues(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
     .filter(Boolean);
-  return paragraphs.join("\n\n");
 }
 
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-function newId(prefix = "id") {
-  const random = Math.random().toString(36).slice(2, 10);
-  return `${prefix}-${Date.now().toString(36)}-${random}`;
+function csvNumbers(value) {
+  return csvValues(value)
+    .map((item) => Number.parseFloat(item))
+    .filter((item) => Number.isFinite(item));
 }
 
 function normalizeDocument(documentJson, report) {
@@ -102,22 +109,19 @@ function normalizeDocument(documentJson, report) {
   base.meta.report_name = safeText(base.meta.report_name, report?.report_name || "Business Insight Report");
   base.meta.report_type = safeText(base.meta.report_type, report?.report_type || "business_report");
   base.meta.template_id = safeText(base.meta.template_id, report?.template_id || "obsidian_board");
-
-  if (!base.meta.page_setup || typeof base.meta.page_setup !== "object") {
-    base.meta.page_setup = {};
-  }
-  if (!base.meta.page_setup.margins || typeof base.meta.page_setup.margins !== "object") {
-    base.meta.page_setup.margins = { top: 52, right: 52, bottom: 52, left: 52 };
-  }
+  base.meta.page_setup = base.meta.page_setup && typeof base.meta.page_setup === "object" ? base.meta.page_setup : {};
+  base.meta.page_setup.margins =
+    base.meta.page_setup.margins && typeof base.meta.page_setup.margins === "object"
+      ? base.meta.page_setup.margins
+      : { top: 52, right: 52, bottom: 52, left: 52 };
   base.meta.page_setup.size = safeText(base.meta.page_setup.size, "A4");
   base.meta.page_setup.background = safeText(base.meta.page_setup.background, "#ffffff");
   base.meta.page_setup.font_family = safeText(base.meta.page_setup.font_family, "Georgia");
-  if (!Number.isFinite(Number(base.meta.page_setup.font_scale))) {
-    base.meta.page_setup.font_scale = 100;
-  }
-  if (!base.meta.cover || typeof base.meta.cover !== "object") {
-    base.meta.cover = {};
-  }
+  base.meta.page_setup.font_scale = Number.isFinite(Number(base.meta.page_setup.font_scale))
+    ? Number(base.meta.page_setup.font_scale)
+    : 100;
+
+  base.meta.cover = base.meta.cover && typeof base.meta.cover === "object" ? base.meta.cover : {};
   base.meta.cover.kicker = safeText(base.meta.cover.kicker, "Professional Startup Simulation Report");
   base.meta.cover.title = safeText(base.meta.cover.title, base.meta.report_name);
   base.meta.cover.subtitle = safeText(
@@ -134,23 +138,20 @@ function normalizeDocument(documentJson, report) {
 
   base.sections = base.sections
     .filter((section) => section && typeof section === "object")
-    .map((section, sectionIndex) => {
-      const blocks = Array.isArray(section.blocks) ? section.blocks : [];
-      return {
-        section_id: safeText(section.section_id, newId("section")),
-        title: safeText(section.title, `Section ${sectionIndex + 1}`),
-        order: Number.isFinite(Number(section.order)) ? Number(section.order) : sectionIndex,
-        blocks: blocks
-          .filter((block) => block && typeof block === "object")
-          .map((block, blockIndex) => ({
-            block_id: safeText(block.block_id, newId("block")),
-            type: safeText(block.type, "rich_text"),
-            order: Number.isFinite(Number(block.order)) ? Number(block.order) : blockIndex,
-            layout: block.layout && typeof block.layout === "object" ? block.layout : { span: 12, align: "left", flow: "full-width" },
-            data: block.data && typeof block.data === "object" ? block.data : {},
-          })),
-      };
-    })
+    .map((section, sectionIndex) => ({
+      section_id: safeText(section.section_id, newId("section")),
+      title: safeText(section.title, `Section ${sectionIndex + 1}`),
+      order: Number.isFinite(Number(section.order)) ? Number(section.order) : sectionIndex,
+      blocks: (Array.isArray(section.blocks) ? section.blocks : [])
+        .filter((block) => block && typeof block === "object")
+        .map((block, blockIndex) => ({
+          block_id: safeText(block.block_id, newId("block")),
+          type: safeText(block.type, "rich_text"),
+          order: Number.isFinite(Number(block.order)) ? Number(block.order) : blockIndex,
+          layout: block.layout && typeof block.layout === "object" ? block.layout : { span: 12, align: "left", flow: "full-width" },
+          data: block.data && typeof block.data === "object" ? block.data : {},
+        })),
+    }))
     .sort((a, b) => a.order - b.order);
 
   if (base.sections.length === 0) {
@@ -175,81 +176,55 @@ function normalizeDocument(documentJson, report) {
   return base;
 }
 
-function estimateBlockHeight(block) {
-  const type = String(block?.type || "rich_text").toLowerCase();
-  if (type === "divider") return 32;
-  if (type === "chart") return 360;
-  if (type === "metric_grid") return 280;
-  if (type === "table") {
-    const rows = Array.isArray(block?.data?.rows) ? block.data.rows.length : 3;
-    return 160 + Math.max(3, rows) * 36;
+function createBlockForTool(toolKey, order) {
+  if (toolKey === "divider") {
+    return { block_id: newId("block"), type: "divider", order, layout: { span: 12 }, data: {} };
   }
-  if (type === "card") {
-    const items = Array.isArray(block?.data?.items) ? block.data.items.length : 2;
-    return 110 + Math.max(2, items) * 28;
+  if (toolKey === "chart") {
+    return {
+      block_id: newId("block"),
+      type: "chart",
+      order,
+      layout: { span: 12 },
+      data: {
+        title: "New Chart",
+        chart_type: "bar",
+        labels: ["Signal A", "Signal B", "Signal C"],
+        series: [{ name: "Score", values: [55, 72, 64] }],
+        notes: "",
+        colors: ["#0ea5e9", "#22c55e", "#f59e0b"],
+      },
+    };
   }
-  const text = readDocText(block?.data);
-  const characters = text.length || 120;
-  const lineEstimate = Math.ceil(characters / 92);
-  return Math.max(140, 76 + lineEstimate * 28);
-}
-
-function composePages(sections, pageSpec, marginPx, includeCoverPage = true) {
-  const availableHeight = Math.max(520, pageSpec.minHeight - marginPx * 2 - 28);
-  const leadingPages = includeCoverPage
-    ? [{ pageIndex: 0, items: [{ kind: "cover", itemKey: "cover-page" }], usedHeight: availableHeight }]
-    : [];
-  const flowItems = [];
-  for (const section of sections) {
-    flowItems.push({
-      kind: "section",
-      itemKey: `${section.section_id}-heading`,
-      section_id: section.section_id,
-      title: section.title,
-      estimatedHeight: 74,
-    });
-    const blocks = Array.isArray(section.blocks) ? [...section.blocks].sort((a, b) => a.order - b.order) : [];
-    for (const block of blocks) {
-      flowItems.push({
-        kind: "block",
-        itemKey: `${section.section_id}-${block.block_id}`,
-        section_id: section.section_id,
-        block,
-        estimatedHeight: estimateBlockHeight(block),
-      });
-    }
+  if (toolKey === "metric") {
+    return {
+      block_id: newId("block"),
+      type: "metric_grid",
+      order,
+      layout: { span: 12 },
+      data: {
+        title: "Metrics",
+        metrics: [
+          { label: "North Star", value: "0", delta: "+0%" },
+          { label: "Risk Index", value: "0.00", delta: "stable" },
+        ],
+      },
+    };
   }
-
-  const pages = [];
-  let currentPage = { pageIndex: 0, items: [], usedHeight: 0 };
-
-  for (const item of flowItems) {
-    const nextHeight = currentPage.usedHeight + item.estimatedHeight;
-    if (nextHeight > availableHeight && currentPage.items.length > 0) {
-      pages.push({ ...currentPage });
-      currentPage = { pageIndex: pages.length, items: [], usedHeight: 0 };
-    }
-    currentPage.items.push(item);
-    currentPage.usedHeight += item.estimatedHeight;
-  }
-
-  if (currentPage.items.length > 0) {
-    pages.push(currentPage);
-  }
-  if (pages.length === 0) {
-    pages.push({ pageIndex: 0, items: [], usedHeight: 0 });
-  }
-  const contentPages = pages.map((page, index) => ({
-    ...page,
-    pageIndex: index + leadingPages.length,
-  }));
-  return [...leadingPages, ...contentPages];
+  const starter = toolKey === "bullet" ? "- Bullet point one\n- Bullet point two" : "New report text";
+  return {
+    block_id: newId("block"),
+    type: "rich_text",
+    order,
+    layout: { span: 12 },
+    data: toDocText(starter),
+  };
 }
 
 function ReportPreviewPane({ pdfUrl, status, error, zoom, onRefresh }) {
   const scale = zoom / 100;
   return (
-    <main className="min-w-0 flex-1 overflow-auto bg-[#1a1f27] px-6 py-10">
+    <main className="min-w-0 flex-1 overflow-auto bg-[#1a1f27] px-6 py-6">
       <div className="mx-auto min-h-full" style={{ width: `${Math.max(760, 980 * scale)}px` }}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
           <span>{status}</span>
@@ -261,10 +236,7 @@ function ReportPreviewPane({ pdfUrl, status, error, zoom, onRefresh }) {
             Refresh preview
           </button>
         </div>
-        <div
-          className="overflow-hidden rounded-md border border-slate-700 bg-white shadow-[0_20px_50px_rgba(2,6,23,0.55)]"
-          style={{ height: "calc(100dvh - 178px)" }}
-        >
+        <div className="overflow-hidden rounded-md border border-slate-700 bg-[#1a1f27] shadow-[0_20px_50px_rgba(2,6,23,0.55)]" style={{ height: "calc(100dvh - 164px)" }}>
           {error ? (
             <div className="flex h-full items-center justify-center bg-slate-950 p-6 text-center">
               <div className="max-w-md">
@@ -276,7 +248,7 @@ function ReportPreviewPane({ pdfUrl, status, error, zoom, onRefresh }) {
             <iframe
               title="Report preview"
               src={pdfUrl}
-              className="h-full w-full border-0 bg-white"
+              className="h-full w-full border-0 bg-[#1a1f27]"
               style={{ transform: `scale(${scale})`, transformOrigin: "top center", width: `${100 / scale}%` }}
             />
           ) : (
@@ -291,57 +263,166 @@ function ReportPreviewPane({ pdfUrl, status, error, zoom, onRefresh }) {
   );
 }
 
-function createBlockForTool(toolKey, order) {
-  if (toolKey === "divider") {
-    return {
-      block_id: newId("block"),
-      type: "divider",
-      order,
-      layout: { span: 12, align: "left", flow: "full-width" },
-      data: {},
-    };
-  }
-  if (toolKey === "chart") {
-    return {
-      block_id: newId("block"),
-      type: "chart",
-      order,
-      layout: { span: 12, align: "left", flow: "full-width" },
-      data: {
-        title: "New Chart",
-        chart_type: "bar",
-        labels: ["Signal A", "Signal B", "Signal C"],
-        series: [{ name: "Score", values: [55, 72, 64] }],
-        legend: true,
-        notes: "",
-        colors: ["#0ea5e9", "#22c55e", "#f59e0b"],
-      },
-    };
-  }
-  if (toolKey === "metric") {
-    return {
-      block_id: newId("block"),
-      type: "metric_grid",
-      order,
-      layout: { span: 12, align: "left", flow: "full-width" },
-      data: {
-        title: "Metrics",
-        metrics: [
-          { label: "North Star", value: "0", delta: "+0%" },
-          { label: "Risk Index", value: "0.00", delta: "stable" },
-          { label: "Momentum", value: "0", delta: "+0" },
-        ],
-      },
-    };
-  }
-  const starter = toolKey === "bullet" ? "- Bullet point one\n- Bullet point two" : "New heading";
-  return {
-    block_id: newId("block"),
-    type: "rich_text",
-    order,
-    layout: { span: 12, align: "left", flow: "full-width" },
-    data: toDocText(starter),
+function InspectorField({ label, children }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+const inputClass = "w-full rounded-md border border-slate-700 bg-slate-900 px-2.5 py-2 text-sm text-slate-100 outline-none focus:border-cyan-500";
+const textareaClass = `${inputClass} min-h-[110px] resize-y leading-6`;
+
+function ReportInspector({
+  cover,
+  activeSection,
+  activeBlock,
+  onUpdateCoverField,
+  onUpdateSectionTitle,
+  onUpdateBlock,
+  onDeleteBlock,
+}) {
+  const blockType = String(activeBlock?.type || "").toLowerCase();
+  const data = activeBlock?.data && typeof activeBlock.data === "object" ? activeBlock.data : {};
+
+  const patchBlockData = (patch) => {
+    if (!activeSection || !activeBlock) return;
+    onUpdateBlock(activeSection.section_id, activeBlock.block_id, {
+      ...activeBlock,
+      data: { ...data, ...patch },
+    });
   };
+
+  const metricLines = (data.metrics || []).map((item) => `${item.label || ""} | ${item.value || ""} | ${item.delta || item.note || ""}`).join("\n");
+  const cardLines = (data.items || []).join("\n");
+  const firstSeries = Array.isArray(data.series) && data.series[0] ? data.series[0] : { name: "Series", values: [] };
+
+  return (
+    <aside className="w-[360px] shrink-0 border-l border-slate-800 bg-[#0d1218]">
+      <div className="h-full overflow-y-auto px-4 py-4">
+        <section className="space-y-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">Cover</p>
+          {[
+            ["kicker", "Kicker"],
+            ["title", "Title"],
+            ["subtitle", "Subtitle"],
+            ["startup_name", "Startup"],
+            ["generated_on", "Generated"],
+            ["report_id", "Report ID"],
+            ["prepared_by", "Prepared By"],
+          ].map(([field, label]) => (
+            <InspectorField key={field} label={label}>
+              <input value={String(cover?.[field] || "")} onChange={(event) => onUpdateCoverField(field, event.target.value)} className={inputClass} />
+            </InspectorField>
+          ))}
+        </section>
+
+        <section className="mt-6 space-y-3 border-t border-slate-800 pt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">Selection</p>
+          {activeSection ? (
+            <InspectorField label="Section title">
+              <input value={activeSection.title || ""} onChange={(event) => onUpdateSectionTitle(activeSection.section_id, event.target.value)} className={inputClass} />
+            </InspectorField>
+          ) : null}
+
+          {activeBlock ? (
+            <div className="space-y-3 rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">{String(activeBlock.type || "Block").replaceAll("_", " ")}</p>
+                <button type="button" onClick={() => onDeleteBlock(activeSection.section_id, activeBlock.block_id)} className="text-xs font-semibold text-rose-300 hover:text-rose-200">
+                  Remove
+                </button>
+              </div>
+
+              {blockType === "rich_text" ? (
+                <InspectorField label="Text">
+                  <textarea
+                    value={readDocText(data)}
+                    onChange={(event) =>
+                      onUpdateBlock(activeSection.section_id, activeBlock.block_id, {
+                        ...activeBlock,
+                        data: toDocText(event.target.value),
+                      })
+                    }
+                    className={textareaClass}
+                  />
+                </InspectorField>
+              ) : null}
+
+              {blockType === "metric_grid" ? (
+                <>
+                  <InspectorField label="Title">
+                    <input value={String(data.title || "")} onChange={(event) => patchBlockData({ title: event.target.value })} className={inputClass} />
+                  </InspectorField>
+                  <InspectorField label="Metrics: label | value | delta">
+                    <textarea
+                      value={metricLines}
+                      onChange={(event) =>
+                        patchBlockData({
+                          metrics: event.target.value
+                            .split("\n")
+                            .map((line) => line.split("|").map((item) => item.trim()))
+                            .filter((parts) => parts.some(Boolean))
+                            .map(([label, value, delta]) => ({ label, value, delta })),
+                        })
+                      }
+                      className={textareaClass}
+                    />
+                  </InspectorField>
+                </>
+              ) : null}
+
+              {blockType === "chart" ? (
+                <>
+                  <InspectorField label="Title">
+                    <input value={String(data.title || "")} onChange={(event) => patchBlockData({ title: event.target.value })} className={inputClass} />
+                  </InspectorField>
+                  <InspectorField label="Type">
+                    <select value={String(data.chart_type || "bar")} onChange={(event) => patchBlockData({ chart_type: event.target.value })} className={inputClass}>
+                      <option value="bar">Bar</option>
+                      <option value="line">Line</option>
+                      <option value="area">Area</option>
+                      <option value="pie">Pie</option>
+                    </select>
+                  </InspectorField>
+                  <InspectorField label="Labels">
+                    <input value={(data.labels || []).join(", ")} onChange={(event) => patchBlockData({ labels: csvValues(event.target.value) })} className={inputClass} />
+                  </InspectorField>
+                  <InspectorField label="Values">
+                    <input
+                      value={(firstSeries.values || []).join(", ")}
+                      onChange={(event) => patchBlockData({ series: [{ ...firstSeries, name: firstSeries.name || "Series", values: csvNumbers(event.target.value) }] })}
+                      className={inputClass}
+                    />
+                  </InspectorField>
+                  <InspectorField label="Notes">
+                    <textarea value={String(data.notes || "")} onChange={(event) => patchBlockData({ notes: event.target.value })} className={textareaClass} />
+                  </InspectorField>
+                </>
+              ) : null}
+
+              {blockType === "card" ? (
+                <>
+                  <InspectorField label="Title">
+                    <input value={String(data.title || "")} onChange={(event) => patchBlockData({ title: event.target.value })} className={inputClass} />
+                  </InspectorField>
+                  <InspectorField label="Items">
+                    <textarea value={cardLines} onChange={(event) => patchBlockData({ items: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} className={textareaClass} />
+                  </InspectorField>
+                </>
+              ) : null}
+
+              {blockType === "divider" ? <p className="text-sm text-slate-400">Divider block. It will render as a visual separator in the report.</p> : null}
+            </div>
+          ) : (
+            <p className="rounded-lg border border-slate-800 bg-slate-950/40 p-3 text-sm text-slate-400">Select a block to edit its content.</p>
+          )}
+        </section>
+      </div>
+    </aside>
+  );
 }
 
 export default function ReportEditPage() {
@@ -355,70 +436,55 @@ export default function ReportEditPage() {
   const [report, setReport] = useState(null);
   const [documentState, setDocumentState] = useState(null);
   const [activeSectionId, setActiveSectionId] = useState("");
-  const [activePageIndex, setActivePageIndex] = useState(0);
+  const [activeBlockId, setActiveBlockId] = useState("");
   const [activeVersionId, setActiveVersionId] = useState("");
   const [quality, setQuality] = useState("standard");
-  const [viewMode, setViewMode] = useState("preview");
   const [previewPdfUrl, setPreviewPdfUrl] = useState("");
   const [previewStatus, setPreviewStatus] = useState("Preview not ready yet");
   const [previewError, setPreviewError] = useState("");
   const [pageSize, setPageSize] = useState("a4");
   const [marginPreset, setMarginPreset] = useState("normal");
   const [paperTone, setPaperTone] = useState("white");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const initialSnapshotRef = useRef("");
   const previewRequestRef = useRef(0);
   const previewPdfUrlRef = useRef("");
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const paperRefs = useRef({});
-  const scrollContainerRef = useRef(null);
 
-  const pageSpec = PAGE_SIZE_OPTIONS.find((item) => item.value === pageSize) || PAGE_SIZE_OPTIONS[0];
-  const marginSpec = MARGIN_OPTIONS.find((item) => item.value === marginPreset) || MARGIN_OPTIONS[1];
   const sections = useMemo(() => {
-    if (!documentState?.sections || !Array.isArray(documentState.sections)) return [];
+    if (!Array.isArray(documentState?.sections)) return [];
     return [...documentState.sections].sort((a, b) => a.order - b.order);
   }, [documentState]);
-  const pages = useMemo(
-    () => composePages(sections, pageSpec, marginSpec.px, true),
-    [sections, pageSpec, marginSpec.px]
-  );
+  const activeSection = sections.find((section) => section.section_id === activeSectionId) || sections[0] || null;
+  const activeBlock = activeSection?.blocks?.find((block) => block.block_id === activeBlockId) || null;
   const canSave = Boolean(report && documentState);
 
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const [editorPayload, templates] = await Promise.all([
-          getReportEditor(reportId),
-          listReportTemplates(),
-        ]);
+        const [editorPayload, templates] = await Promise.all([getReportEditor(reportId), listReportTemplates()]);
         const reportPayload = editorPayload?.report || null;
         const normalized = normalizeDocument(editorPayload?.document_json || {}, reportPayload);
         setReport(reportPayload);
         setDocumentState(normalized);
         setActiveSectionId(normalized.sections[0]?.section_id || "");
-        setActivePageIndex(0);
+        setActiveBlockId("");
         setActiveVersionId(editorPayload?.active_version_id || reportPayload?.latest_draft_version_id || reportPayload?.published_version_id || "");
 
         const sizeToken = String(normalized?.meta?.page_setup?.size || "").toLowerCase();
         setPageSize(sizeToken === "letter" ? "letter" : "a4");
-
         const marginValue = Number(normalized?.meta?.page_setup?.margins?.left || 52);
         if (marginValue <= 40) setMarginPreset("narrow");
         else if (marginValue >= 64) setMarginPreset("wide");
         else setMarginPreset("normal");
-
         const backgroundToken = String(normalized?.meta?.page_setup?.background || "").toLowerCase();
         if (backgroundToken === "#f7f3ec") setPaperTone("warm");
         else if (backgroundToken === "#f3f7fb") setPaperTone("cool");
         else setPaperTone("white");
 
-        const matchedTemplate = (templates || []).find(
-          (item) => item.template_id === reportPayload?.template_id
-        );
+        const matchedTemplate = (templates || []).find((item) => item.template_id === reportPayload?.template_id);
         setQuality(matchedTemplate?.default_quality || "standard");
-
         initialSnapshotRef.current = JSON.stringify(normalized);
         setHasUnsavedChanges(false);
       } catch (error) {
@@ -438,9 +504,7 @@ export default function ReportEditPage() {
 
   useEffect(() => {
     return () => {
-      if (previewPdfUrlRef.current) {
-        window.URL.revokeObjectURL(previewPdfUrlRef.current);
-      }
+      if (previewPdfUrlRef.current) window.URL.revokeObjectURL(previewPdfUrlRef.current);
     };
   }, []);
 
@@ -453,37 +517,6 @@ export default function ReportEditPage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === "s") {
-        event.preventDefault();
-        if (canSave && !isSaving) void handleSave();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [canSave, isSaving, documentState]);
-
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const top = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (!top) return;
-        const indexValue = Number.parseInt(top.target.dataset.pageIndex || "0", 10);
-        if (Number.isFinite(indexValue)) setActivePageIndex(indexValue);
-      },
-      { root: container, threshold: 0.35 }
-    );
-    Object.values(paperRefs.current).forEach((element) => {
-      if (element) observer.observe(element);
-    });
-    return () => observer.disconnect();
-  }, [pages.length]);
-
   const updateDocument = (updater) => {
     setDocumentState((current) => {
       if (!current) return current;
@@ -493,13 +526,10 @@ export default function ReportEditPage() {
     });
   };
 
-  const refreshPreview = useCallback(async ({ quiet = false } = {}) => {
+  const refreshPreview = useCallback(async () => {
     if (!report || !documentState) return;
     const requestId = previewRequestRef.current + 1;
     previewRequestRef.current = requestId;
-    if (!quiet) {
-      setViewMode("preview");
-    }
     setPreviewStatus("Preparing preview...");
     setPreviewError("");
     try {
@@ -509,9 +539,7 @@ export default function ReportEditPage() {
       });
       if (previewRequestRef.current !== requestId) return;
       const nextUrl = window.URL.createObjectURL(pdfBlob);
-      if (previewPdfUrlRef.current) {
-        window.URL.revokeObjectURL(previewPdfUrlRef.current);
-      }
+      if (previewPdfUrlRef.current) window.URL.revokeObjectURL(previewPdfUrlRef.current);
       previewPdfUrlRef.current = nextUrl;
       setPreviewPdfUrl(nextUrl);
       setPreviewStatus(quality === "premium" ? "Premium preview ready" : "Preview ready");
@@ -524,16 +552,23 @@ export default function ReportEditPage() {
 
   useEffect(() => {
     if (!report || !documentState) return;
-    if (viewMode !== "preview") {
-      setPreviewStatus("Preview will update when opened");
-      return;
-    }
     setPreviewStatus("Updating preview...");
     const timer = window.setTimeout(() => {
-      void refreshPreview({ quiet: true });
-    }, 1200);
+      void refreshPreview();
+    }, 1000);
     return () => window.clearTimeout(timer);
-  }, [documentState, quality, report, refreshPreview, viewMode]);
+  }, [documentState, quality, report, refreshPreview]);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "s") {
+        event.preventDefault();
+        if (canSave && !isSaving) void handleSave();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [canSave, isSaving, documentState]);
 
   const syncPageSetup = (nextPageSize, nextMarginPreset, nextPaperTone) => {
     updateDocument((draft) => {
@@ -541,25 +576,10 @@ export default function ReportEditPage() {
       draft.meta.page_setup = draft.meta.page_setup || {};
       const pageSizeItem = PAGE_SIZE_OPTIONS.find((item) => item.value === nextPageSize) || PAGE_SIZE_OPTIONS[0];
       const marginItem = MARGIN_OPTIONS.find((item) => item.value === nextMarginPreset) || MARGIN_OPTIONS[1];
-      const background =
-        nextPaperTone === "warm" ? "#f7f3ec" : nextPaperTone === "cool" ? "#f3f7fb" : "#ffffff";
-
+      const background = nextPaperTone === "warm" ? "#f7f3ec" : nextPaperTone === "cool" ? "#f3f7fb" : "#ffffff";
       draft.meta.page_setup.size = pageSizeItem.exportSize;
       draft.meta.page_setup.background = background;
-      draft.meta.page_setup.margins = {
-        top: marginItem.px,
-        right: marginItem.px,
-        bottom: marginItem.px,
-        left: marginItem.px,
-      };
-    });
-  };
-
-  const updateSectionTitle = (sectionId, title) => {
-    updateDocument((draft) => {
-      const section = draft.sections.find((item) => item.section_id === sectionId);
-      if (!section) return;
-      section.title = title;
+      draft.meta.page_setup.margins = { top: marginItem.px, right: marginItem.px, bottom: marginItem.px, left: marginItem.px };
     });
   };
 
@@ -568,47 +588,55 @@ export default function ReportEditPage() {
       draft.meta = draft.meta || {};
       draft.meta.cover = draft.meta.cover || {};
       draft.meta.cover[field] = value;
-      if (field === "title") {
-        draft.meta.report_name = value || draft.meta.report_name;
-      }
+      if (field === "title") draft.meta.report_name = value || draft.meta.report_name;
+    });
+  };
+
+  const updateSectionTitle = (sectionId, title) => {
+    updateDocument((draft) => {
+      const section = draft.sections.find((item) => item.section_id === sectionId);
+      if (section) section.title = title;
     });
   };
 
   const addSection = () => {
     updateDocument((draft) => {
-      const nextOrder = draft.sections.length;
       const section = {
         section_id: newId("section"),
-        title: `Section ${nextOrder + 1}`,
-        order: nextOrder,
-        blocks: [
-          {
-            block_id: newId("block"),
-            type: "rich_text",
-            order: 0,
-            layout: { span: 12, align: "left", flow: "full-width" },
-            data: toDocText("Write section content..."),
-          },
-        ],
+        title: `Section ${draft.sections.length + 1}`,
+        order: draft.sections.length,
+        blocks: [],
       };
       draft.sections.push(section);
       setActiveSectionId(section.section_id);
+      setActiveBlockId("");
     });
   };
 
   const updateBlock = (sectionId, blockId, nextBlock) => {
     updateDocument((draft) => {
       const section = draft.sections.find((item) => item.section_id === sectionId);
-      if (!section || !Array.isArray(section.blocks)) return;
-      section.blocks = section.blocks.map((block) => (block.block_id === blockId ? nextBlock : block));
+      if (!section) return;
+      section.blocks = (section.blocks || []).map((block) => (block.block_id === blockId ? nextBlock : block));
       section.blocks.forEach((block, index) => {
         block.order = index;
       });
     });
   };
 
+  const deleteBlock = (sectionId, blockId) => {
+    updateDocument((draft) => {
+      const section = draft.sections.find((item) => item.section_id === sectionId);
+      if (!section) return;
+      section.blocks = (section.blocks || []).filter((block) => block.block_id !== blockId);
+      section.blocks.forEach((block, index) => {
+        block.order = index;
+      });
+      setActiveBlockId("");
+    });
+  };
+
   const insertBlock = (toolKey) => {
-    setViewMode("edit");
     const targetSectionId = activeSectionId || sections[0]?.section_id;
     if (!targetSectionId) return;
     updateDocument((draft) => {
@@ -617,6 +645,8 @@ export default function ReportEditPage() {
       const blocks = Array.isArray(section.blocks) ? section.blocks : [];
       const block = createBlockForTool(toolKey, blocks.length);
       section.blocks = [...blocks, block];
+      setActiveSectionId(section.section_id);
+      setActiveBlockId(block.block_id);
     });
   };
 
@@ -625,12 +655,8 @@ export default function ReportEditPage() {
     setIsSaving(true);
     try {
       const payload = await saveReportDraft(report.report_id, documentState);
-      if (payload?.report) {
-        setReport(payload.report);
-      }
-      if (payload?.version?.version_id) {
-        setActiveVersionId(payload.version.version_id);
-      }
+      if (payload?.report) setReport(payload.report);
+      if (payload?.version?.version_id) setActiveVersionId(payload.version.version_id);
       initialSnapshotRef.current = JSON.stringify(documentState);
       setHasUnsavedChanges(false);
       toast.success(payload?.deduplicated ? "No content changes to save." : "Draft saved.");
@@ -650,9 +676,7 @@ export default function ReportEditPage() {
       let versionId = activeVersionId;
       if (hasUnsavedChanges) {
         versionId = await handleSave();
-        if (!versionId) {
-          throw new Error("Save failed, so the PDF was not exported. Fix the draft save issue and try again.");
-        }
+        if (!versionId) throw new Error("Save failed, so the PDF was not exported. Fix the draft save issue and try again.");
       }
       await exportReport(report.report_id, "pdf", documentState.meta?.report_name || report.report_name, {
         reportType: report.report_type,
@@ -667,26 +691,6 @@ export default function ReportEditPage() {
       setIsExporting(false);
     }
   };
-
-  const scrollToPage = (pageIndex) => {
-    paperRefs.current[String(pageIndex)]?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  const paperBackground =
-    paperTone === "warm" ? "#f7f3ec" : paperTone === "cool" ? "#f3f7fb" : "#ffffff";
-
-  const sectionPageMap = useMemo(() => {
-    const map = new Map();
-    for (const page of pages) {
-      for (const item of page.items) {
-        if (item.kind !== "section" || !item.section_id) continue;
-        if (!map.has(item.section_id)) {
-          map.set(item.section_id, page.pageIndex);
-        }
-      }
-    }
-    return map;
-  }, [pages]);
 
   if (isLoading || !documentState) {
     return (
@@ -714,10 +718,8 @@ export default function ReportEditPage() {
           onBack={() => navigate("/reports")}
           onSave={handleSave}
           onExport={handleExport}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
           previewStatus={previewStatus}
-          onRefreshPreview={() => void refreshPreview({ quiet: false })}
+          onRefreshPreview={() => void refreshPreview()}
           pageSize={pageSize}
           onPageSizeChange={(value) => {
             setPageSize(value);
@@ -737,56 +739,41 @@ export default function ReportEditPage() {
           }}
           quality={quality}
           onQualityChange={setQuality}
-          pageCount={pages.length}
         />
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <ReportEditSidebar
             toolItems={TOOL_ITEMS}
-            activeSectionId={activeSectionId}
+            activeSectionId={activeSection?.section_id || ""}
+            activeBlockId={activeBlockId}
             onInsertBlock={insertBlock}
             sections={sections}
             onSelectSection={(sectionId) => {
-              setViewMode("edit");
               setActiveSectionId(sectionId);
-              const pageIndex = sectionPageMap.get(sectionId);
-              if (Number.isFinite(pageIndex)) {
-                scrollToPage(pageIndex);
-              }
+              setActiveBlockId("");
+            }}
+            onSelectBlock={(sectionId, blockId) => {
+              setActiveSectionId(sectionId);
+              setActiveBlockId(blockId);
             }}
             onAddSection={addSection}
-            pages={pages}
-            activePageIndex={activePageIndex}
-            onScrollToPage={scrollToPage}
           />
-
-          {viewMode === "preview" ? (
-            <ReportPreviewPane
-              pdfUrl={previewPdfUrl}
-              status={previewStatus}
-              error={previewError}
-              zoom={zoom}
-              onRefresh={() => void refreshPreview({ quiet: false })}
-            />
-          ) : (
-            <ReportEditCanvas
-              scrollContainerRef={scrollContainerRef}
-              paperRefs={paperRefs}
-              pages={pages}
-              pageSpec={pageSpec}
-              marginSpec={marginSpec}
-              paperBackground={paperBackground}
-              zoom={zoom}
-              activePageIndex={activePageIndex}
-              activeSectionId={activeSectionId}
-              cover={documentState?.meta?.cover || {}}
-              onSetActivePage={setActivePageIndex}
-              onSetActiveSection={setActiveSectionId}
-              onUpdateCoverField={updateCoverField}
-              onUpdateSectionTitle={updateSectionTitle}
-              onUpdateBlock={updateBlock}
-            />
-          )}
+          <ReportPreviewPane
+            pdfUrl={previewPdfUrl}
+            status={previewStatus}
+            error={previewError}
+            zoom={zoom}
+            onRefresh={() => void refreshPreview()}
+          />
+          <ReportInspector
+            cover={documentState?.meta?.cover || {}}
+            activeSection={activeSection}
+            activeBlock={activeBlock}
+            onUpdateCoverField={updateCoverField}
+            onUpdateSectionTitle={updateSectionTitle}
+            onUpdateBlock={updateBlock}
+            onDeleteBlock={deleteBlock}
+          />
         </div>
       </div>
     </section>
