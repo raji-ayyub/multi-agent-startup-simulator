@@ -3807,25 +3807,32 @@ def build_report_html_from_document(
     .doc-shell {{ max-width: 900px; margin: 0 auto; }}
     .doc-paper {{
       background: var(--doc-paper);
-      border: 1px solid var(--doc-border);
-      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 0;
       box-shadow: 0 20px 48px rgba(15, 23, 42, 0.35);
-      padding: 0;
-      overflow: hidden;
+      padding: {margin_top}px {margin_right}px {margin_bottom}px {margin_left}px;
+      overflow: visible;
     }}
     .doc-cover {{
-      border-bottom: 1px solid var(--doc-border);
-      padding: 42px {margin_right}px 28px {margin_left}px;
-      background: linear-gradient(135deg, rgba(148,163,184,0.06), rgba(148,163,184,0.01));
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      background: #ffffff;
+      margin: 0 0 30px;
     }}
-    .doc-kicker {{ margin: 0; font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--doc-accent); font-weight: 700; }}
-    .doc-title {{ margin: 12px 0 0; font-size: 2.75rem; line-height: 1.05; color: var(--doc-primary); max-width: 96%; }}
-    .doc-subtitle {{ margin: 10px 0 0; font-size: 1.28rem; color: #475569; max-width: 85%; line-height: 1.35; }}
-    .doc-meta-grid {{ margin-top: 22px; border-top: 1px solid var(--doc-border); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; padding-top: 18px; }}
-    .doc-meta-item {{ border: 1px solid var(--doc-border); border-radius: 10px; background: #f8fafc; padding: 12px; }}
+    .doc-cover-top {{
+      border-bottom: 1px solid #e2e8f0;
+      background: linear-gradient(135deg, #f8fafc, #ffffff);
+      padding: 32px 40px 34px;
+    }}
+    .doc-kicker {{ margin: 0; font-size: 0.72rem; letter-spacing: 0.20em; text-transform: uppercase; color: #334155; font-weight: 700; }}
+    .doc-title {{ margin: 16px 0 0; font-size: 3.2rem; line-height: 1.02; color: #0f172a; max-width: 96%; font-weight: 700; }}
+    .doc-subtitle {{ margin: 16px 0 0; font-size: 1.45rem; color: #475569; max-width: 85%; line-height: 1.35; }}
+    .doc-meta-grid {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; padding: 32px 40px; }}
+    .doc-meta-item {{ border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; padding: 16px; }}
     .doc-meta-label {{ margin: 0; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b; }}
-    .doc-meta-value {{ margin: 7px 0 0; font-size: 1.08rem; font-weight: 700; color: #0f172a; line-height: 1.35; word-break: break-word; }}
-    .doc-content {{ padding: {margin_top}px {margin_right}px {margin_bottom}px {margin_left}px; }}
+    .doc-meta-value {{ margin: 8px 0 0; font-size: 1.55rem; font-weight: 700; color: #0f172a; line-height: 1.28; word-break: break-word; }}
+    .doc-content {{ padding: 0; }}
     .doc-section {{ break-inside: avoid; margin: 0 0 24px; page-break-inside: avoid; }}
     .doc-section h2 {{
       margin: 0 0 12px;
@@ -3867,7 +3874,7 @@ def build_report_html_from_document(
     @media print {{
       body {{ background: #ffffff; padding: 0; }}
       .doc-shell {{ max-width: none; margin: 0; }}
-      .doc-paper {{ border: 0; border-radius: 0; box-shadow: none; }}
+      .doc-paper {{ border: 1px solid #cbd5e1; border-radius: 0; box-shadow: none; }}
       .doc-footer {{ display: none; }}
     }}
     @page {{
@@ -3882,9 +3889,11 @@ def build_report_html_from_document(
   <div class="doc-shell">
     <article class="doc-paper">
       <header class="doc-cover">
-        <p class="doc-kicker">{cover_kicker}</p>
-        <h1 class="doc-title">{cover_title}</h1>
-        <p class="doc-subtitle">{cover_subtitle}</p>
+        <div class="doc-cover-top">
+          <p class="doc-kicker">{cover_kicker}</p>
+          <h1 class="doc-title">{cover_title}</h1>
+          <p class="doc-subtitle">{cover_subtitle}</p>
+        </div>
         <div class="doc-meta-grid">
           <article class="doc-meta-item">
             <p class="doc-meta-label">Startup</p>
