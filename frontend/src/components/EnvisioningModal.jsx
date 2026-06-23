@@ -122,16 +122,11 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     [form]
   );
 
-  const showRunDecisionActions = useMemo(() => {
-    if (simulationStage || isIntakeLoading || messages.length === 0) return false;
+  const quickReplyOptions = useMemo(() => {
+    if (simulationStage || isIntakeLoading || messages.length === 0) return [];
     const last = messages[messages.length - 1];
-    if (!last || last.role !== "assistant") return false;
-    const content = String(last.content || "").toLowerCase();
-    return (
-      content.includes("do you want me to run simulation now") ||
-      content.includes("do you want me to run simulation") ||
-      content.includes("tell me when to run simulation")
-    );
+    if (!last || last.role !== "assistant") return [];
+    return Array.isArray(last.suggestedReplies) ? last.suggestedReplies.filter(Boolean).slice(0, 4) : [];
   }, [messages, simulationStage, isIntakeLoading]);
 
   useEffect(() => {
@@ -153,6 +148,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
             content:
               response?.assistant_message ||
               "Tell me about your startup idea and I will collect what is needed for simulation.",
+            suggestedReplies: Array.isArray(response?.suggested_replies) ? response.suggested_replies : [],
           },
         ]);
         setIntakeReady(Boolean(response?.ready_to_run));
@@ -164,6 +160,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
           {
             role: "assistant",
             content: "Tell me about your startup idea and I will collect what is needed for simulation.",
+            suggestedReplies: [],
           },
         ]);
       } finally {
@@ -233,7 +230,11 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
       patchIdeaFields(intakeFieldsToForm(response?.collected_fields || {}));
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: response?.assistant_message || "Noted. Continue." },
+        {
+          role: "assistant",
+          content: response?.assistant_message || "Noted. Continue.",
+          suggestedReplies: Array.isArray(response?.suggested_replies) ? response.suggested_replies : [],
+        },
       ]);
       setIntakeReady(Boolean(response?.ready_to_run));
       setCompletion(Number(response?.completion_percent || 0));
@@ -303,14 +304,6 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     saveDraft(form);
     patchIdeaFields(form);
     setBannerMessage("Draft saved.");
-  };
-
-  const handleQuickRunNow = async () => {
-    await submitMessage("Run simulation now.");
-  };
-
-  const handleQuickAddMore = async () => {
-    await submitMessage("I want to add more details first.");
   };
 
   const handleLaunch = async () => {
@@ -508,24 +501,19 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                   </button>
                 </div>
 
-                {showRunDecisionActions ? (
+                {quickReplyOptions.length > 0 ? (
                   <div className="mt-3 shrink-0 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={handleQuickRunNow}
-                      disabled={isIntakeLoading || simulationStage}
-                      className="app-success-btn rounded-full px-3 py-1.5 text-xs font-semibold transition"
-                    >
-                      Run simulation now
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleQuickAddMore}
-                      disabled={isIntakeLoading || simulationStage}
-                      className="app-ghost-btn rounded-full border px-3 py-1.5 text-xs font-semibold transition"
-                    >
-                      Add more details
-                    </button>
+                    {quickReplyOptions.map((reply) => (
+                      <button
+                        key={reply}
+                        type="button"
+                        onClick={() => submitMessage(reply)}
+                        disabled={isIntakeLoading || simulationStage}
+                        className="app-ghost-btn rounded-full border px-3 py-1.5 text-xs font-semibold transition"
+                      >
+                        {reply}
+                      </button>
+                    ))}
                   </div>
                 ) : null}
               </div>

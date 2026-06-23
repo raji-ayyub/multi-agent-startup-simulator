@@ -111,3 +111,6 @@ class SimulationIntakeTurnResponse(BaseModel):
     missing_fields: List[str]
     ready_to_run: bool
     completion_percent: int = Field(..., ge=0, le=100)
+    conversation_mode: str = "COLLECTING_CONTEXT"
+    detected_intent: str = "UNKNOWN"
+    suggested_replies: List[str] = Field(default_factory=list)

@@ -59,6 +59,29 @@ INTAKE_FIELDS = [
     "marketingStrategy",
 ]
 
+INTAKE_REQUIRED_FIELDS = [
+    "startupName",
+    "problemStatement",
+    "targetAudience",
+]
+
+INTAKE_FIELD_LABELS = {
+    "startupName": "startup name",
+    "elevatorPitch": "elevator pitch",
+    "problemStatement": "problem statement",
+    "targetAudience": "target audience",
+    "problemUrgency": "problem urgency",
+    "primaryTargetSegment": "primary target segment",
+    "geography": "geography",
+    "marketSizeEstimate": "market size estimate",
+    "customerBehaviorPainPoints": "customer pain points",
+    "competitorPatterns": "competitor patterns",
+    "monthlyBurn": "monthly burn",
+    "estimatedCac": "estimated CAC",
+    "currentCashInHand": "current cash in hand",
+    "marketingStrategy": "marketing strategy",
+}
+
 
 
 
@@ -335,83 +358,247 @@ def _merge_updates(draft: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, 
     return merged
 
 
-def _extract_intake_updates(
+def _sanitize_intake_updates(updates: Any) -> Dict[str, Any]:
+    if not isinstance(updates, dict):
+        return {}
+    sanitized: Dict[str, Any] = {}
+    for key in INTAKE_FIELDS:
+        value = updates.get(key)
+        if value is None:
+            continue
+        value_str = str(value).strip()
+        if value_str:
+            sanitized[key] = value_str
+    return sanitized
+
+
+def _intake_missing_field_keys(draft: Dict[str, Any]) -> List[str]:
+    return [field for field in INTAKE_REQUIRED_FIELDS if _is_blank(draft.get(field))]
+
+
+def _intake_missing_field_labels(draft: Dict[str, Any]) -> List[str]:
+    return [INTAKE_FIELD_LABELS.get(field, field) for field in _intake_missing_field_keys(draft)]
+
+
+def _intake_completion_percent(draft: Dict[str, Any]) -> int:
+    filled_count = sum(1 for field in INTAKE_FIELDS if not _is_blank(draft.get(field)))
+    return int(round((filled_count / len(INTAKE_FIELDS)) * 100))
+
+
+def _normalize_suggested_replies(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    replies: List[str] = []
+    seen = set()
+    for item in value:
+        text = str(item or "").strip()
+        if not text:
+            continue
+        lowered = text.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        replies.append(text[:120])
+        if len(replies) >= 4:
+            break
+    return replies
+
+
+def _looks_like_run_confirmation(user_message: str) -> bool:
+    text = user_message.strip().lower()
+    if not text:
+        return False
+    run_keywords = ["run", "start", "go ahead", "go-ahead", "simulate", "execute", "ready", "do it"]
+    negations = ["don't", "dont", "not", "wait", "hold", "later"]
+    return any(keyword in text for keyword in run_keywords) and not any(neg in text for neg in negations)
+
+
+def _looks_like_add_context(user_message: str) -> bool:
+    text = user_message.strip().lower()
+    if not text:
+        return False
+    add_keywords = ["add more", "more details", "more context", "keep going", "not yet", "wait", "hold on"]
+    return any(keyword in text for keyword in add_keywords)
+
+
+def _next_missing_field_prompt(field_key: str) -> str:
+    prompts = {
+        "startupName": "What should we call the startup for this simulation?",
+        "problemStatement": "What real problem would this startup solve?",
+        "targetAudience": "Who would be the first target customer for it?",
+    }
+    return prompts.get(field_key, f"Tell me the {INTAKE_FIELD_LABELS.get(field_key, field_key)}.")
+
+
+def _fallback_intake_turn_agent(
+    draft: Dict[str, Any],
+    user_message: str,
+) -> Dict[str, Any]:
+    text = user_message.strip()
+    lowered = text.lower()
+    missing_keys = _intake_missing_field_keys(draft)
+
+    social_keywords = ["hi", "hello", "hey", "thanks", "thank you", "ok", "okay", "cool", "great"]
+    offtopic_keywords = ["health", "medical", "doctor", "sick", "feeling", "personal"]
+    no_idea_markers = [
+        "i don't have an idea",
+        "i dont have an idea",
+        "no idea",
+        "don't have a startup idea",
+        "dont have a startup idea",
+        "help me brainstorm",
+        "brainstorm with me",
+        "can you suggest ideas",
+    ]
+
+    if not lowered:
+        return {
+            "intent": "EMPTY",
+            "conversation_mode": "COLLECTING_CONTEXT",
+            "assistant_message": "Hi. Share your startup idea and I'll help you shape it into something we can simulate.",
+            "ready_to_run": False,
+            "suggested_replies": [
+                "I already have an idea",
+                "Help me brainstorm one",
+                "What details do you need?",
+            ],
+        }
+
+    if any(lowered == keyword or lowered.startswith(f"{keyword} ") for keyword in social_keywords):
+        return {
+            "intent": "SOCIAL",
+            "conversation_mode": "COLLECTING_CONTEXT",
+            "assistant_message": "Hey. If you already have an idea, tell me about it. If not, I can help you brainstorm one first.",
+            "ready_to_run": False,
+            "suggested_replies": [
+                "I have an idea",
+                "Help me brainstorm one",
+                "What do you need from me?",
+            ],
+        }
+
+    if any(keyword in lowered for keyword in offtopic_keywords):
+        return {
+            "intent": "OFFTOPIC_PERSONAL",
+            "conversation_mode": "OFFTOPIC",
+            "assistant_message": "I’m focused on startup simulation here. If you want, we can come back to a startup idea or brainstorm one together.",
+            "ready_to_run": False,
+            "suggested_replies": [
+                "Help me brainstorm a startup",
+                "I already have an idea",
+            ],
+        }
+
+    if any(marker in lowered for marker in no_idea_markers):
+        return {
+            "intent": "NO_IDEA_YET",
+            "conversation_mode": "BRAINSTORMING",
+            "assistant_message": (
+                "No problem. We can figure one out together. "
+                "We can start from an industry you know, a problem you’ve noticed, or skills you already have."
+            ),
+            "ready_to_run": False,
+            "suggested_replies": [
+                "Start with problems I have noticed",
+                "Start with industries I know",
+                "Start with my skills",
+            ],
+        }
+
+    if _looks_like_run_confirmation(lowered):
+        if missing_keys:
+            first_missing = missing_keys[0]
+            return {
+                "intent": "RUN_CONFIRMATION",
+                "conversation_mode": "COLLECTING_CONTEXT",
+                "assistant_message": (
+                    f"We’re close, but I still need your {INTAKE_FIELD_LABELS.get(first_missing, first_missing)} "
+                    "before I can run a useful simulation. "
+                    f"{_next_missing_field_prompt(first_missing)}"
+                ),
+                "ready_to_run": False,
+                "suggested_replies": [],
+            }
+        return {
+            "intent": "RUN_CONFIRMATION",
+            "conversation_mode": "READY_TO_RUN",
+            "assistant_message": "Running simulation now with the context you've provided.",
+            "ready_to_run": True,
+            "suggested_replies": [],
+        }
+
+    if _looks_like_add_context(lowered):
+        return {
+            "intent": "ADDING_CONTEXT",
+            "conversation_mode": "COLLECTING_CONTEXT",
+            "assistant_message": "Sounds good. Add whatever else you want me to factor into the simulation.",
+            "ready_to_run": False,
+            "suggested_replies": [],
+        }
+
+    if missing_keys:
+        first_missing = missing_keys[0]
+        return {
+            "intent": "STARTUP_CONTEXT",
+            "conversation_mode": "COLLECTING_CONTEXT",
+            "assistant_message": _next_missing_field_prompt(first_missing),
+            "ready_to_run": False,
+            "suggested_replies": [],
+        }
+
+    return {
+        "intent": "STARTUP_CONTEXT",
+        "conversation_mode": "READY_CHECK",
+        "assistant_message": "Got it. I have enough to work with. Do you want me to run the simulation now or keep refining it?",
+        "ready_to_run": False,
+        "suggested_replies": [
+            "Run the simulation now",
+            "I want to add more details",
+        ],
+    }
+
+
+def _invoke_intake_turn_agent(
     draft: Dict[str, Any],
     user_message: str,
     history: List[Dict[str, str]] | None = None,
 ) -> Dict[str, Any]:
     history = history or []
-    empty_updates = {"updates": {}}
-
-    if not user_message.strip():
-        return empty_updates["updates"]
-
     if client is None:
-        return {}
+        return _fallback_intake_turn_agent(draft, user_message)
 
     system_prompt = (
-        "Extract startup information from the user's message. "
-        "Return JSON with an 'updates' object containing any fields you can identify: "
-        "startupName, elevatorPitch, problemStatement, targetAudience, problemUrgency, "
-        "primaryTargetSegment, geography, marketSizeEstimate, customerBehaviorPainPoints, competitorPatterns, "
-        "monthlyBurn, estimatedCac, currentCashInHand, marketingStrategy. "
-        "Include what you find naturally from the conversation."
+        "You are the intake conversation agent for a startup simulation product. "
+        "Your job is to hold a natural conversation, understand the user's state, decide the right next move, "
+        "and extract only the startup details that are actually present.\n\n"
+        "Return strict JSON with these keys:\n"
+        "- intent: one of EMPTY, SOCIAL, OFFTOPIC_PERSONAL, NO_IDEA_YET, BRAINSTORM_REQUEST, STARTUP_CONTEXT, ADDING_CONTEXT, RUN_CONFIRMATION, READY_CHECK, CLARIFICATION\n"
+        "- conversation_mode: one of BRAINSTORMING, COLLECTING_CONTEXT, READY_CHECK, READY_TO_RUN, OFFTOPIC\n"
+        "- assistant_message: a natural assistant reply\n"
+        "- updates: object containing any of these fields only when clearly supported by the conversation: "
+        "startupName, elevatorPitch, problemStatement, targetAudience, problemUrgency, primaryTargetSegment, geography, marketSizeEstimate, customerBehaviorPainPoints, competitorPatterns, monthlyBurn, estimatedCac, currentCashInHand, marketingStrategy\n"
+        "- ready_to_run: boolean\n"
+        "- suggested_replies: array of 0 to 4 short natural next-user replies\n\n"
+        "Rules:\n"
+        "- If the user says they do not have an idea yet, switch to brainstorming instead of asking to run a simulation.\n"
+        "- Never set ready_to_run to true unless startupName, problemStatement, and targetAudience are known.\n"
+        "- If the user asks to run but core information is missing, ask for the most important missing detail.\n"
+        "- Suggested replies should be short, useful, and clickable.\n"
+        "- Do not invent startup facts. Only extract what the user clearly said or strongly implied.\n"
+        "- Keep the reply helpful and human, not robotic or form-like."
     )
     user_prompt = (
         f"Current draft:\n{json.dumps(draft, ensure_ascii=True)}\n\n"
-        f"Recent conversation:\n{json.dumps(history[-8:], ensure_ascii=True)}\n\n"
+        f"Recent conversation:\n{json.dumps(history[-10:], ensure_ascii=True)}\n\n"
         f"Latest user message:\n{user_message}\n\n"
-        "Extract updates now."
+        "Plan the next intake turn now."
     )
     try:
         result = _invoke_json(system_prompt, user_prompt)
-        updates = result.get("updates", {}) if isinstance(result, dict) else {}
-        return updates if isinstance(updates, dict) else {}
+        return result if isinstance(result, dict) else _fallback_intake_turn_agent(draft, user_message)
     except Exception as exc:
-        logger.warning("Intake extraction failed. error=%s", exc)
-        return {}
-
-
-
-
-
-
-
-
-def _classify_intake_intent(user_message: str) -> str:
-    text = user_message.strip().lower()
-    if not text:
-        return "EMPTY"
-
-    # Simple keyword-based classification
-    social_keywords = ["hi", "hello", "hey", "thanks", "thank you", "ok", "okay", "cool", "great"]
-    if any(text == keyword or text.startswith(f"{keyword} ") for keyword in social_keywords):
-        return "SOCIAL"
-
-    offtopic_keywords = ["health", "medical", "doctor", "sick", "feeling", "personal"]
-    if any(keyword in text for keyword in offtopic_keywords):
-        return "OFFTOPIC_PERSONAL"
-
-    return "STARTUP"
-
-
-def _classify_run_decision(user_message: str) -> str:
-    text = user_message.strip().lower()
-    if not text:
-        return "UNKNOWN"
-
-    # Keywords indicating user wants to run
-    run_keywords = ["run", "start", "go", "simulate", "execute", "ready", "let's go", "do it"]
-    if any(keyword in text for keyword in run_keywords):
-        if not any(neg in text for neg in ["don't", "not", "wait", "hold"]):
-            return "CONFIRM_RUN"
-
-    # Keywords indicating user wants to add more
-    add_keywords = ["add", "more", "also", "another", "plus", "additionally", "wait"]
-    if any(keyword in text for keyword in add_keywords):
-        return "ADD_MORE"
-
-    return "UNKNOWN"
+        logger.warning("Intake conversation agent failed. error=%s", exc)
+        return _fallback_intake_turn_agent(draft, user_message)
 
 
 
@@ -424,41 +611,66 @@ def run_intake_turn(
     history: List[Dict[str, str]] | None = None,
 ) -> SimulationIntakeTurnResponse:
     normalized = _normalize_intake_draft(draft)
-    updates = _extract_intake_updates(normalized, user_message, history)
+    turn_result = _invoke_intake_turn_agent(normalized, user_message, history)
+
+    updates = _sanitize_intake_updates(turn_result.get("updates", {}))
     merged = _merge_updates(normalized, updates)
+    missing_field_keys = _intake_missing_field_keys(merged)
+    missing_fields = [INTAKE_FIELD_LABELS.get(field, field) for field in missing_field_keys]
+    completion = _intake_completion_percent(merged)
 
-    intent = _classify_intake_intent(user_message)
-    run_decision = _classify_run_decision(user_message) if user_message.strip() else "UNKNOWN"
+    detected_intent = str(turn_result.get("intent") or "UNKNOWN").strip().upper() or "UNKNOWN"
+    conversation_mode = str(turn_result.get("conversation_mode") or "COLLECTING_CONTEXT").strip().upper() or "COLLECTING_CONTEXT"
+    assistant_message = str(turn_result.get("assistant_message") or "").strip()
+    suggested_replies = _normalize_suggested_replies(turn_result.get("suggested_replies"))
 
-    # Calculate completion based on filled fields
-    filled_count = sum(1 for field in INTAKE_FIELDS if not _is_blank(merged.get(field)))
-    completion = int(round((filled_count / len(INTAKE_FIELDS)) * 100))
+    ready = bool(turn_result.get("ready_to_run")) and not missing_field_keys
+    if not assistant_message:
+        fallback_turn = _fallback_intake_turn_agent(merged, user_message)
+        assistant_message = str(fallback_turn.get("assistant_message") or "").strip()
+        if not suggested_replies:
+            suggested_replies = _normalize_suggested_replies(fallback_turn.get("suggested_replies"))
+        if detected_intent == "UNKNOWN":
+            detected_intent = str(fallback_turn.get("intent") or "UNKNOWN").strip().upper() or "UNKNOWN"
+        if conversation_mode == "COLLECTING_CONTEXT":
+            conversation_mode = str(fallback_turn.get("conversation_mode") or "COLLECTING_CONTEXT").strip().upper() or "COLLECTING_CONTEXT"
 
-    # Determine readiness - user explicitly wants to run
-    ready = run_decision == "CONFIRM_RUN"
-
-    # Generate response message
-    if not user_message.strip():
-        assistant_message = "Hi. Share your startup idea and I'll help you simulate it."
-    elif intent == "OFFTOPIC_PERSONAL":
-        assistant_message = "I'm here for startup simulation. Let me know when you'd like to continue."
-    elif intent == "SOCIAL":
-        assistant_message = "Hey. Share your startup idea whenever you're ready."
-    elif ready:
-        assistant_message = "Running simulation now with the context you've provided."
-    elif run_decision == "ADD_MORE":
-        assistant_message = "Sure, add whatever else you'd like me to consider."
-    elif intent == "STARTUP":
-        assistant_message = "Got it. Want to run the simulation now, or add more context first?"
-    else:
-        assistant_message = "Share more about your startup, or tell me when you're ready to run."
+    if _looks_like_run_confirmation(user_message) and missing_field_keys:
+        ready = False
+        conversation_mode = "COLLECTING_CONTEXT"
+        first_missing = missing_field_keys[0]
+        assistant_message = (
+            f"I still need your {INTAKE_FIELD_LABELS.get(first_missing, first_missing)} before I can run a useful simulation. "
+            f"{_next_missing_field_prompt(first_missing)}"
+        )
+        suggested_replies = []
+    elif _looks_like_run_confirmation(user_message) and not missing_field_keys:
+        ready = True
+        conversation_mode = "READY_TO_RUN"
+        if "running simulation" not in assistant_message.lower():
+            assistant_message = "Running simulation now with the context you've provided."
+        suggested_replies = []
+    elif detected_intent in {"NO_IDEA_YET", "BRAINSTORM_REQUEST"} and not suggested_replies:
+        suggested_replies = [
+            "Start with problems I have noticed",
+            "Start with industries I know",
+            "Start with my skills",
+        ]
+    elif not ready and not missing_field_keys and conversation_mode in {"READY_CHECK", "READY_TO_RUN"} and not suggested_replies:
+        suggested_replies = [
+            "Run the simulation now",
+            "I want to add more details",
+        ]
 
     return SimulationIntakeTurnResponse(
         assistant_message=assistant_message,
         collected_fields=merged,
-        missing_fields=[],
+        missing_fields=missing_fields,
         ready_to_run=ready,
         completion_percent=completion,
+        conversation_mode=conversation_mode,
+        detected_intent=detected_intent,
+        suggested_replies=suggested_replies,
     )
 
 
