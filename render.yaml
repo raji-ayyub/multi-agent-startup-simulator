@@ -17,5 +17,7 @@ services:
         value: "36000"
       - key: PASSWORD_RESET_TOKEN_EXPIRE_HOURS
         value: "2"
+      - key: REPORT_PDF_RENDERER
+        value: weasyprint
       - key: CORS_ORIGINS
         sync: false
