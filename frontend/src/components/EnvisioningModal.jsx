@@ -36,6 +36,9 @@ const URGENCY_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 const SIMULATION_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 const SIMULATION_UPLOAD_ACCEPT =
   ".pdf,.doc,.docx,.txt,.md,.csv,.json,.log,.rtf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain,text/markdown,text/csv,application/json,text/rtf";
+const INTRO_MESSAGE =
+  "Hi. Tell me the startup idea you want to test, or say you do not have one yet and we can brainstorm together.";
+const INTRO_REPLIES = ["I have an idea to test", "I do not have an idea yet", "Help me brainstorm one"];
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -64,6 +67,14 @@ function displayText(value) {
   if (Array.isArray(value)) return value.map(displayText).filter(Boolean).join(", ");
   if (typeof value === "object") return Object.values(value).map(displayText).filter(Boolean).join(", ");
   return String(value);
+}
+
+function hasCoreIntakeFields(fields = {}) {
+  return Boolean(
+    String(fields.startupName || "").trim() &&
+      String(fields.problemStatement || "").trim() &&
+      String(fields.targetAudience || "").trim()
+  );
 }
 
 export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
@@ -99,6 +110,8 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
   const [isUploadLoading, setIsUploadLoading] = useState(false);
   const messagesAnchorRef = useRef(null);
   const fileInputRef = useRef(null);
+  const initialFormRef = useRef(form);
+  const didBootstrapRef = useRef(false);
 
   const collectedPreview = useMemo(
     () => [
@@ -133,10 +146,28 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     let active = true;
 
     const bootstrap = async () => {
+      if (didBootstrapRef.current) return;
+      didBootstrapRef.current = true;
+      const initialForm = initialFormRef.current;
+
+      if (!hasCoreIntakeFields(initialForm)) {
+        setMessages([
+          {
+            role: "assistant",
+            content: INTRO_MESSAGE,
+            suggestedReplies: INTRO_REPLIES,
+          },
+        ]);
+        setIntakeReady(false);
+        setCompletion(0);
+        setMissingFields(["startup name", "problem statement", "target audience"]);
+        return;
+      }
+
       setIsIntakeLoading(true);
       try {
         const response = await runIntakeTurn({
-          draft: form,
+          draft: initialForm,
           userMessage: "",
           history: [],
         });
@@ -147,20 +178,20 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
             role: "assistant",
             content:
               response?.assistant_message ||
-              "Tell me about your startup idea and I will collect what is needed for simulation.",
+              INTRO_MESSAGE,
             suggestedReplies: Array.isArray(response?.suggested_replies) ? response.suggested_replies : [],
           },
         ]);
         setIntakeReady(Boolean(response?.ready_to_run));
         setCompletion(Number(response?.completion_percent || 0));
         setMissingFields(Array.isArray(response?.missing_fields) ? response.missing_fields : []);
-      } catch (error) {
+      } catch {
         if (!active) return;
         setMessages([
           {
             role: "assistant",
-            content: "Tell me about your startup idea and I will collect what is needed for simulation.",
-            suggestedReplies: [],
+            content: INTRO_MESSAGE,
+            suggestedReplies: INTRO_REPLIES,
           },
         ]);
       } finally {
@@ -172,7 +203,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [runIntakeTurn]);
 
   useEffect(() => {
     messagesAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -248,7 +279,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
       if (shouldLaunch && !simulationStage && !isRunning) {
         await launchSimulation(mergedForm);
       }
-    } catch (error) {
+    } catch {
       setBannerMessage(simulationError || "Unable to process your message. Try again.");
     } finally {
       setIsIntakeLoading(false);
@@ -312,6 +343,14 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
       return;
     }
     await launchSimulation(form);
+  };
+
+  const handleConfirmClose = () => {
+    if (isSimulationComplete && typeof onSimulationLaunched === "function") {
+      onSimulationLaunched();
+      return;
+    }
+    onClose();
   };
 
   const visibleLogs = runtimeLogs.slice(0, visibleLogCount);
@@ -623,7 +662,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
               <button
                 type="button"
                 disabled={!isSimulationComplete}
-                onClick={onClose}
+                onClick={handleConfirmClose}
                 className="app-success-btn rounded-full px-5 py-2 text-xs font-semibold transition"
               >
                 Confirm & Close
