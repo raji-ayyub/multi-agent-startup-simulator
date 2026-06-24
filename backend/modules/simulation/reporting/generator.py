@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import re
-import sys
-import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,15 +37,6 @@ except Exception as exc:
     WEASYPRINT_IMPORT_ERROR = exc
 else:
     WEASYPRINT_IMPORT_ERROR = None
-
-try:
-    from playwright.sync_api import sync_playwright
-except Exception as exc:
-    sync_playwright = None
-    PLAYWRIGHT_IMPORT_ERROR = exc
-else:
-    PLAYWRIGHT_IMPORT_ERROR = None
-
 
 class StartupSimulationReportGenerator:
     """Render startup simulation outputs into branded HTML and PDF reports."""
@@ -147,7 +135,7 @@ class StartupSimulationReportGenerator:
         self.logger = logger or logging.getLogger(__name__)
         self.system_name = system_name
         self.default_page_size = default_page_size
-        self.pdf_renderer = (pdf_renderer or os.getenv("REPORT_PDF_RENDERER", "auto")).strip().lower()
+        self.pdf_renderer = (pdf_renderer or os.getenv("REPORT_PDF_RENDERER", "weasyprint")).strip().lower()
         self.template_dir = Path(template_dir) if template_dir else Path(__file__).resolve().parent / "templates"
         if Environment is None or FileSystemLoader is None or select_autoescape is None:
             self.environment = None
@@ -382,152 +370,21 @@ class StartupSimulationReportGenerator:
         output_path.write_bytes(self._render_pdf_bytes(html))
 
     def _render_pdf_bytes(self, html: str) -> bytes:
-        renderer = self._select_pdf_renderer()
-        if renderer == "weasyprint":
-            document = HTML(string=html, base_url=str(self.template_dir))
-            try:
-                return document.write_pdf(optimize_images=True, presentational_hints=True)
-            except TypeError:
-                return document.write_pdf()
-        if renderer == "playwright":
-            try:
-                return self._render_pdf_bytes_with_playwright(html)
-            except RuntimeError as exc:
-                if HTML is not None:
-                    self.logger.warning(
-                        "Playwright PDF rendering failed; falling back to WeasyPrint. reason=%s",
-                        exc,
-                    )
-                    document = HTML(string=html, base_url=str(self.template_dir))
-                    try:
-                        return document.write_pdf(optimize_images=True, presentational_hints=True)
-                    except TypeError:
-                        return document.write_pdf()
-                raise
-        raise RuntimeError(f"Unsupported PDF renderer selected: {renderer}")
+        self._ensure_pdf_renderer()
+        document = HTML(string=html, base_url=str(self.template_dir))
+        try:
+            return document.write_pdf(optimize_images=True, presentational_hints=True)
+        except TypeError:
+            return document.write_pdf()
 
-    def _select_pdf_renderer(self) -> str:
-        preferred = self.pdf_renderer if self.pdf_renderer in {"auto", "weasyprint", "playwright"} else "auto"
-        if preferred == "weasyprint":
-            if HTML is None:
-                message = "REPORT_PDF_RENDERER is set to weasyprint, but WeasyPrint is unavailable."
-                if WEASYPRINT_IMPORT_ERROR is not None:
-                    message = f"{message} Import error: {WEASYPRINT_IMPORT_ERROR}"
-                raise RuntimeError(message)
-            return "weasyprint"
-
-        if preferred == "playwright":
-            if sync_playwright is None:
-                message = "REPORT_PDF_RENDERER is set to playwright, but Playwright is unavailable."
-                if PLAYWRIGHT_IMPORT_ERROR is not None:
-                    message = f"{message} Import error: {PLAYWRIGHT_IMPORT_ERROR}"
-                raise RuntimeError(message)
-            return "playwright"
-
-        # auto mode
-        if HTML is not None:
-            return "weasyprint"
-        if sync_playwright is not None:
-            return "playwright"
-
-        message = (
-            "No supported PDF renderer is available. Install WeasyPrint runtime dependencies "
-            "or Playwright with Chromium in the backend environment."
-        )
-        if WEASYPRINT_IMPORT_ERROR is not None:
-            message = f"{message} WeasyPrint error: {WEASYPRINT_IMPORT_ERROR}"
-        if PLAYWRIGHT_IMPORT_ERROR is not None:
-            message = f"{message} Playwright error: {PLAYWRIGHT_IMPORT_ERROR}"
-        raise RuntimeError(message)
-
-    def _render_pdf_bytes_with_playwright(self, html: str) -> bytes:
-        if sync_playwright is None:
-            message = "Playwright is required to generate PDF reports with Chromium."
-            if PLAYWRIGHT_IMPORT_ERROR is not None:
-                message = f"{message} Import error: {PLAYWRIGHT_IMPORT_ERROR}"
+    def _ensure_pdf_renderer(self) -> None:
+        if self.pdf_renderer not in {"weasyprint", "auto"}:
+            raise RuntimeError("Only WeasyPrint PDF rendering is supported in this deployment.")
+        if HTML is None:
+            message = "WeasyPrint is required to generate PDF reports."
+            if WEASYPRINT_IMPORT_ERROR is not None:
+                message = f"{message} Import error: {WEASYPRINT_IMPORT_ERROR}"
             raise RuntimeError(message)
-
-        temp_path: Path | None = None
-        try:
-            # On Windows, Playwright needs an asyncio policy that supports subprocess.
-            if sys.platform.startswith("win"):
-                try:
-                    current_policy = asyncio.get_event_loop_policy()
-                except Exception:
-                    current_policy = None
-                if current_policy is not None and not isinstance(
-                    current_policy, asyncio.WindowsProactorEventLoopPolicy
-                ):
-                    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-
-            self._assert_asyncio_subprocess_supported_for_playwright()
-
-            with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as handle:
-                handle.write(html)
-                temp_path = Path(handle.name)
-
-            with sync_playwright() as playwright:
-                browser = playwright.chromium.launch(
-                    args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
-                )
-                page = browser.new_page()
-                page.goto(temp_path.resolve().as_uri(), wait_until="networkidle")
-                page.emulate_media(media="print")
-                pdf_bytes = page.pdf(
-                    format=self.default_page_size,
-                    print_background=True,
-                    prefer_css_page_size=True,
-                )
-                browser.close()
-                return pdf_bytes
-        except NotImplementedError as exc:
-            raise RuntimeError(
-                "Playwright PDF rendering is unavailable in this runtime loop configuration. "
-                "Use Windows ProactorEventLoopPolicy (default), run via Docker, "
-                "or install/fix WeasyPrint dependencies."
-            ) from exc
-        except Exception as exc:
-            raise RuntimeError(f"Playwright PDF rendering failed: {exc}")
-        finally:
-            if temp_path is not None and temp_path.exists():
-                temp_path.unlink(missing_ok=True)
-
-    def _assert_asyncio_subprocess_supported_for_playwright(self) -> None:
-        async def _probe() -> int:
-            process = await asyncio.create_subprocess_exec(
-                sys.executable,
-                "-c",
-                "print('ok')",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            _, stderr = await process.communicate()
-            if process.returncode != 0:
-                stderr_text = (stderr or b"").decode("utf-8", errors="ignore").strip()
-                raise RuntimeError(
-                    "Async subprocess preflight returned non-zero status. "
-                    f"stderr={stderr_text}"
-                )
-            return process.returncode
-
-        try:
-            asyncio.run(_probe())
-        except RuntimeError as exc:
-            if "asyncio.run() cannot be called" not in str(exc):
-                raise RuntimeError(f"Playwright async-subprocess preflight failed: {exc}") from exc
-            loop = asyncio.new_event_loop()
-            try:
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(_probe())
-            except Exception as nested_exc:
-                raise RuntimeError(
-                    f"Playwright async-subprocess preflight failed: {nested_exc}"
-                ) from nested_exc
-            finally:
-                loop.close()
-                asyncio.set_event_loop(None)
-        except Exception as exc:
-            raise RuntimeError(f"Playwright async-subprocess preflight failed: {exc}") from exc
 
     def _load_css(self) -> str:
         return (self.template_dir / "report.css").read_text(encoding="utf-8")

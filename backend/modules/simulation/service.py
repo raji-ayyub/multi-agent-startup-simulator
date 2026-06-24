@@ -443,24 +443,38 @@ def _fallback_intake_turn_agent(
     no_idea_markers = [
         "i don't have an idea",
         "i dont have an idea",
+        "i do not have an idea",
         "no idea",
         "don't have a startup idea",
         "dont have a startup idea",
+        "do not have a startup idea",
         "help me brainstorm",
         "brainstorm with me",
         "can you suggest ideas",
     ]
 
     if not lowered:
+        if not _intake_missing_field_keys(draft):
+            return {
+                "intent": "EMPTY",
+                "conversation_mode": "READY_CHECK",
+                "assistant_message": "I found a saved startup brief. Do you want to run it now, or update anything first?",
+                "ready_to_run": False,
+                "suggested_replies": [
+                    "Run the simulation now",
+                    "I want to update it first",
+                    "Start a fresh idea",
+                ],
+            }
         return {
             "intent": "EMPTY",
             "conversation_mode": "COLLECTING_CONTEXT",
-            "assistant_message": "Hi. Share your startup idea and I'll help you shape it into something we can simulate.",
+            "assistant_message": "Hi. Tell me the startup idea you want to test, or say you do not have one yet and we can brainstorm together.",
             "ready_to_run": False,
             "suggested_replies": [
-                "I already have an idea",
+                "I have an idea to test",
+                "I do not have an idea yet",
                 "Help me brainstorm one",
-                "What details do you need?",
             ],
         }
 
@@ -611,7 +625,10 @@ def run_intake_turn(
     history: List[Dict[str, str]] | None = None,
 ) -> SimulationIntakeTurnResponse:
     normalized = _normalize_intake_draft(draft)
-    turn_result = _invoke_intake_turn_agent(normalized, user_message, history)
+    if not str(user_message or "").strip():
+        turn_result = _fallback_intake_turn_agent(normalized, "")
+    else:
+        turn_result = _invoke_intake_turn_agent(normalized, user_message, history)
 
     updates = _sanitize_intake_updates(turn_result.get("updates", {}))
     merged = _merge_updates(normalized, updates)
