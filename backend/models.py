@@ -59,6 +59,16 @@ class SimulationRun(Base):
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
+class SimulationIntakeDocument(Base):
+    __tablename__ = "simulation_intake_documents"
+
+    document_id = Column(String(255), primary_key=True)
+    owner_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    file_name = Column(String(255), nullable=False)
+    extracted_text = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
 class ManagementWorkspace(Base):
     __tablename__ = "management_workspaces"
 

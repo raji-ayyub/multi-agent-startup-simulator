@@ -4,25 +4,27 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, EmailStr, Field
 
 
-UrgencyLevel = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+UrgencyLevel = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL", "UNKNOWN"]
 
 
 class SimulationRunRequest(BaseModel):
-    owner_email: Optional[EmailStr] = None
-    startup_name: str = Field(..., min_length=2, max_length=255)
-    elevator_pitch: Optional[str] = ""
-    problem_statement: str = Field(..., min_length=10, max_length=5000)
-    target_audience: str = Field(..., min_length=2, max_length=500)
-    problem_urgency: UrgencyLevel = "HIGH"
-    primary_target_segment: str = Field("General Market", min_length=2, max_length=500)
-    geography: str = Field("Global", min_length=2, max_length=255)
-    market_size_estimate: Optional[str] = ""
-    customer_behavior_pain_points: str = Field("User pain points under validation.", min_length=5, max_length=5000)
-    competitor_patterns: Optional[str] = ""
-    monthly_burn: Optional[str] = ""
-    estimated_cac: Optional[str] = ""
-    current_cash_in_hand: Optional[str] = ""
-    marketing_strategy: Optional[str] = ""
+    owner_email: Optional[EmailStr] = Field(default=None, json_schema_extra={"user_input": False})
+    run_override: bool = Field(default=False, json_schema_extra={"user_input": False})
+    override_missing_fields: List[str] = Field(default_factory=list, json_schema_extra={"user_input": False})
+    startup_name: str = Field(..., min_length=2, max_length=255, description="The name of the startup being evaluated.")
+    elevator_pitch: Optional[str] = Field(..., description="A short explanation of the product and how it helps customers.")
+    problem_statement: str = Field(..., min_length=10, max_length=5000, description="The customer problem the startup intends to solve.")
+    target_audience: str = Field(..., min_length=2, max_length=500, description="The people or organizations that experience this problem.")
+    problem_urgency: UrgencyLevel = Field(..., description="How urgent the problem is for the target customer, or unknown if it has not been assessed.")
+    primary_target_segment: str = Field(..., min_length=2, max_length=500, description="The specific first customer group to focus on.")
+    geography: str = Field(..., min_length=2, max_length=255, description="The country or region where the startup will operate.")
+    market_size_estimate: Optional[str] = Field(..., description="An estimate of the addressable market, such as TAM or number of potential customers.")
+    customer_behavior_pain_points: str = Field(..., min_length=5, max_length=5000, description="How customers currently handle the problem and what frustrates them.")
+    competitor_patterns: Optional[str] = Field(..., description="Known alternatives, competitors, and how customers choose between them.")
+    monthly_burn: Optional[str] = Field(..., description="Expected monthly operating costs.")
+    estimated_cac: Optional[str] = Field(..., description="Estimated cost to acquire one customer.")
+    current_cash_in_hand: Optional[str] = Field(..., description="Available funds for operating and growth.")
+    marketing_strategy: Optional[str] = Field(..., description="How the startup plans to reach and convert customers.")
 
 
 class SimulationRerunRequest(BaseModel):
@@ -97,12 +99,13 @@ class SimulationIntakeTurnRequest(BaseModel):
     draft: Dict[str, Any] = Field(default_factory=dict)
     user_message: str = ""
     history: List[Dict[str, str]] = Field(default_factory=list)
+    document_ids: List[str] = Field(default_factory=list, max_length=20)
 
 
 class SimulationIntakeFileResponse(BaseModel):
     file_name: str
     extension: str
-    extracted_text: str
+    document_id: str
 
 
 class SimulationIntakeTurnResponse(BaseModel):
@@ -114,3 +117,4 @@ class SimulationIntakeTurnResponse(BaseModel):
     conversation_mode: str = "COLLECTING_CONTEXT"
     detected_intent: str = "UNKNOWN"
     suggested_replies: List[str] = Field(default_factory=list)
+    run_override: bool = False

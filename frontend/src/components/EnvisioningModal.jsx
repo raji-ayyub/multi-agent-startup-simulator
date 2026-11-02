@@ -3,8 +3,11 @@ import {
   Paperclip,
   Bot,
   CheckCircle2,
+  CircleAlert,
+  Copy,
   Cpu,
   Lightbulb,
+  ListChecks,
   Loader2,
   Monitor,
   Rocket,
@@ -14,13 +17,14 @@ import {
   X,
 } from "lucide-react";
 import useSimulationStore from "../store/simulationStore";
+import { getSimulationRequirements } from "../services/simulationService";
 
 const DEFAULT_FORM = {
   startupName: "",
   elevatorPitch: "",
   problemStatement: "",
   targetAudience: "",
-  problemUrgency: "HIGH",
+  problemUrgency: "",
   primaryTargetSegment: "",
   geography: "",
   marketSizeEstimate: "",
@@ -32,7 +36,7 @@ const DEFAULT_FORM = {
   marketingStrategy: "",
 };
 
-const URGENCY_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+const URGENCY_LEVELS = ["LOW", "MEDIUM", "HIGH", "CRITICAL", "UNKNOWN"];
 const SIMULATION_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 const SIMULATION_UPLOAD_ACCEPT =
   ".pdf,.doc,.docx,.txt,.md,.csv,.json,.log,.rtf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain,text/markdown,text/csv,application/json,text/rtf";
@@ -49,7 +53,7 @@ function intakeFieldsToForm(fields = {}) {
     elevatorPitch: fields.elevatorPitch || fields.elevator_pitch || "",
     problemStatement: fields.problemStatement || fields.problem_statement || "",
     targetAudience: fields.targetAudience || fields.target_audience || "",
-    problemUrgency: fields.problemUrgency || fields.problem_urgency || "HIGH",
+    problemUrgency: fields.problemUrgency || fields.problem_urgency || "",
     primaryTargetSegment: fields.primaryTargetSegment || fields.primary_target_segment || "",
     marketSizeEstimate: fields.marketSizeEstimate || fields.market_size_estimate || "",
     customerBehaviorPainPoints: fields.customerBehaviorPainPoints || fields.customer_behavior_pain_points || "",
@@ -67,6 +71,73 @@ function displayText(value) {
   if (Array.isArray(value)) return value.map(displayText).filter(Boolean).join(", ");
   if (typeof value === "object") return Object.values(value).map(displayText).filter(Boolean).join(", ");
   return String(value);
+}
+
+function formatAssistantMessage(value) {
+  const text = displayText(value).trim();
+  let lines = text.split(/\r?\n/);
+  const splitLongParagraph = lines.length === 1 && text.length > 220;
+  if (splitLongParagraph) {
+    lines = text.split(/(?<=[.!?])\s+(?=[A-Z])/);
+  }
+
+  const blocks = [];
+  let paragraph = [];
+  let list = [];
+  const flushParagraph = () => {
+    if (paragraph.length) blocks.push({ type: "paragraph", text: paragraph.join(" ").trim() });
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (list.length) blocks.push({ type: "list", items: list });
+    list = [];
+  };
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.trim();
+    if (!line) {
+      flushParagraph();
+      flushList();
+      return;
+    }
+    const bullet = line.match(/^(?:[-*•]|\d+[.)])\s+(.+)$/);
+    if (bullet) {
+      flushParagraph();
+      list.push(bullet[1]);
+      return;
+    }
+    flushList();
+    const heading = line.match(/^#{1,3}\s+(.+)$|^\*\*(.+)\*\*$/);
+    if (heading) {
+      flushParagraph();
+      blocks.push({ type: "heading", text: heading[1] || heading[2] });
+      return;
+    }
+    paragraph.push(line);
+    if (splitLongParagraph) flushParagraph();
+  });
+  flushParagraph();
+  flushList();
+
+  const renderInline = (line) => line.split(/(\*\*[^*]+\*\*)/g).map((part, index) =>
+    part.startsWith("**") && part.endsWith("**")
+      ? <strong key={index} className="font-semibold text-slate-100">{part.slice(2, -2)}</strong>
+      : part
+  );
+
+  return blocks.map((block, index) => {
+    if (block.type === "heading") {
+      return <p key={index} className="mb-1 font-semibold text-slate-100">{renderInline(block.text)}</p>;
+    }
+    if (block.type === "list") {
+      return (
+        <ul key={index} className="my-2 list-disc space-y-1 pl-5 marker:text-blue-300">
+          {block.items.map((item, itemIndex) => <li key={itemIndex}>{renderInline(item)}</li>)}
+        </ul>
+      );
+    }
+    return <p key={index}>{renderInline(block.text)}</p>;
+  });
 }
 
 function hasCoreIntakeFields(fields = {}) {
@@ -93,7 +164,33 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
 
   const bootDraft = loadDraft();
   const [form, setForm] = useState({ ...DEFAULT_FORM, ...(bootDraft || {}) });
-  const [messages, setMessages] = useState([]);
+  const [documentIds, setDocumentIds] = useState(() =>
+    Array.isArray(bootDraft?.documentIds) ? bootDraft.documentIds : []
+  );
+  const [documentNames, setDocumentNames] = useState(() =>
+    Array.isArray(bootDraft?.documentNames) ? bootDraft.documentNames : []
+  );
+  const [messages, setMessages] = useState(() => {
+    const savedIds = Array.isArray(bootDraft?.documentIds) ? bootDraft.documentIds : [];
+    const savedNames = Array.isArray(bootDraft?.documentNames) ? bootDraft.documentNames : [];
+    const savedAttachments = savedIds.map((documentId, index) => ({
+      id: `saved-upload-${documentId}`,
+      documentId,
+      role: "system",
+      kind: "upload",
+      status: "uploaded",
+      content: `Previously uploaded: ${savedNames[index] || "document"}`,
+    }));
+    const welcomeMessage = savedIds.length
+      ? "Your saved document is attached. Send a message when you want me to review it or continue the intake."
+      : hasCoreIntakeFields(bootDraft || {})
+        ? "Your saved startup details are loaded. Tell me what you would like to update or review."
+        : INTRO_MESSAGE;
+    return [
+      ...savedAttachments,
+      { role: "assistant", content: welcomeMessage, suggestedReplies: savedIds.length ? [] : INTRO_REPLIES },
+    ];
+  });
   const [chatInput, setChatInput] = useState("");
   const [isIntakeLoading, setIsIntakeLoading] = useState(false);
   const [intakeReady, setIntakeReady] = useState(false);
@@ -108,10 +205,13 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
   const [runtimeRecommendations, setRuntimeRecommendations] = useState([]);
   const [runtimeAgents, setRuntimeAgents] = useState([]);
   const [isUploadLoading, setIsUploadLoading] = useState(false);
+  const [requirementsOpen, setRequirementsOpen] = useState(false);
+  const [requirementsLoading, setRequirementsLoading] = useState(false);
+  const [requirements, setRequirements] = useState(null);
+  const [requirementsError, setRequirementsError] = useState("");
+  const [requirementsCopied, setRequirementsCopied] = useState(false);
   const messagesAnchorRef = useRef(null);
   const fileInputRef = useRef(null);
-  const initialFormRef = useRef(form);
-  const didBootstrapRef = useRef(false);
 
   const collectedPreview = useMemo(
     () => [
@@ -135,81 +235,11 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     [form]
   );
 
-  const quickReplyOptions = useMemo(() => {
-    if (simulationStage || isIntakeLoading || messages.length === 0) return [];
-    const last = messages[messages.length - 1];
-    if (!last || last.role !== "assistant") return [];
-    return Array.isArray(last.suggestedReplies) ? last.suggestedReplies.filter(Boolean).slice(0, 4) : [];
-  }, [messages, simulationStage, isIntakeLoading]);
-
-  useEffect(() => {
-    let active = true;
-
-    const bootstrap = async () => {
-      if (didBootstrapRef.current) return;
-      didBootstrapRef.current = true;
-      const initialForm = initialFormRef.current;
-
-      if (!hasCoreIntakeFields(initialForm)) {
-        setMessages([
-          {
-            role: "assistant",
-            content: INTRO_MESSAGE,
-            suggestedReplies: INTRO_REPLIES,
-          },
-        ]);
-        setIntakeReady(false);
-        setCompletion(0);
-        setMissingFields(["startup name", "problem statement", "target audience"]);
-        return;
-      }
-
-      setIsIntakeLoading(true);
-      try {
-        const response = await runIntakeTurn({
-          draft: initialForm,
-          userMessage: "",
-          history: [],
-        });
-        if (!active) return;
-        setForm((prev) => ({ ...prev, ...intakeFieldsToForm(response?.collected_fields || {}) }));
-        setMessages([
-          {
-            role: "assistant",
-            content:
-              response?.assistant_message ||
-              INTRO_MESSAGE,
-            suggestedReplies: Array.isArray(response?.suggested_replies) ? response.suggested_replies : [],
-          },
-        ]);
-        setIntakeReady(Boolean(response?.ready_to_run));
-        setCompletion(Number(response?.completion_percent || 0));
-        setMissingFields(Array.isArray(response?.missing_fields) ? response.missing_fields : []);
-      } catch {
-        if (!active) return;
-        setMessages([
-          {
-            role: "assistant",
-            content: INTRO_MESSAGE,
-            suggestedReplies: INTRO_REPLIES,
-          },
-        ]);
-      } finally {
-        if (active) setIsIntakeLoading(false);
-      }
-    };
-
-    bootstrap();
-    return () => {
-      active = false;
-    };
-  }, [runIntakeTurn]);
-
   useEffect(() => {
     messagesAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
 
-  const launchSimulation = async (launchForm) => {
+  const launchSimulation = async (launchForm, { overrideMissing = false } = {}) => {
     setSimulationStage(true);
     setVisibleLogCount(1);
     setIsSimulationComplete(false);
@@ -220,7 +250,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     setRuntimeAgents([]);
 
     try {
-      const result = await launchSimulationFromBrief(launchForm);
+      const result = await launchSimulationFromBrief(launchForm, { overrideMissing });
       const resultLogs = Array.isArray(result?.logs) ? result.logs : [];
       setRuntimeLogs(resultLogs);
       setRuntimeSynthesis(result?.synthesis || "");
@@ -241,11 +271,15 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
     }
   };
 
-  const submitMessage = async (content) => {
-    if (!content || isIntakeLoading || simulationStage) return;
+  const processIntakeTurn = async (
+    content,
+    attachedDocumentIds = documentIds,
+    { includeUserMessage = true } = {}
+  ) => {
+    if ((includeUserMessage && (!content || isUploadLoading)) || isIntakeLoading || simulationStage) return false;
 
-    const nextMessages = [...messages, { role: "user", content }];
-    setMessages(nextMessages);
+    const nextMessages = includeUserMessage ? [...messages, { role: "user", content }] : messages;
+    if (includeUserMessage) setMessages(nextMessages);
     setIsIntakeLoading(true);
     setBannerMessage("");
 
@@ -253,7 +287,10 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
       const response = await runIntakeTurn({
         draft: form,
         userMessage: content,
-        history: nextMessages.map((item) => ({ role: item.role, content: item.content })),
+        history: nextMessages
+          .filter((item) => item.role === "assistant" || item.role === "user")
+          .map((item) => ({ role: item.role, content: item.content })),
+        documentIds: attachedDocumentIds,
       });
 
       const mergedForm = { ...form, ...intakeFieldsToForm(response?.collected_fields || {}) };
@@ -271,22 +308,24 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
       setCompletion(Number(response?.completion_percent || 0));
       setMissingFields(Array.isArray(response?.missing_fields) ? response.missing_fields : []);
 
-      const assistantText = String(response?.assistant_message || "").toLowerCase();
-      const shouldLaunch =
-        Boolean(response?.ready_to_run) ||
-        assistantText.includes("running simulation now") ||
-        assistantText.includes("run simulation now");
-      if (shouldLaunch && !simulationStage && !isRunning) {
-        await launchSimulation(mergedForm);
+      const shouldLaunch = Boolean(response?.ready_to_run);
+      if (includeUserMessage && shouldLaunch && !simulationStage && !isRunning) {
+        await launchSimulation(mergedForm, { overrideMissing: Boolean(response?.run_override) });
       }
-    } catch {
-      setBannerMessage(simulationError || "Unable to process your message. Try again.");
+      return true;
+    } catch (error) {
+      setBannerMessage(error?.message || simulationError || "Unable to process your message. Try again.");
+      return false;
     } finally {
       setIsIntakeLoading(false);
     }
   };
 
+  const submitMessage = (content, attachedDocumentIds = documentIds) =>
+    processIntakeTurn(content, attachedDocumentIds);
+
   const handleSend = async () => {
+    if (isUploadLoading || isIntakeLoading) return;
     const content = chatInput.trim();
     if (!content) return;
     setChatInput("");
@@ -314,27 +353,112 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
         return;
       }
 
+      const uploadStatusId = `upload-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: uploadStatusId,
+          role: "system",
+          kind: "upload",
+          status: "uploading",
+          content: `Uploading ${file.name}...`,
+        },
+      ]);
+
       const upload = await uploadIntakeFile(file);
-      const trimmed = String(upload?.extracted_text || "").trim();
-      if (!trimmed) {
-        setBannerMessage("Uploaded file is empty.");
+      if (!upload?.document_id) {
+        setBannerMessage("The file was uploaded but could not be saved for intake processing.");
+        setMessages((prev) => prev.map((item) => item.id === uploadStatusId
+          ? { ...item, status: "error", content: "The document could not be saved for intake." }
+          : item));
         return;
       }
 
-      const clipped = trimmed.slice(0, 6000);
-      const uploadMessage = `Uploaded file: ${upload?.file_name || file.name}\n\n${clipped}`;
-      await submitMessage(uploadMessage);
+      const nextDocumentIds = [...new Set([...documentIds, upload.document_id])];
+      const nextDocumentNames = [...documentNames, upload.file_name || file.name];
+      setDocumentIds(nextDocumentIds);
+      setDocumentNames(nextDocumentNames);
+      saveDraft({ ...form, documentIds: nextDocumentIds, documentNames: nextDocumentNames });
+      setMessages((prev) => prev.map((item) => item.id === uploadStatusId
+        ? {
+            ...item,
+            documentId: upload.document_id,
+            status: "uploaded",
+            content: `Document uploaded: ${upload.file_name || file.name}`,
+          }
+        : item));
+      setIsUploadLoading(false);
+      const analyzed = await processIntakeTurn("", nextDocumentIds, { includeUserMessage: false });
+      if (!analyzed) {
+        setMessages((prev) => prev.map((item) => item.id === uploadStatusId
+          ? { ...item, status: "error", content: `Document uploaded, but analysis failed. You can ask the agent to review ${upload.file_name || file.name} again.` }
+          : item));
+      }
     } catch (error) {
       setBannerMessage(error?.message || simulationError || "Unable to read that file. Try a PDF, Word, or text document.");
+      setMessages((prev) => prev.map((item) => item.id?.startsWith("upload-") && item.status === "uploading"
+        ? { ...item, status: "error", content: error?.message || "Document upload failed." }
+        : item));
     } finally {
       setIsUploadLoading(false);
     }
   };
 
+  const handleRemoveDocument = (documentId) => {
+    const documentIndex = documentIds.indexOf(documentId);
+    if (documentIndex < 0) return;
+    const nextDocumentIds = documentIds.filter((id) => id !== documentId);
+    const nextDocumentNames = documentNames.filter((_, index) => index !== documentIndex);
+    setDocumentIds(nextDocumentIds);
+    setDocumentNames(nextDocumentNames);
+    setMessages((prev) => prev.filter((item) => item.documentId !== documentId));
+    saveDraft({ ...form, documentIds: nextDocumentIds, documentNames: nextDocumentNames });
+  };
+
   const handleSaveDraft = () => {
-    saveDraft(form);
+    saveDraft({ ...form, documentIds, documentNames });
     patchIdeaFields(form);
     setBannerMessage("Draft saved.");
+  };
+
+  const handleOpenRequirements = async () => {
+    setRequirementsOpen(true);
+    if (requirements || requirementsLoading) return;
+    setRequirementsLoading(true);
+    setRequirementsError("");
+    try {
+      setRequirements(await getSimulationRequirements());
+    } catch (error) {
+      setRequirementsError(error?.message || "Unable to load simulation requirements.");
+    } finally {
+      setRequirementsLoading(false);
+    }
+  };
+
+  const handleCopyRequirements = async () => {
+    if (!requirements) return;
+    const formatFields = (fields) => fields
+      .map((field) => `- ${field.label}${field.description ? `: ${field.description}` : ""}`)
+      .join("\n");
+    const checklist = [
+      "Startup simulation planning checklist",
+      "",
+      "Important information to provide:",
+      formatFields(requirements.required),
+      ...(requirements.additional_context.length
+        ? ["", "Additional context:", formatFields(requirements.additional_context)]
+        : []),
+      "",
+      "If you want to proceed before providing everything, explicitly ask to run with the information available.",
+    ].join("\n");
+
+    try {
+      await navigator.clipboard.writeText(checklist);
+      setRequirementsCopied(true);
+      window.setTimeout(() => setRequirementsCopied(false), 1800);
+    } catch {
+      setRequirementsError("Could not copy automatically. Check clipboard permissions and try again.");
+    }
   };
 
   const handleLaunch = async () => {
@@ -396,28 +520,20 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
           <div className="app-modal-section min-h-0 border-r p-4 sm:p-6">
             {simulationStage ? (
               <div className="flex h-full min-h-0 flex-col items-center justify-center gap-4 overflow-hidden py-3 text-center">
-                <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-blue-500/70 bg-blue-500/5">
-                  {!isSimulationComplete ? (
-                    <>
-                      <div className="absolute inset-[-3px] animate-spin rounded-full border border-transparent border-t-cyan-300 border-r-blue-400" />
-                      <div className="absolute inset-2 animate-[spin_1.8s_linear_infinite_reverse] rounded-full border border-transparent border-b-blue-300 border-l-cyan-400/80" />
-                      <span className="absolute -top-1.5 h-2.5 w-2.5 animate-pulse rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.7)]" />
-                    </>
-                  ) : (
-                    <span className="absolute -top-1.5 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.7)]" />
-                  )}
-                  <Monitor size={30} className={!isSimulationComplete ? "animate-pulse text-blue-300" : "text-emerald-300"} />
+                <div className={`simulation-orbit relative flex h-40 w-40 shrink-0 items-center justify-center rounded-full ${isSimulationComplete ? "simulation-orbit-complete" : ""}`}>
+                  <div className="simulation-orbit-ring absolute inset-0 rounded-full" />
+                  {!isSimulationComplete ? <span className="simulation-orbit-bob absolute left-1/2 top-1/2" aria-hidden="true" /> : null}
+                  <Monitor size={44} strokeWidth={1.7} className={`simulation-desktop-icon ${isSimulationComplete ? "simulation-desktop-icon-complete" : ""}`} />
                 </div>
 
                 <div
-                  className="app-card-subtle flex min-h-0 w-full max-w-[560px] flex-col rounded-xl border p-5 text-left"
-                  style={{ maxHeight: "min(420px, calc(100% - 6.5rem))" }}
+                  className="app-card-subtle flex min-h-[7.5rem] min-w-0 w-full max-w-[560px] flex-1 flex-col overflow-hidden rounded-xl border p-4 text-left sm:p-5"
                 >
                   <div className="mb-4 flex items-center gap-2 text-blue-300">
                     {isSimulationComplete ? (
                       <CheckCircle2 size={16} />
                     ) : (
-                      <Loader2 size={16} className="animate-spin" />
+                      <Cpu size={16} className="animate-pulse" />
                     )}
                     <span className="text-sm font-medium">
                       {isSimulationComplete ? "Simulation completed." : "Running agent orchestration..."}
@@ -468,7 +584,34 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
             ) : (
               <div className="flex h-full min-h-0 flex-col">
                 <div className="app-chat-surface min-h-0 flex-1 space-y-3 overflow-y-auto rounded-xl border p-4">
-                  {messages.map((item, index) => (
+                  {messages.map((item, index) => item.kind === "upload" ? (
+                    <div
+                      key={item.id || `upload-${index}`}
+                      role="status"
+                      className={`mx-auto flex w-fit max-w-[90%] items-center gap-2 rounded-full border px-3 py-1.5 text-xs ${
+                        item.status === "error" ? "app-status-info" : "app-card-subtle app-copy"
+                      }`}
+                    >
+                      {item.status === "uploading" ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : item.status === "error" ? (
+                        <CircleAlert size={13} />
+                      ) : (
+                        <CheckCircle2 size={13} />
+                      )}
+                      <span>{item.content}</span>
+                      {item.documentId ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDocument(item.documentId)}
+                          className="ml-1 underline underline-offset-2"
+                          aria-label={`Remove ${item.content}`}
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : (
                     <article
                       key={`${item.role}-${index}`}
                       className={`flex gap-2 ${item.role === "user" ? "justify-end" : "justify-start"}`}
@@ -485,7 +628,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                             : "bg-blue-600 text-white"
                         }`}
                       >
-                        {displayText(item.content)}
+                        {item.role === "assistant" ? formatAssistantMessage(item.content) : displayText(item.content)}
                       </div>
                       {item.role === "user" ? (
                         <div className="app-card-subtle app-copy mt-0.5 flex h-[2rem] w-[2rem] items-center justify-center rounded-full border p-1.5">
@@ -495,7 +638,18 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                     </article>
                   ))}
                   {isIntakeLoading ? (
-                    <p className="app-muted text-xs">Assistant is thinking...</p>
+                    <article className="flex items-center gap-2" role="status" aria-label="Agent is typing">
+                      <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border border-blue-500/40 bg-blue-500/10 text-blue-300">
+                        <Bot size={13} />
+                      </div>
+                      <div className="app-card-subtle flex items-center rounded-xl border px-4 py-3">
+                        <span className="intake-typing-dots" aria-hidden="true">
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                      </div>
+                    </article>
                   ) : null}
                   <div ref={messagesAnchorRef} />
                 </div>
@@ -511,6 +665,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                   <textarea
                     rows={2}
                     value={chatInput}
+                    disabled={isUploadLoading}
                     onChange={(event) => setChatInput(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" && !event.shiftKey) {
@@ -540,21 +695,6 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
                   </button>
                 </div>
 
-                {quickReplyOptions.length > 0 ? (
-                  <div className="mt-3 shrink-0 flex flex-wrap gap-2">
-                    {quickReplyOptions.map((reply) => (
-                      <button
-                        key={reply}
-                        type="button"
-                        onClick={() => submitMessage(reply)}
-                        disabled={isIntakeLoading || simulationStage}
-                        className="app-ghost-btn rounded-full border px-3 py-1.5 text-xs font-semibold transition"
-                      >
-                        {reply}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
               </div>
             )}
           </div>
@@ -649,7 +789,7 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
           </aside>
         </div>
 
-        <footer className="app-modal-section flex items-center justify-between gap-3 border-t px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6">
+        <footer className="app-modal-section flex flex-wrap items-center justify-between gap-3 border-t px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6">
           {simulationStage ? (
             <>
               <button
@@ -677,7 +817,15 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
               >
                 Back to Dashboard
               </button>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenRequirements}
+                  className="app-ghost-btn inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-medium transition"
+                >
+                  <ListChecks size={13} />
+                  Requirements
+                </button>
                 <button
                   type="button"
                   onClick={handleSaveDraft}
@@ -700,6 +848,66 @@ export default function EnvisioningModal({ onClose, onSimulationLaunched }) {
           )}
         </footer>
       </section>
+      {requirementsOpen ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/65 p-4" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setRequirementsOpen(false);
+        }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="simulation-requirements-title" className="theme-modal w-full max-w-xl overflow-hidden rounded-2xl border shadow-2xl">
+            <header className="app-modal-section flex items-center justify-between border-b px-5 py-4">
+              <div>
+                <h3 id="simulation-requirements-title" className="app-heading text-base font-semibold">Simulation requirements</h3>
+                <p className="app-muted mt-1 text-xs">The agent will work through every field. You can explicitly ask it to run with any details still missing.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyRequirements}
+                  disabled={!requirements || requirementsLoading}
+                  className="app-ghost-btn inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {requirementsCopied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
+                  {requirementsCopied ? "Copied" : "Copy list"}
+                </button>
+                <button type="button" onClick={() => setRequirementsOpen(false)} aria-label="Close requirements" className="app-ghost-btn rounded-full border p-2">
+                  <X size={14} />
+                </button>
+              </div>
+            </header>
+            <div className="app-modal-section max-h-[65vh] space-y-5 overflow-y-auto p-5">
+              {requirementsLoading ? <p className="app-copy text-sm">Loading requirements...</p> : null}
+              {requirementsError ? <p className="app-status-info rounded-lg border p-3 text-sm">{requirementsError}</p> : null}
+              {requirements ? (
+                <>
+                  <div>
+                    <h4 className="app-heading mb-2 text-sm font-semibold">Important for a complete simulation</h4>
+                    <ul className="space-y-3">
+                      {requirements.required.map((field) => (
+                        <li key={field.key} className="app-card-subtle rounded-lg border p-3">
+                          <p className="app-heading text-sm font-medium">{field.label}</p>
+                          {field.description ? <p className="app-copy mt-1 text-xs">{field.description}</p> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {requirements.additional_context.length ? (
+                    <div>
+                      <h4 className="app-heading mb-2 text-sm font-semibold">Additional context</h4>
+                      <ul className="grid gap-2 sm:grid-cols-2">
+                        {requirements.additional_context.map((field) => (
+                          <li key={field.key} className="app-card-subtle rounded-lg border px-3 py-2">
+                            <p className="app-copy text-xs">{field.label}</p>
+                            {field.description ? <p className="app-muted mt-1 text-[11px]">{field.description}</p> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

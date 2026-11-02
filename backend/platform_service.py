@@ -61,7 +61,6 @@ _SUPPORTED_REPORT_SCOPES = {"targeted", "full"}
 _DOCUMENT_SECTION_KEYS = [
     "executive_summary",
     "business_idea",
-    "methodology",
     "market_feasibility",
     "technical_feasibility",
     "financial_viability",
@@ -74,7 +73,6 @@ _DOCUMENT_SECTION_KEYS = [
 _DOCUMENT_SECTION_DEFAULT_TITLES: Dict[str, str] = {
     "executive_summary": "Executive Summary",
     "business_idea": "Business Idea Overview",
-    "methodology": "Simulation Methodology",
     "market_feasibility": "Market Feasibility",
     "technical_feasibility": "Technical Feasibility",
     "financial_viability": "Financial Viability",
@@ -96,7 +94,6 @@ _TARGETED_REPORT_SECTION_POLICY: Dict[str, List[str]] = {
     "feasibility_report": [
         "executive_summary",
         "business_idea",
-        "methodology",
         "technical_feasibility",
         "operational_feasibility",
         "risk_assessment",
@@ -285,7 +282,7 @@ def _report_title_profile(report_type: str | None) -> Dict[str, str]:
         },
         "business_report": {
             "report_title": "Business Report",
-            "subtitle": "Integrated founder brief across viability, feasibility, market, and capital",
+            "subtitle": "Business performance, market position, and growth priorities",
         },
     }
     return {"report_type": normalized, **profiles[normalized]}
@@ -972,46 +969,56 @@ def _simulation_context(simulation: SimulationRun) -> str:
     for agent in agents[:3]:
         if not isinstance(agent, dict):
             continue
-        perspective = agent.get("perspective") or "Agent"
         summary = agent.get("summary") or ""
-        risks = ", ".join(str(item) for item in (agent.get("risks") or [])[:2])
-        ops = ", ".join(str(item) for item in (agent.get("opportunities") or [])[:2])
-        agent_lines.append(f"- {perspective}: {summary} Risks: {risks or 'None'}. Opportunities: {ops or 'None'}.")
+        details = [str(value).strip() for value in (summary, *(agent.get("risks") or [])[:2], *(agent.get("opportunities") or [])[:2]) if str(value or "").strip()]
+        if details:
+            agent_lines.append("- " + " ".join(details))
     payload = simulation.input_payload if isinstance(simulation.input_payload, dict) else {}
-    return "\n".join(
-        [
-            f"Startup: {simulation.startup_name}",
-            f"Overall score: {simulation.overall_score}",
-            f"Metrics: {json.dumps(simulation.metrics or {})}",
-            f"Synthesis: {simulation.synthesis or ''}",
-            f"Problem statement: {payload.get('problem_statement') or ''}",
-            f"Target audience: {payload.get('target_audience') or ''}",
-            f"Go-to-market: {payload.get('marketing_strategy') or ''}",
-            "Agent signals:",
-            "\n".join(agent_lines) or "- None",
-        ]
-    )
+    lines = [f"Business: {simulation.startup_name}"]
+    if str(simulation.synthesis or "").strip():
+        lines.append(f"Overall assessment: {simulation.synthesis.strip()}")
+    input_labels = {
+        "elevator_pitch": "Product",
+        "problem_statement": "Customer problem",
+        "target_audience": "Target customers",
+        "problem_urgency": "Problem urgency",
+        "primary_target_segment": "Priority customer segment",
+        "geography": "Operating geography",
+        "market_size_estimate": "Market size estimate",
+        "customer_behavior_pain_points": "Customer behavior and pain points",
+        "competitor_patterns": "Alternatives and competition",
+        "monthly_burn": "Monthly operating costs",
+        "estimated_cac": "Estimated customer acquisition cost",
+        "current_cash_in_hand": "Available cash",
+        "marketing_strategy": "Customer acquisition approach",
+    }
+    unavailable_values = {"unknown", "n/a", "na", "not available", "not provided", "none", "null"}
+    for key, label in input_labels.items():
+        value = payload.get(key)
+        normalized_value = str(value or "").strip()
+        if normalized_value and normalized_value.lower() not in unavailable_values and not normalized_value.lower().startswith("not provided;"):
+            lines.append(f"{label}: {normalized_value}")
+    if agent_lines:
+        lines.extend(["Business review findings:", *agent_lines])
+    return "\n".join(lines)
 
 
 def _workspace_context(workspace: ManagementWorkspace | None) -> str:
     if workspace is None:
-        return "No management workspace selected."
+        return ""
     members = []
     for member in workspace.team_members or []:
         quals = ", ".join(str(item) for item in (member.qualifications or [])[:5])
-        members.append(f"- {member.name or 'Unnamed'} ({member.role or 'Role pending'}): {quals or 'No skills listed'}")
-    return "\n".join(
-        [
-            f"Workspace: {workspace.workspace_name}",
-            f"Company: {workspace.company_name}",
-            f"Stage: {workspace.stage or 'N/A'}",
-            f"Revenue: {workspace.annual_revenue or 'N/A'}",
-            f"Employee count: {workspace.employee_count or 0}",
-            f"Management context: {workspace.description or ''}",
-            "Team:",
-            "\n".join(members) or "- None",
-        ]
-    )
+        details = [str(value).strip() for value in (member.name, member.role, quals) if str(value or "").strip()]
+        if details:
+            members.append("- " + " | ".join(details))
+    lines = [f"Company: {workspace.company_name or workspace.workspace_name}"]
+    for label, value in (("Stage", workspace.stage), ("Revenue", workspace.annual_revenue), ("Team size", workspace.employee_count), ("Operating context", workspace.description)):
+        if value is not None and str(value).strip():
+            lines.append(f"{label}: {str(value).strip()}")
+    if members:
+        lines.extend(["Team:", *members])
+    return "\n".join(lines)
 
 
 def _report_section_blueprint(report_type: str) -> List[str]:
@@ -1310,7 +1317,6 @@ def _planner_agent_plan(
         "feasibility_report": [
             "executive_summary",
             "business_idea",
-            "methodology",
             "technical_feasibility",
             "operational_feasibility",
             "risk_assessment",
@@ -1334,7 +1340,6 @@ def _planner_agent_plan(
         "business_report": [
             "executive_summary",
             "business_idea",
-            "methodology",
             "market_feasibility",
             "technical_feasibility",
             "financial_viability",
@@ -1415,15 +1420,14 @@ def _layout_agent_plan(
             "background": "#ffffff",
             "margins": page_margins,
             "header": f"{display_type}",
-            "footer": "Generated by PetraAI",
+            "footer": "",
         },
         "cover": {
-            "kicker": "Professional Startup Simulation Report",
+            "kicker": "Business Report",
             "title": report_name,
             "subtitle": _report_title_profile(report_type).get("subtitle") or display_type,
             "startup_name": str(getattr(simulation, "startup_name", "") or "").strip(),
             "generated_on": datetime.now(timezone.utc).strftime("%B %d, %Y"),
-            "prepared_by": "PetraAI",
         },
     }
 
@@ -1806,7 +1810,7 @@ def generate_business_report(
         if outline and len(outline) >= 2:
             lines = [f"  {i+1}. {item['heading']}" + (f" — {item['description']}" if item.get('description') else "")
                      for i, item in enumerate(outline)]
-            outline_context = "Approved outline (use these headings verbatim):\n" + "\n".join(lines) + "\n\n"
+            outline_context = "Suggested outline (keep only headings that support a useful business insight):\n" + "\n".join(lines) + "\n\n"
 
         response = client.chat.completions.create(
             model=os.getenv("SIMULATION_MODEL", "gpt-4o-mini"),
@@ -1816,26 +1820,36 @@ def generate_business_report(
                 {
                     "role": "system",
                     "content": (
-                        "You are an expert startup operating partner. Return strict JSON with keys: "
-                        "summary (string), sections (array of exactly 4 objects with heading and body), "
-                        "key_findings (array up to 8), recommended_actions (array up to 6), "
+                        "You are an expert business analyst writing a decision-useful report about the startup itself. "
+                        "Describe the business, its customers, market, economics, operating position, and material risks "
+                        "using only facts and judgments supported by the supplied simulation and workspace context. "
+                        "Never describe PetraAI, agents, the simulation process, report generation, data sources, "
+                        "methodology, assumptions, or missing information. Do not invent values, benchmarks, traction, "
+                        "financial projections, timelines, or capabilities. Omit a point or section when the evidence "
+                        "does not support a useful business insight; do not fill space with caveats or generic advice. "
+                        "Return strict JSON with keys: "
+                        "summary (string), sections (array of 1 to 6 relevant objects with heading and body), "
+                        "key_findings (array up to 8, possibly empty), recommended_actions (array up to 6, possibly empty), "
                         "layout_guidance (object, optional). "
                         "layout_guidance may include: page_setup {size(A4|LETTER), margins{top,right,bottom,left}, "
                         "font_family, font_scale, background, header, footer}, "
-                        "section_titles(array of 4 strings), section_order(array of 4 indices), "
+                        "section_titles(array), section_order(array), "
                         "theme_tokens{primary_color,secondary_color,accent_color,text_color,page_border}, "
-                        "cover{kicker,title,subtitle,startup_name,generated_on,report_id,prepared_by}."
+                        "cover{kicker,title,subtitle,startup_name,generated_on}."
                     ),
                 },
                 {
                     "role": "user",
                     "content": (
                         f"Report type: {normalized_report_type}\n"
-                        f"Required section headings: {json.dumps(section_titles)}\n\n"
+                        f"Suggested section themes: {json.dumps(section_titles)}\n\n"
                         f"{outline_context}"
                         f"Report title: {report_name}\n\n"
                         f"Simulation context:\n{_simulation_context(simulation)}\n\n"
-                        f"Management context:\n{_workspace_context(workspace)}"
+                        f"Management context:\n{_workspace_context(workspace)}\n\n"
+                        "Write the report as if it were a concise business analysis for the founding team. "
+                        "Make every paragraph specific to this company. State only useful commercial or "
+                        "operating implications that follow from the supplied evidence."
                     ),
                 },
             ],
@@ -1845,29 +1859,27 @@ def generate_business_report(
         if not isinstance(parsed, dict):
             raise RuntimeError("Report generation returned invalid JSON.")
         sections = parsed.get("sections")
-        if not isinstance(sections, list) or len(sections) < 4:
-            raise RuntimeError("Report generation returned too few sections.")
+        if not isinstance(sections, list):
+            raise RuntimeError("Report generation returned an invalid sections list.")
         normalized_sections = []
-        for item in sections[:4]:
+        for item in sections[:6]:
             if not isinstance(item, dict):
                 continue
             heading = str(item.get("heading") or "").strip()
             body = str(item.get("body") or "").strip()
             if heading and body:
                 normalized_sections.append({"heading": heading[:120], "body": body[:4000]})
-        if len(normalized_sections) < 4:
-            raise RuntimeError("Report generation returned incomplete sections.")
+        if not normalized_sections:
+            raise RuntimeError("Report generation returned no useful business sections.")
         summary = str(parsed.get("summary") or "").strip()
         if not summary:
             raise RuntimeError("Report generation did not return a summary.")
-        key_findings = [str(item).strip() for item in parsed.get("key_findings", []) if str(item).strip()][:8]
+        raw_findings = parsed.get("key_findings")
+        key_findings = [str(item).strip() for item in raw_findings if str(item).strip()][:8] if isinstance(raw_findings, list) else []
+        raw_actions = parsed.get("recommended_actions")
         recommended_actions = [
-            str(item).strip() for item in parsed.get("recommended_actions", []) if str(item).strip()
-        ][:6]
-        if not key_findings:
-            raise RuntimeError("Report generation did not return key findings.")
-        if not recommended_actions:
-            raise RuntimeError("Report generation did not return recommended actions.")
+            str(item).strip() for item in raw_actions if str(item).strip()
+        ][:6] if isinstance(raw_actions, list) else []
         layout_guidance = _sanitize_layout_guidance(parsed.get("layout_guidance"))
         return {
             "report_name": report_name,
@@ -2312,38 +2324,6 @@ def _appendix_tables(simulation: SimulationRun, report: Dict[str, Any], workspac
     payload = simulation.input_payload if isinstance(simulation.input_payload, dict) else {}
     tables: List[Dict[str, Any]] = []
 
-    assumption_rows = [[item["assumption"], item["value"], item["source"]] for item in _assumption_items_from_payload(payload)]
-    if assumption_rows:
-        tables.append(
-            {
-                "title": "Simulation Assumption Register",
-                "columns": ["Assumption", "Value", "Source"],
-                "rows": assumption_rows,
-                "note": "Captured from the intake and simulation pipeline inputs available today.",
-            }
-        )
-
-    agent_rows = []
-    for agent in simulation.agents if isinstance(simulation.agents, list) else []:
-        if not isinstance(agent, dict):
-            continue
-        agent_rows.append(
-            [
-                str(agent.get("perspective") or "Agent"),
-                str(agent.get("confidence") or ""),
-                str(agent.get("summary") or ""),
-            ]
-        )
-    if agent_rows:
-        tables.append(
-            {
-                "title": "Agent Confidence Summary",
-                "columns": ["Agent", "Confidence", "Summary"],
-                "rows": agent_rows,
-                "note": "Generated by the current multi-agent board workflow.",
-            }
-        )
-
     if workspace is not None:
         team_rows = []
         for member in workspace.team_members or []:
@@ -2406,19 +2386,12 @@ def _build_professional_report_input(
         ]
         if value and str(value).strip()
     ]
-    assumptions = _assumption_items_from_payload(payload)
     simulation_metric_cards = _simulation_metric_cards(simulation)
     workspace_resources = _workspace_resource_rows(workspace)
     simulation_risks = _risk_items_from_simulation(simulation)
-    chart_bundle = _build_report_chart_bundle(
-        simulation=simulation,
-        payload=payload,
-        simulation_risks=simulation_risks,
-        workspace_resources=workspace_resources,
-        recommended_actions=recommended_actions,
-    )
+    chart_bundle = {key: [] for key in ("market", "technical", "financial", "operational", "risk", "appendix")}
     appendix_tables = _appendix_tables(simulation, report, workspace) if generator_profile == "comprehensive" else []
-    glossary_items = _glossary_items(simulation) if generator_profile == "comprehensive" else []
+    glossary_items: List[Dict[str, str]] = []
 
     financial_inputs_rows = []
     for label, value in [
@@ -2429,10 +2402,6 @@ def _build_professional_report_input(
         if value and str(value).strip():
             financial_inputs_rows.append([label, str(value)])
 
-    methodology_notes = ["Current simulation combines multi-agent market, customer, and investor reviews."]
-    if not payload.get("market_size_estimate"):
-        methodology_notes.append("No numeric market size model was provided in the current input payload.")
-
     return {
         "startup_name": simulation.startup_name,
         "report_title": profile["report_title"],
@@ -2442,7 +2411,6 @@ def _build_professional_report_input(
         "executive_summary": {
             "idea_overview": report.get("summary") or simulation.synthesis or payload.get("elevator_pitch") or "",
             "viability_score": simulation.overall_score,
-            "success_probability": (simulation.overall_score or 0) / 100 if simulation.overall_score is not None else None,
             "biggest_risks": [item["name"] for item in simulation_risks[:3]],
             "call_to_action": recommended_actions[0] if recommended_actions else "",
             "highlights": simulation_metric_cards,
@@ -2450,21 +2418,10 @@ def _build_professional_report_input(
         "business_idea": {
             "problem_statement": payload.get("problem_statement") or "",
             "solution_summary": payload.get("elevator_pitch") or "",
-            "idea_overview": report.get("summary") or "",
             "value_proposition": simulation.synthesis or "",
             "target_customer_segments": target_segments,
-            "key_assumptions": assumptions,
-        },
-        "methodology": {
-            "summary": "This report uses the current agentic simulation pipeline outputs and any linked workspace context to produce an execution-oriented feasibility narrative.",
-            "simulation_types": [agent.get("perspective") for agent in simulation.agents or [] if isinstance(agent, dict) and agent.get("perspective")],
-            "parameters_varied": [item["assumption"] for item in assumptions],
-            "data_sources": [
-                "Simulation input payload",
-                "Agent summaries, risks, and opportunities",
-                "Management workspace context" if workspace is not None else "No workspace context attached",
-            ],
-            "transparency_notes": methodology_notes,
+            # Intake values and model assumptions belong to internal analysis, not the business narrative.
+            "key_assumptions": [],
         },
         "market_feasibility": {
             "summary": _find_section_body(report, ["market", "demand"]) or str(market_agent.get("summary") or ""),
@@ -2491,7 +2448,6 @@ def _build_professional_report_input(
         },
         "financial_viability": {
             "summary": _find_section_body(report, ["capital", "financial", "risk"]) or str(investor_agent.get("summary") or ""),
-            "break_even_analysis": "Break-even timing was not explicitly modeled in the current simulation payload.",
             "unit_economics": [
                 {"label": "Estimated CAC", "value": payload.get("estimated_cac")}
                 for _ in [0]
@@ -2512,7 +2468,7 @@ def _build_professional_report_input(
                     "title": "Current Financial Inputs",
                     "columns": ["Metric", "Value"],
                     "rows": financial_inputs_rows,
-                    "note": "These figures were available in the source simulation payload.",
+                    "note": "",
                 }
             ]
             if financial_inputs_rows
@@ -2520,15 +2476,15 @@ def _build_professional_report_input(
             "charts": chart_bundle["financial"],
         },
         "operational_feasibility": {
-            "summary": _find_section_body(report, ["operations", "team"]) or _workspace_context(workspace),
+            "summary": _find_section_body(report, ["operations", "team"])
+            or (str(workspace.description or "").strip() if workspace else ""),
             "team_requirements": workspace_resources,
             "operations_plan_results": recommended_actions[:4],
-            "scalability_assessment": simulation.synthesis or "",
             "charts": chart_bundle["operational"],
         },
         "risk_assessment": {
-            "summary": str(investor_agent.get("summary") or simulation.synthesis or ""),
-            "top_risks": simulation_risks,
+            "summary": "",
+            "top_risks": [item["name"] for item in simulation_risks],
             "mitigation_strategies": recommended_actions[:6],
             "charts": chart_bundle["risk"],
         },
@@ -2543,10 +2499,6 @@ def _build_professional_report_input(
             "prioritized_next_steps": [
                 {
                     "action": action,
-                    "priority": "High" if index < 2 else "Medium",
-                    "owner": "",
-                    "timeline": "Next 30-90 days",
-                    "rationale": "",
                 }
                 for index, action in enumerate(recommended_actions[:6])
             ],
@@ -2558,7 +2510,6 @@ def _build_professional_report_input(
             "glossary": glossary_items,
         },
         "key_metrics": simulation_metric_cards,
-        "assumptions": assumptions,
         "simulation_results": {
             "overall_score": simulation.overall_score,
             "metrics": simulation.metrics or {},
@@ -2691,10 +2642,56 @@ def _build_document_from_professional_input(
     }
     sections: List[Dict[str, Any]] = []
 
+    narrative_sections = [
+        item for item in (report.get("sections") if isinstance(report.get("sections"), list) else [])
+        if isinstance(item, dict) and str(item.get("heading") or "").strip() and str(item.get("body") or "").strip()
+    ]
+    if narrative_sections:
+        summary = str(report.get("summary") or "").strip()
+        if summary:
+            sections.append(
+                {
+                    "section_id": str(uuid4()),
+                    "title": "Executive Summary",
+                    "order": len(sections),
+                    "blocks": [_doc_block_from_text(summary, 0)],
+                }
+            )
+        for item in narrative_sections:
+            sections.append(
+                {
+                    "section_id": str(uuid4()),
+                    "title": str(item["heading"]).strip()[:120],
+                    "order": len(sections),
+                    "blocks": [_doc_block_from_text(str(item["body"]).strip(), 0)],
+                }
+            )
+        for key, title in (("key_findings", "Key Findings"), ("recommended_actions", "Recommended Actions")):
+            raw_items = report.get(key)
+            items = [str(value).strip() for value in raw_items if str(value).strip()] if isinstance(raw_items, list) else []
+            if items:
+                sections.append(
+                    {
+                        "section_id": str(uuid4()),
+                        "title": title,
+                        "order": len(sections),
+                        "blocks": [_new_block("card", 0, {"title": title, "items": items, "border": "soft"})],
+                    }
+                )
+        return {
+            "meta": {
+                "report_name": str(report.get("report_name") or "Business Insight Report"),
+                "report_type": _normalize_report_type(report_type),
+                "template_id": template["template_id"],
+                "page_setup": page_setup,
+                "theme_tokens": dict(template.get("theme_tokens") or {}),
+            },
+            "sections": sections,
+        }
+
     section_map = [
         ("executive_summary", "Executive Summary"),
         ("business_idea", "Business Idea Overview"),
-        ("methodology", "Simulation Methodology"),
         ("market_feasibility", "Market Feasibility"),
         ("technical_feasibility", "Technical Feasibility"),
         ("financial_viability", "Financial Viability"),
@@ -2889,12 +2886,11 @@ def _ensure_document_cover_meta(
 
     generated_on = datetime.now(timezone.utc).strftime("%B %d, %Y")
     startup_name = str(getattr(simulation, "startup_name", "") or "").strip()
-    cover.setdefault("kicker", "Professional Startup Simulation Report")
+    cover.setdefault("kicker", "Business Report")
     cover.setdefault("title", str(meta.get("report_name") or report.get("report_name") or "Business Insight Report"))
     cover.setdefault("subtitle", str(profile.get("subtitle") or "Strategic startup report"))
     cover.setdefault("startup_name", startup_name)
     cover.setdefault("generated_on", generated_on)
-    cover.setdefault("prepared_by", "PetraAI")
     cover.setdefault("report_id", str(meta.get("report_id") or report.get("report_id") or ""))
 
     return document_json
@@ -3764,15 +3760,12 @@ def build_report_html_from_document(
     report_type_display = html_lib.escape(report_type_display_raw)
     generated_date = datetime.now(timezone.utc).strftime("%B %d, %Y")
     footer_label_raw = str(simulation.startup_name or "Startup")
-    footer_label = html_lib.escape(footer_label_raw)
     cover_meta = meta.get("cover") if isinstance(meta.get("cover"), dict) else {}
-    cover_kicker = html_lib.escape(str(cover_meta.get("kicker") or "Professional Startup Simulation Report"))
+    cover_kicker = html_lib.escape(str(cover_meta.get("kicker") or "Business Report"))
     cover_title = html_lib.escape(str(cover_meta.get("title") or meta.get("report_name") or "Business Insight Report"))
     cover_subtitle = html_lib.escape(str(cover_meta.get("subtitle") or report_type_display_raw))
     cover_startup_name = html_lib.escape(str(cover_meta.get("startup_name") or footer_label_raw))
     cover_generated_on = html_lib.escape(str(cover_meta.get("generated_on") or generated_date))
-    cover_report_id = html_lib.escape(str(cover_meta.get("report_id") or ""))
-    cover_prepared_by = html_lib.escape(str(cover_meta.get("prepared_by") or "PetraAI"))
     escaped_header_text = header_text.replace("\\", "\\\\").replace('"', '\\"')
     escaped_footer_text = footer_text.replace("\\", "\\\\").replace('"', '\\"')
     header_page_rule = (
@@ -3903,21 +3896,12 @@ def build_report_html_from_document(
             <p class="doc-meta-label">Generated</p>
             <p class="doc-meta-value">{cover_generated_on}</p>
           </article>
-          <article class="doc-meta-item">
-            <p class="doc-meta-label">Report ID</p>
-            <p class="doc-meta-value">{cover_report_id}</p>
-          </article>
-          <article class="doc-meta-item">
-            <p class="doc-meta-label">Prepared By</p>
-            <p class="doc-meta-value">{cover_prepared_by}</p>
-          </article>
         </div>
       </header>
       <main class="doc-content">
         {''.join(section_markup)}
       </main>
     </article>
-    <p class="doc-footer">Generated by PetraAI for {footer_label}</p>
   </div>
 </body>
 </html>
