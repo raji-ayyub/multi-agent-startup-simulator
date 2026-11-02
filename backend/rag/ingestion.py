@@ -345,7 +345,13 @@ def upload_to_storage(local_file_path: str, source_type: str) -> str:
 
 # Main Ingestion Function
 
-def ingest_document(local_file_path: str, title: str, source_type: str = "pdf") -> str:
+def ingest_document(
+    local_file_path: str,
+    title: str,
+    source_type: str = "pdf",
+    return_document_id: bool = False,
+    text_override: str | None = None,
+) -> str | dict:
     """
     Full ingestion pipeline with robust database connection handling.
     """
@@ -381,7 +387,10 @@ def ingest_document(local_file_path: str, title: str, source_type: str = "pdf") 
         logger.info(f"Document metadata inserted with ID: {document_id}")
 
        
-        text = extract_text(local_file_path)
+        text = text_override if text_override is not None else extract_text(local_file_path)
+        text = " ".join(str(text or "").split())
+        if not text:
+            raise ValueError("Uploaded file does not contain readable text.")
         logger.info(f"Text extracted, length: {len(text)} characters")
 
        
@@ -411,6 +420,8 @@ def ingest_document(local_file_path: str, title: str, source_type: str = "pdf") 
         logger.info(f"Inserted {len(chunk_records)} chunks into database")
 
         elapsed = time.time() - start_time
+        if return_document_id:
+            return {"document_id": str(document_id), "chunk_count": len(chunks)}
         return (f"Document '{title}' ingested successfully. "
                 f"ID: {document_id}, Chunks: {len(chunks)}, Time: {elapsed:.2f}s")
 

@@ -75,6 +75,10 @@ def _run_lightweight_migrations() -> None:
         if _has_column(inspector, "business_insight_reports", "template_id") is False:
             conn.execute(text("ALTER TABLE business_insight_reports ADD COLUMN template_id VARCHAR(64) DEFAULT 'obsidian_board'"))
 
+        # Simulation intake full-text document processing
+        if _has_column(inspector, "simulation_intake_documents", "extracted_text") is False:
+            conn.execute(text("ALTER TABLE simulation_intake_documents ADD COLUMN extracted_text TEXT NOT NULL DEFAULT ''"))
+
         # indexes (ignore failures if already present)
         for statement in [
             "CREATE INDEX IF NOT EXISTS ix_user_access_profiles_is_pro ON user_access_profiles (is_pro)",

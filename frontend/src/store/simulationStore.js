@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import {
   deleteSimulation,
-  extractSimulationFile,
+  uploadSimulationFile,
   getSimulation,
   intakeSimulationTurn,
   listSimulations,
@@ -20,7 +20,7 @@ const INITIAL_IDEA = {
   elevatorPitch: "",
   problemStatement: "",
   targetAudience: "",
-  problemUrgency: "HIGH",
+  problemUrgency: "",
   primaryTargetSegment: "",
   geography: "",
   marketSizeEstimate: "",
@@ -246,7 +246,7 @@ const useSimulationStore = create((set, get) => ({
     return get().launchSimulationFromBrief(startupIdea);
   },
 
-  launchSimulationFromBrief: async (brief) => {
+  launchSimulationFromBrief: async (brief, options = {}) => {
     set({
       isRunning: true,
       simulationError: null,
@@ -276,7 +276,7 @@ const useSimulationStore = create((set, get) => ({
           status: "running",
         },
       });
-      const response = await runSimulation(get().startupIdea);
+      const response = await runSimulation(get().startupIdea, options);
       set({
         runningActivity: {
           phase: "loading_result",
@@ -330,9 +330,9 @@ const useSimulationStore = create((set, get) => ({
     }
   },
 
-  runIntakeTurn: async ({ draft, userMessage, history }) => {
+  runIntakeTurn: async ({ draft, userMessage, history, documentIds }) => {
     try {
-      const response = await intakeSimulationTurn({ draft, userMessage, history });
+      const response = await intakeSimulationTurn({ draft, userMessage, history, documentIds });
       if (response?.collected_fields) {
         set((state) => ({
           startupIdea: {
@@ -352,7 +352,7 @@ const useSimulationStore = create((set, get) => ({
 
   uploadIntakeFile: async (file) => {
     try {
-      const response = await extractSimulationFile(file);
+      const response = await uploadSimulationFile(file);
       set({ simulationError: null });
       return response;
     } catch (error) {

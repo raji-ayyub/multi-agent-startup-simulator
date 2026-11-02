@@ -111,11 +111,10 @@ def retrieve_docs(
         try:
             with conn.cursor() as cur:
                 # Build WHERE clause if filters provided
-                where_clause = ""
                 params = [embedding_str]
+                conditions = ["d.source_type IS DISTINCT FROM 'simulation-intake'"]
 
                 if filters:
-                    conditions = []
                     # param_idx = 3
                     for key, val in filters.items():
                         if key == "document_type":
@@ -127,8 +126,7 @@ def retrieve_docs(
                         elif key == "source":
                             conditions.append(f"dc.source ILIKE %s")
                             params.append(f"%{val}%")
-                    if conditions:
-                        where_clause = "WHERE " + " AND ".join(conditions)
+                where_clause = "WHERE " + " AND ".join(conditions)
 
                 query_sql = f"""
                     SELECT
@@ -138,6 +136,7 @@ def retrieve_docs(
                         dc.source::text,
                         dc.metadata
                     FROM public.document_chunks dc
+                    JOIN public.documents d ON d.id = dc.document_id
                     {where_clause}
                     ORDER BY dc.embedding <=> %s::vector
                     LIMIT %s

@@ -1,11 +1,15 @@
+import asyncio
+import os
 import re
+from pathlib import Path
+import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from auth import get_current_user, get_or_create_access_profile
 from database import get_db
-from models import SimulationRun, User
+from models import SimulationIntakeDocument, SimulationRun, User
 from modules.management.cv_parser import extract_cv_text
 from platform_service import create_notification
 from .schemas import (
@@ -22,6 +26,26 @@ from .service import run_intake_turn, run_simulation
 
 simulation_router = APIRouter(prefix="/api/v1/simulations", tags=["simulations"])
 MAX_SIMULATION_VERSION = 3
+MAX_SIMULATION_INTAKE_TEXT_CHARS = int(os.getenv("SIMULATION_INTAKE_MAX_DOCUMENT_CHARS", "250000"))
+
+
+@simulation_router.get("/intake/requirements")
+def simulation_intake_requirements():
+    schema = SimulationRunRequest.model_json_schema()
+    fields = schema.get("properties", {})
+    user_fields = [
+        {
+            "key": key,
+            "label": value.get("title") or key.replace("_", " ").title(),
+            "description": value.get("description", ""),
+        }
+        for key, value in fields.items()
+        if value.get("user_input", True)
+    ]
+    return {
+        "required": user_fields,
+        "additional_context": [],
+    }
 
 
 def _persist_simulation_run(db: Session, payload: SimulationRunRequest, result: SimulationRunResponse) -> SimulationRun:
@@ -87,7 +111,11 @@ def _next_versioned_startup_name(
 
 
 @simulation_router.post("/intake/file", response_model=SimulationIntakeFileResponse)
-async def simulation_intake_file_upload(file: UploadFile = File(...)):
+async def simulation_intake_file_upload(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     file_name = file.filename or "simulation-upload"
     content = await file.read()
     if not content:
@@ -95,34 +123,91 @@ async def simulation_intake_file_upload(file: UploadFile = File(...)):
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Uploaded file exceeds 10MB limit.")
 
+    extension = Path(file_name).suffix.lower().lstrip(".")
     try:
-        text, extension = extract_cv_text(file_name, content)
-        normalized = re.sub(r"\r\n?", "\n", str(text or ""))
-        normalized = re.sub(r"[ \t]+", " ", normalized)
-        normalized = re.sub(r"\n{3,}", "\n\n", normalized).strip()
-        if not normalized:
+        try:
+            extracted_text, _ = await asyncio.to_thread(extract_cv_text, file_name, content)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not str(extracted_text or "").strip():
             raise HTTPException(status_code=400, detail="Uploaded file does not contain readable text.")
+        if len(extracted_text) > MAX_SIMULATION_INTAKE_TEXT_CHARS:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    "The extracted document is too large to send to the intake model in full. "
+                    "Please split it into smaller documents and upload them separately."
+                ),
+            )
+        document_id = str(uuid.uuid4())
+        db.add(
+            SimulationIntakeDocument(
+                document_id=document_id,
+                owner_user_id=current_user.id,
+                file_name=file_name,
+                extracted_text=extracted_text,
+            )
+        )
+        db.commit()
         return SimulationIntakeFileResponse(
             file_name=file_name,
             extension=extension,
-            extracted_text=normalized[:20000],
+            document_id=document_id,
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
     except HTTPException:
         raise
-    except Exception:
-        raise HTTPException(status_code=500, detail="Unable to extract text from uploaded file.")
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Unable to store the extracted document for intake.") from exc
 
 
 @simulation_router.post("/intake/turn", response_model=SimulationIntakeTurnResponse)
-def simulation_intake_turn(payload: SimulationIntakeTurnRequest):
+def simulation_intake_turn(
+    payload: SimulationIntakeTurnRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
+        document_ids = list(dict.fromkeys(payload.document_ids))
+        document_context = ""
+        if document_ids:
+            documents = (
+                db.query(SimulationIntakeDocument)
+                .filter(
+                    SimulationIntakeDocument.owner_user_id == current_user.id,
+                    SimulationIntakeDocument.document_id.in_(document_ids),
+                )
+                .all()
+            )
+            documents_by_id = {row.document_id: row for row in documents}
+            if set(documents_by_id) != set(document_ids):
+                raise HTTPException(status_code=404, detail="An uploaded proposal was not found for this account.")
+            if any(not str(documents_by_id[document_id].extracted_text or "").strip() for document_id in document_ids):
+                raise HTTPException(
+                    status_code=410,
+                    detail="A saved upload has no extracted text. Remove it and upload the document again.",
+                )
+            document_context = "\n\n".join(
+                f"--- Full extracted document: {documents_by_id[document_id].file_name} ---\n"
+                f"{documents_by_id[document_id].extracted_text}"
+                for document_id in document_ids
+            )
+            if len(document_context) > MAX_SIMULATION_INTAKE_TEXT_CHARS:
+                raise HTTPException(
+                    status_code=413,
+                    detail=(
+                        "The combined extracted documents are too large to send to the intake model in full. "
+                        "Remove some documents or split them into smaller parts."
+                    ),
+                )
         return run_intake_turn(
             draft=payload.draft,
             user_message=payload.user_message,
             history=payload.history,
+            document_context=document_context,
         )
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Intake turn failed: {str(exc)}")
 
@@ -135,6 +220,36 @@ def run_simulation_endpoint(
 ):
     try:
         scoped_payload = payload.model_copy(update={"owner_email": current_user.email})
+        intake_fields = {
+            key: value
+            for key, value in SimulationRunRequest.model_fields.items()
+            if value.json_schema_extra and value.json_schema_extra.get("user_input", True)
+        }
+        missing_fields = [
+            key
+            for key in intake_fields
+            if not str(getattr(scoped_payload, key) or "").strip()
+            or (key == "problem_urgency" and scoped_payload.problem_urgency == "UNKNOWN")
+        ]
+        unknown_override_fields = set(scoped_payload.override_missing_fields) - set(intake_fields)
+        if unknown_override_fields:
+            raise HTTPException(
+                status_code=422,
+                detail={"message": "Unknown fields were listed for override.", "fields": sorted(unknown_override_fields)},
+            )
+        if missing_fields and not scoped_payload.run_override:
+            raise HTTPException(
+                status_code=422,
+                detail={"message": "Complete every simulation field or explicitly ask the intake agent to run with missing details.", "fields": missing_fields},
+            )
+        if scoped_payload.run_override:
+            scoped_payload = scoped_payload.model_copy(
+                update={
+                    "override_missing_fields": sorted(
+                        set(scoped_payload.override_missing_fields) | set(missing_fields)
+                    )
+                }
+            )
         result = run_simulation(scoped_payload)
         _persist_simulation_run(db, scoped_payload, result)
         create_notification(
@@ -148,6 +263,8 @@ def run_simulation_endpoint(
         )
         db.commit()
         return result
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Simulation failed: {str(exc)}")
 

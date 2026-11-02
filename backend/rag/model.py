@@ -78,6 +78,23 @@ def generate_embedding(
         raise
 
 
+def generate_embeddings(
+    texts: List[str],
+    model: str = "text-embedding-3-small",
+) -> List[List[float]]:
+    """Generate a batch of query embeddings in one API request."""
+    if not texts:
+        return []
+    try:
+        if client is None:
+            raise ValueError("OPENAI_API_KEY environment variable not set")
+        response = client.embeddings.create(model=model, input=texts)
+        return [item.embedding for item in sorted(response.data, key=lambda item: item.index)]
+    except Exception as e:
+        logger.error(f"Batch embedding generation failed: {e}")
+        raise
+
+
 
 
 def cosine_similarity(a, b) -> float:

@@ -28,6 +28,7 @@ const API_BASE_URL = resolveApiBaseUrlFromHost();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 90000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -42,8 +43,12 @@ api.interceptors.request.use((config) => {
 });
 
 export const getApiErrorMessage = (error, fallback = "Request failed.") => {
+  const detail = error?.response?.data?.detail;
+  const detailMessage = typeof detail === "string"
+    ? detail
+    : detail?.message || (Array.isArray(detail) ? detail.map((item) => item?.msg).filter(Boolean).join(" ") : "");
   return (
-    error?.response?.data?.detail ||
+    detailMessage ||
     error?.response?.data?.message ||
     error?.message ||
     fallback
